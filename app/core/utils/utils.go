@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
-	"pos/app/core/notify"
+	"pos/notify"
 	"time"
 )
 
@@ -20,7 +20,7 @@ func NotifyMassage(massage string) (*notify.Response, error) {
 		return nil, err
 	}
 	c := notify.NewClient()
-	res, err := c.NotifyMessage(context.Background(), token, massage)
+	res, err := c.Notify(context.Background(), token, massage)
 	if err != nil {
 		return res, err
 	}
