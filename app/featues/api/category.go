@@ -17,7 +17,6 @@ func ApplyCategoryAPI(
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		middlewares.RequireSession(sessionEntity),
 		usecase.GetCategories(categoryEntity),
 	)
 
