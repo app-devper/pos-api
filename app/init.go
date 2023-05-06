@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"os"
-	"pos/app/domain/repository"
+	"pos/app/domain"
 	"pos/app/featues/catagory"
 	"pos/app/featues/order"
 	"pos/app/featues/product"
@@ -35,14 +35,11 @@ func (app Routes) StartGin() {
 
 	publicRoute := r.Group("/api/pos/v1")
 
-	sessionEntity := repository.NewSessionEntity(resource)
-	productEntity := repository.NewProductEntity(resource)
-	orderEntity := repository.NewOrderEntity(resource)
-	categoryEntity := repository.NewCategoryEntity(resource)
+	repository := domain.InitRepository(resource)
 
-	product.ApplyProductAPI(publicRoute, sessionEntity, productEntity)
-	order.ApplyOrderAPI(publicRoute, sessionEntity, orderEntity, productEntity)
-	catagory.ApplyCategoryAPI(publicRoute, sessionEntity, categoryEntity)
+	product.ApplyProductAPI(publicRoute, repository)
+	order.ApplyOrderAPI(publicRoute, repository)
+	catagory.ApplyCategoryAPI(publicRoute, repository)
 
 	r.NoRoute(middlewares.NoRoute())
 

@@ -3,55 +3,55 @@ package product
 import (
 	"github.com/gin-gonic/gin"
 	"pos/app/core/constant"
-	"pos/app/domain/repository"
-	usecase2 "pos/app/featues/product/usecase"
+	"pos/app/domain"
+	"pos/app/featues/product/usecase"
 	"pos/middlewares"
 )
 
-func ApplyProductAPI(app *gin.RouterGroup,
-	sessionEntity repository.ISession,
-	productEntity repository.IProduct,
+func ApplyProductAPI(
+	app *gin.RouterGroup,
+	repository *domain.Repository,
 ) {
 
 	productRoute := app.Group("product")
 
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetProducts(productEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProducts(repository.Product),
 	)
 
 	productRoute.POST("",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.CreateProduct(productEntity),
+		usecase.CreateProduct(repository.Product),
 	)
 
 	productRoute.GET("/:productId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetProductById(productEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductById(repository.Product),
 	)
 
 	productRoute.PUT("/:productId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.UpdateProductById(productEntity),
+		usecase.UpdateProductById(repository.Product),
 	)
 
 	productRoute.DELETE("/:productId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.DeleteProductById(productEntity),
+		usecase.DeleteProductById(repository.Product),
 	)
 
 	productRoute.GET("/serial-number/:serialNumber",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetProductBySerialNumber(productEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductBySerialNumber(repository.Product),
 	)
 
 }

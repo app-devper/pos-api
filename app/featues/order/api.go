@@ -3,82 +3,80 @@ package order
 import (
 	"github.com/gin-gonic/gin"
 	"pos/app/core/constant"
-	"pos/app/domain/repository"
-	usecase2 "pos/app/featues/order/usecase"
+	"pos/app/domain"
+	"pos/app/featues/order/usecase"
 	"pos/middlewares"
 )
 
 func ApplyOrderAPI(
 	app *gin.RouterGroup,
-	sessionEntity repository.ISession,
-	orderEntity repository.IOrder,
-	productEntity repository.IProduct,
+	repository *domain.Repository,
 ) {
 	orderRoute := app.Group("order")
 
 	orderRoute.POST("",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.CreateOrder(orderEntity, productEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.CreateOrder(repository.Order, repository.Product),
 	)
 
 	orderRoute.GET("",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetOrdersRange(orderEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetOrdersRange(repository.Order),
 	)
 
 	orderRoute.GET("/:orderId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetOrderById(orderEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetOrderById(repository.Order),
 	)
 
 	orderRoute.DELETE("/:orderId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.DeleteOrderById(orderEntity, productEntity),
+		usecase.DeleteOrderById(repository.Order, repository.Product),
 	)
 
 	orderRoute.GET("/:orderId/total-cost",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.UpdateTotalCostById(orderEntity, productEntity),
+		usecase.UpdateTotalCostById(repository.Order, repository.Product),
 	)
 
 	orderRoute.GET("/item",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetOrderItemRange(orderEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetOrderItemRange(repository.Order),
 	)
 
 	orderRoute.GET("/item/:itemId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
-		usecase2.GetOrderItemById(orderEntity),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetOrderItemById(repository.Order),
 	)
 
 	orderRoute.DELETE("/item/:itemId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.DeleteOrderItemById(orderEntity, productEntity),
+		usecase.DeleteOrderItemById(repository.Order, repository.Product),
 	)
 
 	orderRoute.GET("/product/:productId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.GetOrderItemByProductId(orderEntity),
+		usecase.GetOrderItemByProductId(repository.Order),
 	)
 
 	orderRoute.DELETE("/:orderId/product/:productId",
 		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(sessionEntity),
+		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase2.DeleteOrderItemByOrderProductId(orderEntity, productEntity),
+		usecase.DeleteOrderItemByOrderProductId(repository.Order, repository.Product),
 	)
 
 }
