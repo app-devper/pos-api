@@ -5,7 +5,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"pos/app/domain/repository"
-	"pos/app/featues/api"
+	"pos/app/featues/catagory"
+	"pos/app/featues/order"
+	"pos/app/featues/product"
 	"pos/db"
 	"pos/middlewares"
 )
@@ -38,9 +40,9 @@ func (app Routes) StartGin() {
 	orderEntity := repository.NewOrderEntity(resource)
 	categoryEntity := repository.NewCategoryEntity(resource)
 
-	api.ApplyProductAPI(publicRoute, sessionEntity, productEntity)
-	api.ApplyOrderAPI(publicRoute, sessionEntity, orderEntity, productEntity)
-	api.ApplyCategoryAPI(publicRoute, sessionEntity, categoryEntity)
+	product.ApplyProductAPI(publicRoute, sessionEntity, productEntity)
+	order.ApplyOrderAPI(publicRoute, sessionEntity, orderEntity, productEntity)
+	catagory.ApplyCategoryAPI(publicRoute, sessionEntity, categoryEntity)
 
 	r.NoRoute(middlewares.NoRoute())
 

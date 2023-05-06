@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/domain/repository"
-	"pos/app/featues/request"
+	"pos/app/domain/request"
 )
 
 func CreateProduct(productEntity repository.IProduct) gin.HandlerFunc {

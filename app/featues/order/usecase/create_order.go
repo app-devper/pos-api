@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"pos/app/core/utils"
 	"pos/app/domain/repository"
-	"pos/app/featues/request"
+	"pos/app/domain/request"
 )
 
 func CreateOrder(orderEntity repository.IOrder, productEntity repository.IProduct) gin.HandlerFunc {

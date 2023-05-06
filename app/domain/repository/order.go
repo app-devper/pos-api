@@ -9,7 +9,7 @@ import (
 	"pos/app/core/constant"
 	"pos/app/core/utils"
 	"pos/app/domain/model"
-	"pos/app/featues/request"
+	"pos/app/domain/request"
 	"pos/db"
 	"time"
 )

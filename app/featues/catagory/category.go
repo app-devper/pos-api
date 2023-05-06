@@ -1,9 +1,9 @@
-package api
+package catagory
 
 import (
 	"github.com/gin-gonic/gin"
 	"pos/app/domain/repository"
-	"pos/app/domain/usecase"
+	usecase2 "pos/app/featues/catagory/usecase"
 	"pos/middlewares"
 )
 
@@ -17,36 +17,36 @@ func ApplyCategoryAPI(
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		usecase.GetCategories(categoryEntity),
+		usecase2.GetCategories(categoryEntity),
 	)
 
 	productRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		usecase.CreateCategory(categoryEntity),
+		usecase2.CreateCategory(categoryEntity),
 	)
 
 	productRoute.GET("/:categoryId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		usecase.GetCategoryById(categoryEntity),
+		usecase2.GetCategoryById(categoryEntity),
 	)
 
 	productRoute.PUT("/:categoryId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		usecase.UpdateCategoryById(categoryEntity),
+		usecase2.UpdateCategoryById(categoryEntity),
 	)
 
 	productRoute.DELETE("/:categoryId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		usecase.DeleteCategoryById(categoryEntity),
+		usecase2.DeleteCategoryById(categoryEntity),
 	)
 
 	productRoute.PATCH("/:categoryId/default",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(sessionEntity),
-		usecase.UpdateDefaultCategoryById(categoryEntity),
+		usecase2.UpdateDefaultCategoryById(categoryEntity),
 	)
 }
