@@ -8,10 +8,10 @@ import (
 )
 
 func ApplyCategoryAPI(
-	app *gin.RouterGroup,
+	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
-	productRoute := app.Group("category")
+	productRoute := route.Group("category")
 
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),

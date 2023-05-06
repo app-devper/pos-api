@@ -9,10 +9,10 @@ import (
 )
 
 func ApplyOrderAPI(
-	app *gin.RouterGroup,
+	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
-	orderRoute := app.Group("order")
+	orderRoute := route.Group("order")
 
 	orderRoute.POST("",
 		middlewares.RequireAuthenticated(),

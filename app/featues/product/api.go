@@ -9,11 +9,11 @@ import (
 )
 
 func ApplyProductAPI(
-	app *gin.RouterGroup,
+	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
 
-	productRoute := app.Group("product")
+	productRoute := route.Group("product")
 
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
