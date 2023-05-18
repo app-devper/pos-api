@@ -54,4 +54,10 @@ func ApplyProductAPI(
 		usecase.GetProductBySerialNumber(repository.Product),
 	)
 
+	productRoute.GET("/serial-number",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetSerialNumber(repository.Sequence),
+	)
+
 }

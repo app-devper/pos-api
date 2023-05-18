@@ -7,9 +7,11 @@ import (
 
 type Repository struct {
 	Session  repository.ISession
+	Sequence repository.ISequence
 	Category repository.ICategory
 	Order    repository.IOrder
 	Product  repository.IProduct
+	Customer repository.ICustomer
 }
 
 func InitRepository(resource *db.Resource) *Repository {
@@ -17,6 +19,7 @@ func InitRepository(resource *db.Resource) *Repository {
 		Session:  repository.NewSessionEntity(resource),
 		Category: repository.NewCategoryEntity(resource),
 		Order:    repository.NewOrderEntity(resource),
-		Product:  repository.NewProductEntity(resource),
+		Sequence: repository.NewSequenceEntity(resource),
+		Customer: repository.NewCustomerEntity(resource),
 	}
 }

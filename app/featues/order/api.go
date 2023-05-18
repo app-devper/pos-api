@@ -17,13 +17,19 @@ func ApplyOrderAPI(
 	orderRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		usecase.CreateOrder(repository.Order, repository.Product),
+		usecase.CreateOrder(repository.Order, repository.Product, repository.Sequence),
 	)
 
 	orderRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetOrdersRange(repository.Order),
+	)
+
+	orderRoute.GET("/:customerCode/code",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetOrdersByCustomerCode(repository.Order),
 	)
 
 	orderRoute.GET("/:orderId",

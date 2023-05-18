@@ -5,13 +5,7 @@ import (
 	"errors"
 	"os"
 	"pos/notify"
-	"time"
 )
-
-func InitContext() (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	return ctx, cancel
-}
 
 func NotifyMassage(massage string) (*notify.Response, error) {
 	token := os.Getenv("LINE_TOKEN")
@@ -25,10 +19,4 @@ func NotifyMassage(massage string) (*notify.Response, error) {
 		return res, err
 	}
 	return res, nil
-}
-
-func ToFormat(date time.Time) string {
-	location, _ := time.LoadLocation("Asia/Bangkok")
-	format := "02 Jan 2006 15:04"
-	return date.In(location).Format(format)
 }

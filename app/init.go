@@ -6,6 +6,7 @@ import (
 	"os"
 	"pos/app/domain"
 	"pos/app/featues/catagory"
+	"pos/app/featues/customer"
 	"pos/app/featues/order"
 	"pos/app/featues/product"
 	"pos/db"
@@ -40,6 +41,7 @@ func (app Routes) StartGin() {
 	product.ApplyProductAPI(publicRoute, repository)
 	order.ApplyOrderAPI(publicRoute, repository)
 	catagory.ApplyCategoryAPI(publicRoute, repository)
+	customer.ApplyCustomerAPI(publicRoute, repository)
 
 	r.NoRoute(middlewares.NoRoute())
 

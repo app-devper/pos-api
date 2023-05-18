@@ -14,7 +14,7 @@ import (
 
 type Resource struct {
 	PosDb *mongo.Database
-	RdDB  *redis.Client
+	RdDb  *redis.Client
 }
 
 // Close use this method to close database connection
@@ -50,6 +50,6 @@ func InitResource() (*Resource, error) {
 
 	return &Resource{
 		PosDb: mongoClient.Database(posDbName),
-		RdDB:  rdb,
+		RdDb:  rdb,
 	}, nil
 }
