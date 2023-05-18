@@ -21,5 +21,6 @@ func InitRepository(resource *db.Resource) *Repository {
 		Order:    repository.NewOrderEntity(resource),
 		Sequence: repository.NewSequenceEntity(resource),
 		Customer: repository.NewCustomerEntity(resource),
+		Product:  repository.NewProductEntity(resource),
 	}
 }
