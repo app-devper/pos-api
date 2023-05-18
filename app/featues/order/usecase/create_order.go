@@ -4,11 +4,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
+	"pos/app/domain/constant"
 	"pos/app/domain/repository"
-	"pos/app/featues/request"
+	"pos/app/domain/request"
 )
 
-func CreateOrder(orderEntity repository.IOrder, productEntity repository.IProduct) gin.HandlerFunc {
+func CreateOrder(
+	orderEntity repository.IOrder,
+	productEntity repository.IProduct,
+	sequenceEntity repository.ISequence,
+) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Order{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -22,8 +27,14 @@ func CreateOrder(orderEntity repository.IOrder, productEntity repository.IProduc
 			totalCost += req.Items[index].CostPrice
 		}
 		req.TotalCost = totalCost
-		userId := ctx.GetString("UserId")
+
+		userId := utils.GetUserId(ctx)
 		req.CreatedBy = userId
+
+		sequence, _ := sequenceEntity.NextSequence(constant.ORDER)
+		if sequence != nil {
+			req.Code = sequence.GenerateCode()
+		}
 
 		result, err := orderEntity.CreateOrder(req)
 		if err != nil {

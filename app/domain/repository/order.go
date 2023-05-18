@@ -6,10 +6,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"pos/app/core/constant"
 	"pos/app/core/utils"
+	"pos/app/domain/constant"
 	"pos/app/domain/model"
-	"pos/app/featues/request"
+	"pos/app/domain/request"
 	"pos/db"
 	"time"
 )
@@ -23,10 +23,12 @@ type orderEntity struct {
 type IOrder interface {
 	CreateOrder(form request.Order) (*model.Order, error)
 	GetOrderRange(form request.GetOrderRange) ([]model.Order, error)
+	GetOrdersByCustomerCode(customerCode string) ([]model.Order, error)
 	UpdateTotal() ([]model.Order, error)
 	GetOrderById(id string) (*model.Order, error)
 	GetOrderDetailById(id string) (*model.OrderDetail, error)
 	UpdateTotalCostOrderById(id string, totalCost float64) (*model.Order, error)
+	UpdateCustomerCodeOrderById(id string, customerCode string) (*model.Order, error)
 	RemoveOrderById(id string) (*model.OrderDetail, error)
 	UpdateTotalOrderById(id string) (*model.Order, error)
 	GetTotalOrderById(id string) float64
@@ -61,15 +63,17 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*model.Order, error)
 
 	var orderId = primitive.NewObjectID()
 	data := model.Order{
-		Id:          orderId,
-		Status:      constant.ACTIVE,
-		Total:       form.Total,
-		TotalCost:   form.TotalCost,
-		Type:        form.Type,
-		CreatedBy:   form.CreatedBy,
-		CreatedDate: time.Now(),
-		UpdatedBy:   form.CreatedBy,
-		UpdatedDate: time.Now(),
+		Id:           orderId,
+		Code:         form.Code,
+		CustomerCode: form.CustomerCode,
+		Status:       constant.ACTIVE,
+		Total:        form.Total,
+		TotalCost:    form.TotalCost,
+		Type:         form.Type,
+		CreatedBy:    form.CreatedBy,
+		CreatedDate:  time.Now(),
+		UpdatedBy:    form.CreatedBy,
+		UpdatedDate:  time.Now(),
 	}
 	_, err := entity.orderRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -151,6 +155,32 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]model.Or
 	return items, nil
 }
 
+func (entity *orderEntity) GetOrdersByCustomerCode(customerCode string) ([]model.Order, error) {
+	logrus.Info("GetOrdersByCustomerCode")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	var items []model.Order
+	cursor, err := entity.orderRepo.Find(ctx, bson.M{"customerCode": customerCode})
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		var data model.Order
+		err = cursor.Decode(&data)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, data)
+		}
+	}
+	if items == nil {
+		items = []model.Order{}
+	}
+	return items, nil
+}
+
 func (entity *orderEntity) UpdateTotal() ([]model.Order, error) {
 	logrus.Info("UpdateTotal")
 	ctx, cancel := utils.InitContext()
@@ -212,6 +242,30 @@ func (entity *orderEntity) UpdateTotalCostOrderById(id string, totalCost float64
 	}
 
 	data.TotalCost = totalCost
+	data.UpdatedDate = time.Now()
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (entity *orderEntity) UpdateCustomerCodeOrderById(id string, customerCode string) (*model.Order, error) {
+	logrus.Info("UpdateCustomerCodeOrderById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	data, err := entity.GetOrderById(id)
+	objId, _ := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+
+	data.CustomerCode = customerCode
 	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After

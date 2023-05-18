@@ -4,20 +4,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/domain/repository"
-	"pos/app/featues/request"
+	"pos/app/domain/request"
 )
 
-func UpdateProductById(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateCategoryById(entity repository.ICategory) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		id := ctx.Param("productId")
-		req := request.UpdateProduct{}
+		categoryId := ctx.Param("categoryId")
+		req := request.Category{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		userId := ctx.GetString("UserId")
-		req.UpdatedBy = userId
-		result, err := productEntity.UpdateProductById(id, req)
+		result, err := entity.UpdateCategoryById(categoryId, req)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
