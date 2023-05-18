@@ -26,7 +26,7 @@ func ApplyOrderAPI(
 		usecase.GetOrdersRange(repository.Order),
 	)
 
-	orderRoute.GET("/:customerCode/code",
+	orderRoute.GET("/customer/:customerCode",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetOrdersByCustomerCode(repository.Order),

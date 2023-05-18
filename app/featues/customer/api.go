@@ -31,7 +31,7 @@ func ApplyCustomerAPI(
 		usecase.GetCustomerById(repository.Customer),
 	)
 
-	customerRoute.GET("/:customerCode/code",
+	customerRoute.GET("/code/:customerCode",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetCustomerByCode(repository.Customer),
