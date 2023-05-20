@@ -26,6 +26,7 @@ type ICustomer interface {
 	GetCustomerByCode(code string) (*model.Customer, error)
 	RemoveCustomerById(id string) (*model.Customer, error)
 	UpdateCustomerById(id string, form request.UpdateCustomer) (*model.Customer, error)
+	UpdateCustomerStatusById(id string, form request.UpdateCustomerStatus) (*model.Customer, error)
 }
 
 func NewCustomerEntity(resource *db.Resource) ICustomer {
@@ -147,6 +148,31 @@ func (entity *customerEntity) UpdateCustomerById(id string, form request.UpdateC
 		ReturnDocument: &isReturnNewDoc,
 	}
 	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *customerEntity) UpdateCustomerStatusById(id string, form request.UpdateCustomerStatus) (*model.Customer, error) {
+	logrus.Info("UpdateCustomerStatusById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	cid, _ := primitive.ObjectIDFromHex(id)
+	var data model.Customer
+	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": cid}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	data.Status = form.Status
+	data.UpdatedBy = form.UpdatedBy
+	data.UpdatedDate = time.Now()
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": cid}, bson.M{"$set": data}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

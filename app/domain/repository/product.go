@@ -15,7 +15,8 @@ import (
 )
 
 type productEntity struct {
-	productRepo *mongo.Collection
+	productRepo      *mongo.Collection
+	productPriceRepo *mongo.Collection
 }
 
 type IProduct interface {
@@ -29,11 +30,20 @@ type IProduct interface {
 	RemoveQuantityById(id string, quantity int) (*model.Product, error)
 	AddQuantityById(id string, quantity int) (*model.Product, error)
 	GetTotalCostPrice(id string, quantity int) float64
+
+	GetProductPriceByProductCustomerId(productId string, customerId string) (*model.ProductPrice, error)
+	CreateProductPriceByProductId(form request.ProductPrice) (*model.ProductPrice, error)
+	GetProductPriceDetailByProductId(productId string) ([]model.ProductPriceDetail, error)
+	GetProductPriceDetailByCustomerId(customerId string) ([]model.ProductPriceDetail, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
 	productRepo := resource.PosDb.Collection("products")
-	var entity IProduct = &productEntity{productRepo: productRepo}
+	productPriceRepo := resource.PosDb.Collection("products_price")
+	var entity IProduct = &productEntity{
+		productRepo:      productRepo,
+		productPriceRepo: productPriceRepo,
+	}
 	_, _ = entity.CreateIndex()
 	return entity
 }
@@ -247,4 +257,158 @@ func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 
 		return 0
 	}
 	return data.CostPrice * float64(quantity)
+}
+
+func (entity *productEntity) GetProductPriceByProductCustomerId(productId string, customerId string) (*model.ProductPrice, error) {
+	logrus.Info("GetProductPriceByProductCustomerId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	var data model.ProductPrice
+	pid, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
+	cid, err := primitive.ObjectIDFromHex(customerId)
+	if err != nil {
+		return nil, err
+	}
+	err = entity.productPriceRepo.FindOne(ctx, bson.M{"productId": pid, "customerId": cid}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) CreateProductPriceByProductId(form request.ProductPrice) (*model.ProductPrice, error) {
+	logrus.Info("CreateProductPriceByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	data, _ := entity.GetProductPriceByProductCustomerId(form.ProductId, form.CustomerId)
+	if data != nil {
+		data.CustomerPrice = form.CustomerPrice
+		data.UpdatedBy = form.CreatedBy
+		data.UpdatedDate = time.Now()
+
+		isReturnNewDoc := options.After
+		opts := &options.FindOneAndUpdateOptions{
+			ReturnDocument: &isReturnNewDoc,
+		}
+		err := entity.productPriceRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, opts).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	} else {
+		data := model.ProductPrice{}
+		data.Id = primitive.NewObjectID()
+		pid, err := primitive.ObjectIDFromHex(form.ProductId)
+		if err != nil {
+			return nil, err
+		}
+		data.ProductId = pid
+		cid, err := primitive.ObjectIDFromHex(form.CustomerId)
+		if err != nil {
+			return nil, err
+		}
+		data.CustomerId = cid
+		data.CustomerPrice = form.CustomerPrice
+		data.CreatedBy = form.CreatedBy
+		data.CreatedDate = time.Now()
+		data.UpdatedBy = form.CreatedBy
+		data.UpdatedDate = time.Now()
+		_, err = entity.productPriceRepo.InsertOne(ctx, data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
+	}
+
+}
+
+func (entity *productEntity) GetProductPriceDetailByProductId(productId string) ([]model.ProductPriceDetail, error) {
+	logrus.Info("GetProductPriceDetailByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	pid, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
+	cursor, err := entity.productPriceRepo.Aggregate(ctx, []bson.M{
+		{
+			"$match": bson.M{
+				"productId": pid,
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "customers",
+				"localField":   "customerId",
+				"foreignField": "_id",
+				"as":           "customer",
+			},
+		},
+		{"$unwind": "customer"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	var items []model.ProductPriceDetail
+	for cursor.Next(ctx) {
+		var data model.ProductPriceDetail
+		err = cursor.Decode(&data)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, data)
+		}
+	}
+	if items == nil {
+		items = []model.ProductPriceDetail{}
+	}
+	return items, nil
+}
+
+func (entity *productEntity) GetProductPriceDetailByCustomerId(customerId string) ([]model.ProductPriceDetail, error) {
+	logrus.Info("GetProductPriceDetailByCustomerId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	cid, err := primitive.ObjectIDFromHex(customerId)
+	if err != nil {
+		return nil, err
+	}
+	cursor, err := entity.productPriceRepo.Aggregate(ctx, []bson.M{
+		{
+			"$match": bson.M{
+				"customerId": cid,
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "products",
+				"localField":   "productId",
+				"foreignField": "_id",
+				"as":           "product",
+			},
+		},
+		{"$unwind": "product"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	var items []model.ProductPriceDetail
+	for cursor.Next(ctx) {
+		var data model.ProductPriceDetail
+		err = cursor.Decode(&data)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, data)
+		}
+	}
+	if items == nil {
+		items = []model.ProductPriceDetail{}
+	}
+	return items, nil
 }

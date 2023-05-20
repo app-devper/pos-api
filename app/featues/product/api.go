@@ -60,4 +60,28 @@ func ApplyProductAPI(
 		usecase.GetSerialNumber(repository.Sequence),
 	)
 
+	productRoute.POST("price",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.CreateProductPrice(repository.Product),
+	)
+
+	productRoute.GET("/:productId/price/:customerId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductPriceByProductCustomerId(repository.Product),
+	)
+
+	productRoute.GET("customer/:customerId/price",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductPriceDetailsByCustomerId(repository.Product),
+	)
+
+	productRoute.GET("/:productId/price",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductPriceDetailsByProductId(repository.Product),
+	)
+
 }

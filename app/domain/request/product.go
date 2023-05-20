@@ -33,3 +33,10 @@ type ProductLot struct {
 	ExpireDate string  `json:"expireDate" binding:"required"`
 	CostPrice  float64 `json:"costPrice"  binding:"required"`
 }
+
+type ProductPrice struct {
+	ProductId     string  `json:"productId" binding:"required"`
+	CustomerId    string  `json:"customerId" binding:"required"`
+	CustomerPrice float64 `json:"customerPrice"  binding:"required"`
+	CreatedBy     string
+}

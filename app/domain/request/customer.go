@@ -16,3 +16,8 @@ type UpdateCustomer struct {
 	Email     string `json:"email"`
 	UpdatedBy string
 }
+
+type UpdateCustomerStatus struct {
+	Status    string `json:"status"`
+	UpdatedBy string
+}
