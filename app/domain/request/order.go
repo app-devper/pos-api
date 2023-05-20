@@ -27,3 +27,7 @@ type GetOrderRange struct {
 	StartDate time.Time `form:"startDate" binding:"required"`
 	EndDate   time.Time `form:"endDate" binding:"required"`
 }
+
+type UpdateCustomerCode struct {
+	CustomerCode string `json:"customerCode"`
+}

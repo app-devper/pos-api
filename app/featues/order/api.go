@@ -52,6 +52,12 @@ func ApplyOrderAPI(
 		usecase.UpdateTotalCostById(repository.Order, repository.Product),
 	)
 
+	orderRoute.PATCH("/:orderId/customer-code",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateCustomerCodeOrderById(repository.Order),
+	)
+
 	orderRoute.GET("/item",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),

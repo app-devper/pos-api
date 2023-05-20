@@ -43,6 +43,12 @@ func ApplyCustomerAPI(
 		usecase.UpdateCustomerById(repository.Customer),
 	)
 
+	customerRoute.PATCH("/:customerId/status",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateCustomerStatusById(repository.Customer),
+	)
+
 	customerRoute.DELETE("/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
