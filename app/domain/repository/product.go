@@ -183,6 +183,7 @@ func (entity *productEntity) UpdateProductById(id string, form request.UpdatePro
 	if err != nil {
 		return nil, err
 	}
+	data.SerialNumber = form.SerialNumber
 	data.Name = form.Name
 	data.NameEn = form.NameEn
 	data.Description = form.Description
