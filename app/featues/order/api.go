@@ -84,6 +84,13 @@ func ApplyOrderAPI(
 		usecase.GetOrderItemByProductId(repository.Order),
 	)
 
+	orderRoute.GET("/product/:productId/detail",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN),
+		usecase.GetOrderItemDetailsByProductId(repository.Order),
+	)
+
 	orderRoute.DELETE("/:orderId/product/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),

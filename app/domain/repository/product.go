@@ -113,6 +113,7 @@ func (entity *productEntity) CreateProduct(form request.Product) (*model.Product
 		data.CostPrice = form.CostPrice
 		data.Unit = form.Unit
 		data.Quantity = data.Quantity + form.Quantity
+		data.Category = form.Category
 		data.UpdatedDate = time.Now()
 
 		isReturnNewDoc := options.After
@@ -136,6 +137,7 @@ func (entity *productEntity) CreateProduct(form request.Product) (*model.Product
 		data.CostPrice = form.CostPrice
 		data.Quantity = form.Quantity
 		data.CreatedBy = form.CreatedBy
+		data.Category = form.Category
 		data.CreatedDate = time.Now()
 		data.UpdatedBy = form.CreatedBy
 		data.UpdatedDate = time.Now()
@@ -191,6 +193,7 @@ func (entity *productEntity) UpdateProductById(id string, form request.UpdatePro
 	data.CostPrice = form.CostPrice
 	data.Unit = form.Unit
 	data.Quantity = form.Quantity
+	data.Category = form.Category
 	data.UpdatedBy = form.UpdatedBy
 	data.UpdatedDate = time.Now()
 

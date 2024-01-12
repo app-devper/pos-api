@@ -96,12 +96,13 @@ func (entity *categoryEntity) CreateCategory(form request.Category) (*model.Cate
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := model.Category{
-		Id:          primitive.NewObjectID(),
-		Name:        form.Name,
-		Value:       strings.ToUpper(form.Value),
-		Description: form.Description,
-		CreatedDate: time.Now(),
-		UpdatedDate: time.Now(),
+		Id:                   primitive.NewObjectID(),
+		Name:                 form.Name,
+		Value:                strings.ToUpper(form.Value),
+		RequireCustomerOrder: form.RequireCustomerOrder,
+		Description:          form.Description,
+		CreatedDate:          time.Now(),
+		UpdatedDate:          time.Now(),
 	}
 	_, err := entity.categoryRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -152,6 +153,7 @@ func (entity *categoryEntity) UpdateCategoryById(id string, form request.Categor
 	}
 	data.Name = form.Name
 	data.Value = strings.ToUpper(form.Value)
+	data.RequireCustomerOrder = form.RequireCustomerOrder
 	data.Description = form.Description
 	data.UpdatedDate = time.Now()
 

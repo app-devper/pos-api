@@ -10,6 +10,7 @@ type Order struct {
 	Id           primitive.ObjectID `bson:"_id" json:"id"`
 	Code         string             `bson:"code" json:"code"`
 	CustomerCode string             `bson:"customerCode" json:"customerCode"`
+	CustomerName string             `bson:"customerName" json:"customerName"`
 	Status       string             `bson:"status" json:"status"`
 	CreatedBy    string             `bson:"createdBy" json:"createdBy"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
@@ -24,6 +25,7 @@ type OrderDetail struct {
 	Id           primitive.ObjectID `bson:"_id" json:"id"`
 	Code         string             `bson:"code" json:"code"`
 	CustomerCode string             `bson:"customerCode" json:"customerCode"`
+	CustomerName string             `bson:"customerName" json:"customerName"`
 	Status       string             `bson:"status" json:"status"`
 	CreatedBy    string             `bson:"createdBy" json:"createdBy"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
@@ -63,6 +65,7 @@ type OrderItemDetail struct {
 	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
 	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
 	Product     Product            `bson:"product" json:"product"`
+	Order       Order              `bson:"order" json:"order"`
 }
 
 func (item OrderItemDetail) GetMessage() string {

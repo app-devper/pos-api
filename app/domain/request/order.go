@@ -7,6 +7,7 @@ type Order struct {
 	Amount       float64     `json:"amount" binding:"required"`
 	Type         string      `json:"type" binding:"required"`
 	CustomerCode string      `json:"customerCode"`
+	CustomerName string      `json:"customerName"`
 	Total        float64     `json:"total"`
 	TotalCost    float64     `json:"totalCost"`
 	Change       float64     `json:"change"`

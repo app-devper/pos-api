@@ -43,6 +43,7 @@ type IOrder interface {
 	GetOrderItemDetailByOrderProductId(orderId string, productId string) (*model.OrderItemDetail, error)
 	RemoveOrderItemByOrderProductId(orderId string, productId string) (*model.OrderItemDetail, error)
 	GetOrderItemByProductId(productId string) ([]model.OrderItem, error)
+	GetOrderItemDetailsByProductId(productId string) ([]model.OrderItemDetail, error)
 
 	GetPaymentByOrderId(orderId string) (*model.Payment, error)
 	RemovePaymentByOrderId(orderId string) (*model.Payment, error)
@@ -66,6 +67,7 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*model.Order, error)
 		Id:           orderId,
 		Code:         form.Code,
 		CustomerCode: form.CustomerCode,
+		CustomerName: form.CustomerName,
 		Status:       constant.ACTIVE,
 		Total:        form.Total,
 		TotalCost:    form.TotalCost,
@@ -669,6 +671,57 @@ func (entity *orderEntity) GetOrderItemByProductId(productId string) ([]model.Or
 	}
 	if items == nil {
 		items = []model.OrderItem{}
+	}
+	return items, nil
+}
+
+func (entity *orderEntity) GetOrderItemDetailsByProductId(productId string) ([]model.OrderItemDetail, error) {
+	logrus.Info("GetOrderItemDetailsByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	productObjId, _ := primitive.ObjectIDFromHex(productId)
+	cursor, err := entity.orderItemRepo.Aggregate(ctx, []bson.M{
+		{
+			"$match": bson.M{
+				"productId": productObjId,
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "products",
+				"localField":   "productId",
+				"foreignField": "_id",
+				"as":           "product",
+			},
+		},
+		{"$unwind": "$product"},
+		{
+			"$lookup": bson.M{
+				"from":         "orders",
+				"localField":   "orderId",
+				"foreignField": "_id",
+				"as":           "order",
+			},
+		},
+		{"$unwind": "order"},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	var items []model.OrderItemDetail
+	for cursor.Next(ctx) {
+		var data model.OrderItemDetail
+		err = cursor.Decode(&data)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, data)
+		}
+	}
+	if items == nil {
+		items = []model.OrderItemDetail{}
 	}
 	return items, nil
 }
