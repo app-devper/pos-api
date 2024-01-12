@@ -34,16 +34,16 @@ type IOrder interface {
 	GetTotalOrderById(id string) float64
 	GetTotalCostOrderById(id string) float64
 
-	GetOrderItemRange(form request.GetOrderRange) ([]model.OrderItemDetail, error)
+	GetOrderItemRange(form request.GetOrderRange) ([]model.OrderItemProductDetail, error)
 	GetOrderItemById(id string) (*model.OrderItem, error)
 	UpdateOrderItemById(id string, form request.OrderItem) (*model.OrderItem, error)
-	RemoveOrderItemById(id string) (*model.OrderItemDetail, error)
-	GetOrderItemDetailById(id string) (*model.OrderItemDetail, error)
-	GetOrderItemDetailByOrderId(orderId string) ([]model.OrderItemDetail, error)
-	GetOrderItemDetailByOrderProductId(orderId string, productId string) (*model.OrderItemDetail, error)
-	RemoveOrderItemByOrderProductId(orderId string, productId string) (*model.OrderItemDetail, error)
+	RemoveOrderItemById(id string) (*model.OrderItemProductDetail, error)
+	GetOrderItemDetailById(id string) (*model.OrderItemProductDetail, error)
+	GetOrderItemDetailByOrderId(orderId string) ([]model.OrderItemProductDetail, error)
+	GetOrderItemDetailByOrderProductId(orderId string, productId string) (*model.OrderItemProductDetail, error)
+	RemoveOrderItemByOrderProductId(orderId string, productId string) (*model.OrderItemProductDetail, error)
 	GetOrderItemByProductId(productId string) ([]model.OrderItem, error)
-	GetOrderItemDetailsByProductId(productId string) ([]model.OrderItemDetail, error)
+	GetOrderItemOrderDetailsByProductId(productId string) ([]model.OrderItemOrderDetail, error)
 
 	GetPaymentByOrderId(orderId string) (*model.Payment, error)
 	RemovePaymentByOrderId(orderId string) (*model.Payment, error)
@@ -420,7 +420,7 @@ func (entity *orderEntity) GetTotalCostOrderById(orderId string) float64 {
 	return result[0]["totalCost"].(float64)
 }
 
-func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]model.OrderItemDetail, error) {
+func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]model.OrderItemProductDetail, error) {
 	logrus.Info("GetOrderItemRange")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -446,9 +446,9 @@ func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]mode
 	if err != nil {
 		return nil, err
 	}
-	var items []model.OrderItemDetail
+	var items []model.OrderItemProductDetail
 	for cursor.Next(ctx) {
-		var data model.OrderItemDetail
+		var data model.OrderItemProductDetail
 		err = cursor.Decode(&data)
 		if err != nil {
 			logrus.Error(err)
@@ -458,7 +458,7 @@ func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]mode
 		}
 	}
 	if items == nil {
-		items = []model.OrderItemDetail{}
+		items = []model.OrderItemProductDetail{}
 	}
 	return items, nil
 }
@@ -503,7 +503,7 @@ func (entity *orderEntity) UpdateOrderItemById(id string, form request.OrderItem
 	return data, nil
 }
 
-func (entity *orderEntity) RemoveOrderItemById(id string) (*model.OrderItemDetail, error) {
+func (entity *orderEntity) RemoveOrderItemById(id string) (*model.OrderItemProductDetail, error) {
 	logrus.Info("RemoveOrderItemById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -519,7 +519,7 @@ func (entity *orderEntity) RemoveOrderItemById(id string) (*model.OrderItemDetai
 	return item, nil
 }
 
-func (entity *orderEntity) GetOrderItemDetailById(id string) (*model.OrderItemDetail, error) {
+func (entity *orderEntity) GetOrderItemDetailById(id string) (*model.OrderItemProductDetail, error) {
 	logrus.Info("GetOrderItemDetailById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -543,9 +543,9 @@ func (entity *orderEntity) GetOrderItemDetailById(id string) (*model.OrderItemDe
 	if err != nil {
 		return nil, err
 	}
-	var items []model.OrderItemDetail
+	var items []model.OrderItemProductDetail
 	for cursor.Next(ctx) {
-		var data model.OrderItemDetail
+		var data model.OrderItemProductDetail
 		err = cursor.Decode(&data)
 		if err != nil {
 			logrus.Error(err)
@@ -555,12 +555,12 @@ func (entity *orderEntity) GetOrderItemDetailById(id string) (*model.OrderItemDe
 		}
 	}
 	if items == nil {
-		items = []model.OrderItemDetail{}
+		items = []model.OrderItemProductDetail{}
 	}
 	return &items[0], nil
 }
 
-func (entity *orderEntity) GetOrderItemDetailByOrderId(orderId string) ([]model.OrderItemDetail, error) {
+func (entity *orderEntity) GetOrderItemDetailByOrderId(orderId string) ([]model.OrderItemProductDetail, error) {
 	logrus.Info("GetOrderItemByOrderId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -585,9 +585,9 @@ func (entity *orderEntity) GetOrderItemDetailByOrderId(orderId string) ([]model.
 	if err != nil {
 		return nil, err
 	}
-	var items []model.OrderItemDetail
+	var items []model.OrderItemProductDetail
 	for cursor.Next(ctx) {
-		var data model.OrderItemDetail
+		var data model.OrderItemProductDetail
 		err = cursor.Decode(&data)
 		if err != nil {
 			logrus.Error(err)
@@ -597,12 +597,12 @@ func (entity *orderEntity) GetOrderItemDetailByOrderId(orderId string) ([]model.
 		}
 	}
 	if items == nil {
-		items = []model.OrderItemDetail{}
+		items = []model.OrderItemProductDetail{}
 	}
 	return items, nil
 }
 
-func (entity *orderEntity) GetOrderItemDetailByOrderProductId(orderId string, productId string) (*model.OrderItemDetail, error) {
+func (entity *orderEntity) GetOrderItemDetailByOrderProductId(orderId string, productId string) (*model.OrderItemProductDetail, error) {
 	logrus.Info("GetOrderItemDetailByOrderProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -629,9 +629,9 @@ func (entity *orderEntity) GetOrderItemDetailByOrderProductId(orderId string, pr
 	if err != nil {
 		return nil, err
 	}
-	var items []model.OrderItemDetail
+	var items []model.OrderItemProductDetail
 	for cursor.Next(ctx) {
-		var data model.OrderItemDetail
+		var data model.OrderItemProductDetail
 		err = cursor.Decode(&data)
 		if err != nil {
 			logrus.Error(err)
@@ -641,7 +641,7 @@ func (entity *orderEntity) GetOrderItemDetailByOrderProductId(orderId string, pr
 		}
 	}
 	if items == nil {
-		items = []model.OrderItemDetail{}
+		items = []model.OrderItemProductDetail{}
 	}
 	return &items[0], nil
 }
@@ -675,8 +675,8 @@ func (entity *orderEntity) GetOrderItemByProductId(productId string) ([]model.Or
 	return items, nil
 }
 
-func (entity *orderEntity) GetOrderItemDetailsByProductId(productId string) ([]model.OrderItemDetail, error) {
-	logrus.Info("GetOrderItemDetailsByProductId")
+func (entity *orderEntity) GetOrderItemOrderDetailsByProductId(productId string) ([]model.OrderItemOrderDetail, error) {
+	logrus.Info("GetOrderItemOrderDetailsByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	productObjId, _ := primitive.ObjectIDFromHex(productId)
@@ -700,9 +700,9 @@ func (entity *orderEntity) GetOrderItemDetailsByProductId(productId string) ([]m
 	if err != nil {
 		return nil, err
 	}
-	var items []model.OrderItemDetail
+	var items []model.OrderItemOrderDetail
 	for cursor.Next(ctx) {
-		var data model.OrderItemDetail
+		var data model.OrderItemOrderDetail
 		err = cursor.Decode(&data)
 		if err != nil {
 			logrus.Error(err)
@@ -712,12 +712,12 @@ func (entity *orderEntity) GetOrderItemDetailsByProductId(productId string) ([]m
 		}
 	}
 	if items == nil {
-		items = []model.OrderItemDetail{}
+		items = []model.OrderItemOrderDetail{}
 	}
 	return items, nil
 }
 
-func (entity *orderEntity) RemoveOrderItemByOrderId(orderId string) ([]model.OrderItemDetail, error) {
+func (entity *orderEntity) RemoveOrderItemByOrderId(orderId string) ([]model.OrderItemProductDetail, error) {
 	logrus.Info("RemoveOrderItemByOrderId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -733,7 +733,7 @@ func (entity *orderEntity) RemoveOrderItemByOrderId(orderId string) ([]model.Ord
 	return items, nil
 }
 
-func (entity *orderEntity) RemoveOrderItemByOrderProductId(orderId string, productId string) (*model.OrderItemDetail, error) {
+func (entity *orderEntity) RemoveOrderItemByOrderProductId(orderId string, productId string) (*model.OrderItemProductDetail, error) {
 	logrus.Info("RemoveOrderItemByOrderProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()

@@ -9,7 +9,7 @@ import (
 func GetOrderItemDetailsByProductId(orderEntity repository.IOrder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
-		result, err := orderEntity.GetOrderItemDetailsByProductId(productId)
+		result, err := orderEntity.GetOrderItemOrderDetailsByProductId(productId)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
