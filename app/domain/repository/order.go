@@ -688,15 +688,6 @@ func (entity *orderEntity) GetOrderItemDetailsByProductId(productId string) ([]m
 		},
 		{
 			"$lookup": bson.M{
-				"from":         "products",
-				"localField":   "productId",
-				"foreignField": "_id",
-				"as":           "product",
-			},
-		},
-		{"$unwind": "$product"},
-		{
-			"$lookup": bson.M{
 				"from":         "orders",
 				"localField":   "orderId",
 				"foreignField": "_id",
