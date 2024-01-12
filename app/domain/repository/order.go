@@ -703,7 +703,7 @@ func (entity *orderEntity) GetOrderItemDetailsByProductId(productId string) ([]m
 				"as":           "order",
 			},
 		},
-		{"$unwind": "order"},
+		{"$unwind": "$order"},
 	})
 
 	if err != nil {
