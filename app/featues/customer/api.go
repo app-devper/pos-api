@@ -11,7 +11,7 @@ func ApplyCustomerAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
-	customerRoute := route.Group("customer")
+	customerRoute := route.Group("customers")
 
 	customerRoute.POST("",
 		middlewares.RequireAuthenticated(),
@@ -31,12 +31,6 @@ func ApplyCustomerAPI(
 		usecase.GetCustomerById(repository.Customer),
 	)
 
-	customerRoute.GET("/code/:customerCode",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.GetCustomerByCode(repository.Customer),
-	)
-
 	customerRoute.PUT("/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
@@ -53,6 +47,12 @@ func ApplyCustomerAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.DeleteCustomerById(repository.Customer),
+	)
+
+	customerRoute.GET("/code/:customerCode",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetCustomerByCode(repository.Customer),
 	)
 
 }

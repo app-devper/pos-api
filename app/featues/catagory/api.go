@@ -11,7 +11,7 @@ func ApplyCategoryAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
-	productRoute := route.Group("category")
+	productRoute := route.Group("categories")
 
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),

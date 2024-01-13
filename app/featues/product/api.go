@@ -13,7 +13,7 @@ func ApplyProductAPI(
 	repository *domain.Repository,
 ) {
 
-	productRoute := route.Group("product")
+	productRoute := route.Group("products")
 
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
@@ -57,22 +57,22 @@ func ApplyProductAPI(
 	productRoute.GET("/serial-number",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		usecase.GetSerialNumber(repository.Sequence),
+		usecase.GenerateSerialNumber(repository.Sequence),
 	)
 
-	productRoute.POST("price",
+	productRoute.POST("/price",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.CreateProductPrice(repository.Product),
 	)
 
-	productRoute.GET("/:productId/price/:customerId",
+	productRoute.GET("/:productId/price/customers/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetProductPriceByProductCustomerId(repository.Product),
 	)
 
-	productRoute.GET("customer/:customerId/price",
+	productRoute.GET("/price/customers/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetProductPriceDetailsByCustomerId(repository.Product),

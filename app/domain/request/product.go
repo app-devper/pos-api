@@ -1,5 +1,9 @@
 package request
 
+type GetProduct struct {
+	Category string `json:"category"`
+}
+
 type Product struct {
 	Name         string  `json:"name" binding:"required"`
 	NameEn       string  `json:"nameEn"`

@@ -7,7 +7,7 @@ import (
 	"pos/app/domain/repository"
 )
 
-func GetSerialNumber(sequenceEntity repository.ISequence) gin.HandlerFunc {
+func GenerateSerialNumber(sequenceEntity repository.ISequence) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		result, err := sequenceEntity.NextSequence(constant.PRODUCT)
 		if err != nil {

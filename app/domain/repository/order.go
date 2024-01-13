@@ -43,7 +43,7 @@ type IOrder interface {
 	GetOrderItemDetailByOrderProductId(orderId string, productId string) (*model.OrderItemProductDetail, error)
 	RemoveOrderItemByOrderProductId(orderId string, productId string) (*model.OrderItemProductDetail, error)
 	GetOrderItemByProductId(productId string) ([]model.OrderItem, error)
-	GetOrderItemOrderDetailsByProductId(productId string) ([]model.OrderItemOrderDetail, error)
+	GetOrderItemOrderDetailsByProductId(productId string, form request.GetOrderRange) ([]model.OrderItemOrderDetail, error)
 
 	GetPaymentByOrderId(orderId string) (*model.Payment, error)
 	RemovePaymentByOrderId(orderId string) (*model.Payment, error)
@@ -675,7 +675,7 @@ func (entity *orderEntity) GetOrderItemByProductId(productId string) ([]model.Or
 	return items, nil
 }
 
-func (entity *orderEntity) GetOrderItemOrderDetailsByProductId(productId string) ([]model.OrderItemOrderDetail, error) {
+func (entity *orderEntity) GetOrderItemOrderDetailsByProductId(productId string, form request.GetOrderRange) ([]model.OrderItemOrderDetail, error) {
 	logrus.Info("GetOrderItemOrderDetailsByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -684,6 +684,10 @@ func (entity *orderEntity) GetOrderItemOrderDetailsByProductId(productId string)
 		{
 			"$match": bson.M{
 				"productId": productObjId,
+				"createdDate": bson.M{
+					"$gt": form.StartDate,
+					"$lt": form.EndDate,
+				},
 			},
 		},
 		{

@@ -21,7 +21,7 @@ type productEntity struct {
 
 type IProduct interface {
 	CreateIndex() (string, error)
-	GetProductAll() ([]model.Product, error)
+	GetProductAll(product request.GetProduct) ([]model.Product, error)
 	GetProductBySerialNumber(serialNumber string) (*model.Product, error)
 	GetProductById(id string) (*model.Product, error)
 	CreateProduct(form request.Product) (*model.Product, error)
@@ -61,15 +61,19 @@ func (entity *productEntity) CreateIndex() (string, error) {
 	return ind, err
 }
 
-func (entity *productEntity) GetProductAll() ([]model.Product, error) {
+func (entity *productEntity) GetProductAll(product request.GetProduct) ([]model.Product, error) {
 	logrus.Info("GetProductAll")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var products []model.Product
-	cursor, err := entity.productRepo.Find(ctx, bson.M{})
+	query := bson.M{}
+	if product.Category != "" {
+		query["category"] = product.Category
+	}
+	cursor, err := entity.productRepo.Find(ctx, query)
 	if err != nil {
 		return nil, err
 	}
+	var products []model.Product
 	for cursor.Next(ctx) {
 		var user model.Product
 		err = cursor.Decode(&user)
