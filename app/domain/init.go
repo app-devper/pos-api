@@ -12,6 +12,7 @@ type Repository struct {
 	Order    repository.IOrder
 	Product  repository.IProduct
 	Customer repository.ICustomer
+	Supplier repository.ISupplier
 }
 
 func InitRepository(resource *db.Resource) *Repository {
@@ -22,5 +23,6 @@ func InitRepository(resource *db.Resource) *Repository {
 		Sequence: repository.NewSequenceEntity(resource),
 		Customer: repository.NewCustomerEntity(resource),
 		Product:  repository.NewProductEntity(resource),
+		Supplier: repository.NewSupplierEntity(resource),
 	}
 }
