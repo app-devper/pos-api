@@ -13,8 +13,8 @@ type Customer struct {
 	Phone       string             `bson:"phone" json:"phone"`
 	Email       string             `bson:"email" json:"email"`
 	Status      string             `bson:"status" json:"status"`
-	CreatedBy   string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 }

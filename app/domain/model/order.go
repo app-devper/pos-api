@@ -12,10 +12,10 @@ type Order struct {
 	CustomerCode string             `bson:"customerCode" json:"customerCode"`
 	CustomerName string             `bson:"customerName" json:"customerName"`
 	Status       string             `bson:"status" json:"status"`
-	CreatedBy    string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy    string             `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy    string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate  time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy    string             `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
 	Total        float64            `bson:"total" json:"total"`
 	TotalCost    float64            `bson:"totalCost" json:"totalCost"`
 	Type         string             `bson:"type" json:"type"`
@@ -27,10 +27,10 @@ type OrderDetail struct {
 	CustomerCode string                   `bson:"customerCode" json:"customerCode"`
 	CustomerName string                   `bson:"customerName" json:"customerName"`
 	Status       string                   `bson:"status" json:"status"`
-	CreatedBy    string                   `bson:"createdBy" json:"createdBy"`
+	CreatedBy    string                   `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time                `bson:"createdDate" json:"createdDate"`
-	UpdatedBy    string                   `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate  time.Time                `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy    string                   `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time                `bson:"updatedDate" json:"-"`
 	Total        float64                  `bson:"total" json:"total"`
 	TotalCost    float64                  `bson:"totalCost" json:"totalCost"`
 	Type         string                   `bson:"type" json:"type"`
@@ -46,10 +46,10 @@ type OrderItem struct {
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Discount    float64            `bson:"discount" json:"discount"`
-	CreatedBy   string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 }
 
 type OrderItemProductDetail struct {
@@ -60,10 +60,10 @@ type OrderItemProductDetail struct {
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Discount    float64            `bson:"discount" json:"discount"`
-	CreatedBy   string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 	Product     Product            `bson:"product" json:"product"`
 }
 
@@ -75,10 +75,10 @@ type OrderItemOrderDetail struct {
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Discount    float64            `bson:"discount" json:"discount"`
-	CreatedBy   string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 	Order       Order              `bson:"order" json:"order"`
 }
 

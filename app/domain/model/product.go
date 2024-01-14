@@ -16,10 +16,10 @@ type Product struct {
 	Quantity     int                `bson:"quantity" json:"quantity"`
 	SerialNumber string             `bson:"serialNumber" json:"serialNumber"`
 	Category     string             `bson:"category"  json:"category"`
-	CreatedBy    string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy    string             `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy    string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate  time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy    string             `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
 }
 
 type ProductLot struct {
@@ -29,10 +29,10 @@ type ProductLot struct {
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	ExpireDate  string             `bson:"expireDate" json:"expireDate"`
-	CreatedBy   string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 }
 
 type ProductPrice struct {
@@ -40,10 +40,10 @@ type ProductPrice struct {
 	ProductId     primitive.ObjectID `bson:"productId" json:"productId"`
 	CustomerId    primitive.ObjectID `bson:"customerId" json:"customerId"`
 	CustomerPrice float64            `bson:"customerPrice" json:"customerPrice"`
-	CreatedBy     string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy     string             `bson:"createdBy" json:"-"`
 	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy     string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate   time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy     string             `bson:"updatedBy" json:"-"`
+	UpdatedDate   time.Time          `bson:"updatedDate" json:"-"`
 }
 
 type ProductPriceDetail struct {
@@ -53,8 +53,8 @@ type ProductPriceDetail struct {
 	CustomerPrice float64            `bson:"customerPrice" json:"customerPrice"`
 	Customer      Customer           `bson:"customer" json:"customer"`
 	Product       Product            `bson:"product" json:"product"`
-	CreatedBy     string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy     string             `bson:"createdBy" json:"-"`
 	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy     string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate   time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy     string             `bson:"updatedBy" json:"-"`
+	UpdatedDate   time.Time          `bson:"updatedDate" json:"-"`
 }

@@ -13,8 +13,8 @@ type Payment struct {
 	Total       float64            `bson:"total" json:"total"`
 	Change      float64            `bson:"change" json:"change"`
 	Type        string             `bson:"type" json:"type"`
-	CreatedBy   string             `bson:"createdBy" json:"createdBy"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"updatedBy"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"updatedDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 }
