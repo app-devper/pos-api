@@ -7,22 +7,18 @@ import (
 	"pos/app/domain/request"
 )
 
-func CreateProduct(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLogsExpire(productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.Product{}
+		req := request.GetExpireRange{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		userId := ctx.GetString("UserId")
-		req.CreatedBy = userId
-		result, err := productEntity.CreateProduct(req)
+		result, err := productEntity.GetProductLotsExpire(req)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		_, _ = productEntity.CreateProductLot(result.Id.Hex(), req)
-
 		ctx.JSON(http.StatusOK, result)
 	}
 }

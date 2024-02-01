@@ -60,28 +60,44 @@ func ApplyProductAPI(
 		usecase.GenerateSerialNumber(repository.Sequence),
 	)
 
-	productRoute.POST("/price",
+	productRoute.POST("/prices",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.CreateProductPrice(repository.Product),
 	)
 
-	productRoute.GET("/:productId/price/customers/:customerId",
+	productRoute.GET("/:productId/prices/customers/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetProductPriceByProductCustomerId(repository.Product),
 	)
 
-	productRoute.GET("/price/customers/:customerId",
+	productRoute.GET("/prices/customers/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetProductPriceDetailsByCustomerId(repository.Product),
 	)
 
-	productRoute.GET("/:productId/price",
+	productRoute.GET("/:productId/prices",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.GetProductPriceDetailsByProductId(repository.Product),
+	)
+
+	productRoute.GET("/:productId/lots",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductLogsByProductId(repository.Product),
+	)
+
+	productRoute.GET("/lots",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductLogsExpire(repository.Product),
+	)
+
+	productRoute.GET("/lots/expire-notify",
+		usecase.GetProductLogsExpireNotify(repository.Product),
 	)
 
 }
