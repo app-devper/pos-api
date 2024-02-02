@@ -484,8 +484,8 @@ func (entity *productEntity) GetProductLotsExpire(form request.GetExpireRange) (
 		{
 			"$match": bson.M{
 				"expireDate": bson.M{
-					"$gt": form.StartDate,
-					"$lt": form.EndDate,
+					"$gte": form.StartDate,
+					"$lt":  form.EndDate,
 				},
 			},
 		},

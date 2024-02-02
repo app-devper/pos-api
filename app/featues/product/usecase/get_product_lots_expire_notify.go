@@ -17,12 +17,15 @@ func GetProductLogsExpireNotify(productEntity repository.IProduct) gin.HandlerFu
 		startDate := utils.Bod(today)
 		endDate := startDate.Add(24 * time.Hour)
 		req := request.GetExpireRange{
-			StartDate: startDate,
-			EndDate:   endDate,
+			StartDate: startDate.UTC(),
+			EndDate:   endDate.UTC(),
 		}
 		result, err := productEntity.GetProductLotsExpire(req)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"status":  http.StatusBadRequest,
+				"message": err.Error(),
+			})
 			return
 		}
 
@@ -38,6 +41,10 @@ func GetProductLogsExpireNotify(productEntity repository.IProduct) gin.HandlerFu
 			_, _ = utils.NotifyMassage("สินค้าหมดอายุวันที่ " + date + "\n\n" + message)
 		}
 
-		ctx.JSON(http.StatusOK, result)
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":  http.StatusOK,
+			"message": "success",
+		})
+
 	}
 }
