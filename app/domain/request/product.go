@@ -18,6 +18,7 @@ type Product struct {
 	Category     string    `json:"category"`
 	LotNumber    string    `json:"lotNumber" binding:"required"`
 	ExpireDate   time.Time `json:"expireDate" binding:"required"`
+	ReceiveId    string    `json:"receiveId"`
 	CreatedBy    string
 }
 

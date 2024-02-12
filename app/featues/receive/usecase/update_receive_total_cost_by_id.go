@@ -7,23 +7,19 @@ import (
 	"pos/app/domain/request"
 )
 
-func CreateProduct(productEntity repository.IProduct, receiveEntity repository.IReceive) gin.HandlerFunc {
+func UpdateReceiveTotalCostById(receiveEntity repository.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.Product{}
+		req := request.UpdateReceiveTotalCode{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		userId := ctx.GetString("UserId")
-		req.CreatedBy = userId
-		result, err := productEntity.CreateProduct(req)
+		id := ctx.Param("receiveId")
+
+		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCode)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
-		}
-		lot, _ := productEntity.CreateProductLot(result.Id.Hex(), req)
-		if req.ReceiveId != "" {
-			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex())
 		}
 
 		ctx.JSON(http.StatusOK, result)

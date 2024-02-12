@@ -22,7 +22,37 @@ func ApplySupplierAPI(
 	supplierRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		usecase.GetSupplier(repository.Supplier),
+		usecase.GetSuppliers(repository.Supplier),
+	)
+
+	supplierRoute.PUT("/info",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateSupplierInfo(repository.Supplier),
+	)
+
+	supplierRoute.GET("/info",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetSupplierInfo(repository.Supplier),
+	)
+
+	supplierRoute.GET("/:supplierId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetSupplierById(repository.Supplier),
+	)
+
+	supplierRoute.DELETE("/:supplierId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.DeleteSupplierById(repository.Supplier),
+	)
+
+	supplierRoute.PUT("/:supplierId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateSupplierById(repository.Supplier),
 	)
 
 }

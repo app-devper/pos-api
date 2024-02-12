@@ -3,6 +3,7 @@ package constant
 const (
 	MEMBER  = "MEMBER"
 	ORDER   = "ORDER"
+	RECEIVE = "RECEIVE"
 	PRODUCT = "PRODUCT"
 )
 

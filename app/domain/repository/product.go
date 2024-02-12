@@ -39,8 +39,10 @@ type IProduct interface {
 
 	CreateProductLot(productId string, form request.Product) (*model.ProductLot, error)
 	GetProductLotsByProductId(productId string) ([]model.ProductLot, error)
+	GetProductLotsByIds(ids []string) ([]model.ProductLot, error)
 	GetProductLotsExpire(form request.GetExpireRange) ([]model.ProductLotDetail, error)
 	GetProductLotById(id string) (*model.ProductLot, error)
+	RemoveProductLotById(id string) (*model.ProductLot, error)
 	UpdateProductLotById(id string, form request.ProductLot) (*model.ProductLot, error)
 }
 
@@ -48,7 +50,7 @@ func NewProductEntity(resource *db.Resource) IProduct {
 	productsRepo := resource.PosDb.Collection("products")
 	productPricesRepo := resource.PosDb.Collection("product_prices")
 	productLotsRepo := resource.PosDb.Collection("product_lots")
-	var entity IProduct = &productEntity{
+	entity := &productEntity{
 		productsRepo:      productsRepo,
 		productPricesRepo: productPricesRepo,
 		productLotsRepo:   productLotsRepo,
@@ -468,6 +470,57 @@ func (entity *productEntity) GetProductLotsByProductId(productId string) (items 
 			logrus.Info(cursor.Current)
 		} else {
 			items = append(items, productLot)
+		}
+	}
+	if items == nil {
+		items = []model.ProductLot{}
+	}
+	return items, nil
+}
+
+func (entity *productEntity) RemoveProductLotById(id string) (*model.ProductLot, error) {
+	logrus.Info("RemoveProductLotById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	data := model.ProductLot{}
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	err = entity.productLotsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	_, err = entity.productLotsRepo.DeleteOne(ctx, bson.M{"_id": objId})
+	return &data, nil
+}
+
+func (entity *productEntity) GetProductLotsByIds(ids []string) (items []model.ProductLot, err error) {
+	logrus.Info("GetProductLotsByIds")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	objIds := make([]primitive.ObjectID, 0, len(ids))
+	for _, value := range ids {
+		id, err := primitive.ObjectIDFromHex(value)
+		if err != nil {
+			return nil, err
+		}
+		objIds = append(objIds, id)
+	}
+
+	cursor, err := entity.productLotsRepo.Find(ctx, bson.M{"_id": bson.M{"$in": objIds}})
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		item := model.ProductLot{}
+		err = cursor.Decode(&item)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, item)
 		}
 	}
 	if items == nil {

@@ -3,27 +3,27 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/utils"
 	"pos/app/domain/repository"
 	"pos/app/domain/request"
 )
 
-func CreateProduct(productEntity repository.IProduct, receiveEntity repository.IReceive) gin.HandlerFunc {
+func UpdateReceiveById(receiveEntity repository.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.Product{}
+		req := request.Receive{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		userId := ctx.GetString("UserId")
-		req.CreatedBy = userId
-		result, err := productEntity.CreateProduct(req)
+		id := ctx.Param("receiveId")
+
+		userId := utils.GetUserId(ctx)
+		req.UpdatedBy = userId
+
+		result, err := receiveEntity.UpdateReceiveById(id, req)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
-		}
-		lot, _ := productEntity.CreateProductLot(result.Id.Hex(), req)
-		if req.ReceiveId != "" {
-			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex())
 		}
 
 		ctx.JSON(http.StatusOK, result)

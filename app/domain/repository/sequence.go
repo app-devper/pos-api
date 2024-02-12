@@ -25,7 +25,7 @@ type ISequence interface {
 
 func NewSequenceEntity(resource *db.Resource) ISequence {
 	sequenceRepo := resource.PosDb.Collection("sequences")
-	var entity ISequence = &sequenceEntity{sequenceRepo: sequenceRepo}
+	entity := &sequenceEntity{sequenceRepo: sequenceRepo}
 	return entity
 }
 
@@ -44,6 +44,9 @@ func (entity *sequenceEntity) CreateSequence(field string, value int) (*model.Se
 		data.Format = 4
 		if field == constant.ORDER {
 			data.Prefix = "OD_"
+			data.Type = constant.DAILY
+		} else if field == constant.RECEIVE {
+			data.Prefix = "RC_"
 			data.Type = constant.DAILY
 		} else if field == constant.MEMBER {
 			data.Prefix = "MB_"

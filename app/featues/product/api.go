@@ -25,7 +25,7 @@ func ApplyProductAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase.CreateProduct(repository.Product),
+		usecase.CreateProduct(repository.Product, repository.Receive),
 	)
 
 	productRoute.GET("/:productId",

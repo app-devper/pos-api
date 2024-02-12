@@ -6,10 +6,10 @@ import (
 	"pos/app/domain/repository"
 )
 
-func GetSupplier(supplierEntity repository.ISupplier) gin.HandlerFunc {
+func DeleteReceiveById(receiveEntity repository.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		clientId := ctx.GetString("ClientId")
-		result, err := supplierEntity.GetSupplierByClientId(clientId)
+		id := ctx.Param("receiveId")
+		result, err := receiveEntity.RemoveReceiveById(id)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
