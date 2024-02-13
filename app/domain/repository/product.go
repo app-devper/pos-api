@@ -44,6 +44,7 @@ type IProduct interface {
 	GetProductLotById(id string) (*model.ProductLot, error)
 	RemoveProductLotById(id string) (*model.ProductLot, error)
 	UpdateProductLotById(id string, form request.ProductLot) (*model.ProductLot, error)
+	UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*model.ProductLot, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
@@ -442,6 +443,7 @@ func (entity *productEntity) CreateProductLot(productId string, form request.Pro
 	data.Quantity = form.Quantity
 	data.CostPrice = form.CostPrice
 	data.CreatedBy = form.CreatedBy
+	data.Notify = true
 	data.UpdatedBy = form.CreatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedDate = time.Now()
@@ -540,6 +542,7 @@ func (entity *productEntity) GetProductLotsExpire(form request.GetExpireRange) (
 					"$gte": form.StartDate,
 					"$lt":  form.EndDate,
 				},
+				"notify": true,
 			},
 		},
 		{
@@ -599,6 +602,31 @@ func (entity *productEntity) UpdateProductLotById(id string, form request.Produc
 	data.ExpireDate = form.ExpireDate
 	data.Quantity = form.Quantity
 	data.CostPrice = form.CostPrice
+	data.UpdatedDate = time.Now()
+	data.UpdatedBy = form.UpdatedBy
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (entity *productEntity) UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*model.ProductLot, error) {
+	logrus.Info("UpdateProductLotNotifyById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, _ := primitive.ObjectIDFromHex(id)
+	data, err := entity.GetProductLotById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	data.Notify = form.Notify
 	data.UpdatedDate = time.Now()
 	data.UpdatedBy = form.UpdatedBy
 

@@ -7,14 +7,17 @@ import (
 	"pos/app/domain/request"
 )
 
-func GetProductLotsExpire(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.GetExpireRange{}
+		id := ctx.Param("lotId")
+		req := request.ProductLot{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		result, err := productEntity.GetProductLotsExpire(req)
+		userId := ctx.GetString("UserId")
+		req.UpdatedBy = userId
+		result, err := productEntity.UpdateProductLotById(id, req)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

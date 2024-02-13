@@ -6,11 +6,11 @@ import (
 	"pos/app/domain/repository"
 )
 
-func GetProductLotsByProductId(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		productId := ctx.Param("productId")
+		lotId := ctx.Param("lotId")
 
-		result, err := productEntity.GetProductLotsByProductId(productId)
+		result, err := productEntity.GetProductLotById(lotId)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

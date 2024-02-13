@@ -54,3 +54,8 @@ type ProductPrice struct {
 	CustomerPrice float64 `json:"customerPrice"  binding:"required"`
 	CreatedBy     string
 }
+
+type UpdateProductLotNotify struct {
+	Notify    bool `json:"notify" binding:"required"`
+	UpdatedBy string
+}

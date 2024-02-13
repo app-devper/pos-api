@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func GetProductLogsExpireNotify(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLotsExpireNotify(productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		location := utils.GetLocation()
 		today := time.Now().In(location)

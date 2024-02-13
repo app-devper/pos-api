@@ -29,6 +29,7 @@ type ProductLot struct {
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	ExpireDate  time.Time          `bson:"expireDate" json:"expireDate"`
+	Notify      bool               `bson:"notify" json:"notify"`
 	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy   string             `bson:"updatedBy" json:"-"`
@@ -42,6 +43,7 @@ type ProductLotDetail struct {
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	ExpireDate  time.Time          `bson:"expireDate" json:"expireDate"`
+	Notify      bool               `bson:"notify" json:"notify"`
 	Product     Product            `bson:"product" json:"product"`
 	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
