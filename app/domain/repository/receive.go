@@ -178,7 +178,7 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 	}
 	data.SupplierId = supplier
 	data.Reference = form.Reference
-	data.TotalCost = form.TotalCode
+	data.TotalCost = form.TotalCost
 	data.UpdatedBy = form.UpdatedBy
 	data.UpdatedDate = time.Now()
 

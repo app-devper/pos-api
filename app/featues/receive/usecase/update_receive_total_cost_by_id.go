@@ -16,7 +16,7 @@ func UpdateReceiveTotalCostById(receiveEntity repository.IReceive) gin.HandlerFu
 		}
 		id := ctx.Param("receiveId")
 
-		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCode)
+		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCost)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
