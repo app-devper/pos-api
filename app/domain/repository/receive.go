@@ -23,7 +23,7 @@ type IReceive interface {
 	CreateReceive(form request.Receive) (*model.Receive, error)
 	GetReceiveById(id string) (*model.Receive, error)
 	RemoveReceiveById(id string) (*model.Receive, error)
-	UpdateReceiveById(id string, form request.Receive) (*model.Receive, error)
+	UpdateReceiveById(id string, form request.UpdateReceive) (*model.Receive, error)
 	UpdateReceiveTotalCostById(id string, totalCost float64) (*model.Receive, error)
 	CreateReceiveItem(id string, lotId string) (*model.ReceiveItem, error)
 	GetReceiveItemsByReceiveId(receiveId string) ([]model.ReceiveItem, error)
@@ -159,7 +159,7 @@ func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost flo
 	return &data, nil
 }
 
-func (entity *receiveEntity) UpdateReceiveById(id string, form request.Receive) (*model.Receive, error) {
+func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateReceive) (*model.Receive, error) {
 	logrus.Info("UpdateReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -178,6 +178,7 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.Receive) 
 	}
 	data.SupplierId = supplier
 	data.Reference = form.Reference
+	data.TotalCost = form.TotalCode
 	data.UpdatedBy = form.UpdatedBy
 	data.UpdatedDate = time.Now()
 

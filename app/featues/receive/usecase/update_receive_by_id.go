@@ -10,7 +10,7 @@ import (
 
 func UpdateReceiveById(receiveEntity repository.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.Receive{}
+		req := request.UpdateReceive{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
