@@ -90,10 +90,16 @@ func ApplyProductAPI(
 		usecase.GetProductLotsByProductId(repository.Product),
 	)
 
-	productRoute.GET("/lots/expire",
+	productRoute.POST("/lots",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		usecase.GetProductLotsExpire(repository.Product),
+		usecase.CreateProductLot(repository.Product),
+	)
+
+	productRoute.GET("/lots/expired",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductLotsExpired(repository.Product),
 	)
 
 	productRoute.GET("/lots/:lotId",

@@ -37,13 +37,15 @@ type IProduct interface {
 	GetProductPriceDetailByProductId(productId string) ([]model.ProductPriceDetail, error)
 	GetProductPriceDetailByCustomerId(customerId string) ([]model.ProductPriceDetail, error)
 
-	CreateProductLot(productId string, form request.Product) (*model.ProductLot, error)
+	CreateProductLotByProductId(productId string, form request.Product) (*model.ProductLot, error)
+	CreateProductLot(form request.ProductLot) (*model.ProductLot, error)
 	GetProductLotsByProductId(productId string) ([]model.ProductLot, error)
 	GetProductLotsByIds(ids []string) ([]model.ProductLot, error)
-	GetProductLotsExpire(form request.GetExpireRange) ([]model.ProductLotDetail, error)
+	GetProductLotsExpired() ([]model.ProductLot, error)
+	GetProductLotsExpireNotify(form request.GetExpireRange) ([]model.ProductLotDetail, error)
 	GetProductLotById(id string) (*model.ProductLot, error)
 	RemoveProductLotById(id string) (*model.ProductLot, error)
-	UpdateProductLotById(id string, form request.ProductLot) (*model.ProductLot, error)
+	UpdateProductLotById(id string, form request.UpdateProductLot) (*model.ProductLot, error)
 	UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*model.ProductLot, error)
 }
 
@@ -431,8 +433,8 @@ func (entity *productEntity) GetProductPriceDetailByCustomerId(customerId string
 	return items, nil
 }
 
-func (entity *productEntity) CreateProductLot(productId string, form request.Product) (*model.ProductLot, error) {
-	logrus.Info("CreateProductLot")
+func (entity *productEntity) CreateProductLotByProductId(productId string, form request.Product) (*model.ProductLot, error) {
+	logrus.Info("CreateProductLotByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := model.ProductLot{}
@@ -445,6 +447,30 @@ func (entity *productEntity) CreateProductLot(productId string, form request.Pro
 	data.CreatedBy = form.CreatedBy
 	data.Notify = true
 	data.UpdatedBy = form.CreatedBy
+	data.CreatedDate = time.Now()
+	data.UpdatedDate = time.Now()
+
+	_, err := entity.productLotsRepo.InsertOne(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) CreateProductLot(form request.ProductLot) (*model.ProductLot, error) {
+	logrus.Info("CreateProductLot")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	data := model.ProductLot{}
+	data.Id = primitive.NewObjectID()
+	data.ProductId, _ = primitive.ObjectIDFromHex(form.ProductId)
+	data.LotNumber = form.LotNumber
+	data.ExpireDate = form.ExpireDate
+	data.Quantity = form.Quantity
+	data.CostPrice = form.CostPrice
+	data.CreatedBy = form.UpdatedBy
+	data.Notify = true
+	data.UpdatedBy = form.UpdatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedDate = time.Now()
 
@@ -531,8 +557,34 @@ func (entity *productEntity) GetProductLotsByIds(ids []string) (items []model.Pr
 	return items, nil
 }
 
-func (entity *productEntity) GetProductLotsExpire(form request.GetExpireRange) (items []model.ProductLotDetail, err error) {
-	logrus.Info("GetProductLotsExpire")
+func (entity *productEntity) GetProductLotsExpired() (items []model.ProductLot, err error) {
+	logrus.Info("GetProductLotsExpired")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	cursor, err := entity.productLotsRepo.Find(ctx, bson.M{"expireDate": bson.M{
+		"$lte": time.Now(),
+	}})
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		item := model.ProductLot{}
+		err = cursor.Decode(&item)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, item)
+		}
+	}
+	if items == nil {
+		items = []model.ProductLot{}
+	}
+	return items, nil
+}
+
+func (entity *productEntity) GetProductLotsExpireNotify(form request.GetExpireRange) (items []model.ProductLotDetail, err error) {
+	logrus.Info("GetProductLotsExpireNotify")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	cursor, err := entity.productLotsRepo.Aggregate(ctx, []bson.M{
@@ -588,7 +640,7 @@ func (entity *productEntity) GetProductLotById(id string) (*model.ProductLot, er
 	return &data, nil
 }
 
-func (entity *productEntity) UpdateProductLotById(id string, form request.ProductLot) (*model.ProductLot, error) {
+func (entity *productEntity) UpdateProductLotById(id string, form request.UpdateProductLot) (*model.ProductLot, error) {
 	logrus.Info("UpdateProductLotById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()

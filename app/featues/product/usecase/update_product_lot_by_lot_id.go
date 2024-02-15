@@ -10,7 +10,7 @@ import (
 func UpdateProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("lotId")
-		req := request.ProductLot{}
+		req := request.UpdateProductLot{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

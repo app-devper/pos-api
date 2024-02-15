@@ -36,10 +36,19 @@ type UpdateProduct struct {
 }
 
 type ProductLot struct {
+	ProductId  string    `json:"productId" binding:"required"`
 	Quantity   int       `json:"quantity" binding:"required"`
 	LotNumber  string    `json:"lotNumber" binding:"required"`
 	ExpireDate time.Time `json:"expireDate" binding:"required"`
-	CostPrice  float64   `json:"costPrice"  binding:"required"`
+	CostPrice  float64   `json:"costPrice" binding:"required"`
+	UpdatedBy  string
+}
+
+type UpdateProductLot struct {
+	Quantity   int       `json:"quantity" binding:"required"`
+	LotNumber  string    `json:"lotNumber" binding:"required"`
+	ExpireDate time.Time `json:"expireDate" binding:"required"`
+	CostPrice  float64   `json:"costPrice" binding:"required"`
 	UpdatedBy  string
 }
 
@@ -51,7 +60,7 @@ type GetExpireRange struct {
 type ProductPrice struct {
 	ProductId     string  `json:"productId" binding:"required"`
 	CustomerId    string  `json:"customerId" binding:"required"`
-	CustomerPrice float64 `json:"customerPrice"  binding:"required"`
+	CustomerPrice float64 `json:"customerPrice" binding:"required"`
 	CreatedBy     string
 }
 

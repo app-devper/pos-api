@@ -27,6 +27,7 @@ type IReceive interface {
 	UpdateReceiveTotalCostById(id string, totalCost float64) (*model.Receive, error)
 	CreateReceiveItem(id string, lotId string) (*model.ReceiveItem, error)
 	GetReceiveItemsByReceiveId(receiveId string) ([]model.ReceiveItem, error)
+	GetReceiveItemByLotId(lotId string) (*model.ReceiveItem, error)
 	RemoveReceiveItemByLotId(lotId string) (*model.ReceiveItem, error)
 }
 
@@ -241,6 +242,19 @@ func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items
 		items = []model.ReceiveItem{}
 	}
 	return items, nil
+}
+
+func (entity *receiveEntity) GetReceiveItemByLotId(lotId string) (*model.ReceiveItem, error) {
+	logrus.Info("GetReceiveItemByLotId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	lot, _ := primitive.ObjectIDFromHex(lotId)
+	data := model.ReceiveItem{}
+	err := entity.receiveItemsRepo.FindOne(ctx, bson.M{"lotId": lot}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
 }
 
 func (entity *receiveEntity) RemoveReceiveItemByLotId(lotId string) (*model.ReceiveItem, error) {

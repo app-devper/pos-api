@@ -21,7 +21,7 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		lot, _ := productEntity.CreateProductLot(result.Id.Hex(), req)
+		lot, _ := productEntity.CreateProductLotByProductId(result.Id.Hex(), req)
 		if req.ReceiveId != "" {
 			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex())
 		}

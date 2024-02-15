@@ -20,7 +20,7 @@ func GetProductLotsExpireNotify(productEntity repository.IProduct) gin.HandlerFu
 			StartDate: startDate.UTC(),
 			EndDate:   endDate.UTC(),
 		}
-		result, err := productEntity.GetProductLotsExpire(req)
+		result, err := productEntity.GetProductLotsExpireNotify(req)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 				"status":  http.StatusBadRequest,
