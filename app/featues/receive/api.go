@@ -58,7 +58,7 @@ func ApplyReceiveAPI(
 	receiveRoute.DELETE("lots/:lotId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		usecase.DeleteReceiveItemByLotId(repository.Receive),
+		usecase.DeleteReceiveItemByLotId(repository.Receive, repository.Product),
 	)
 
 }
