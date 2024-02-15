@@ -23,7 +23,7 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 		}
 		lot, _ := productEntity.CreateProductLotByProductId(result.Id.Hex(), req)
 		if req.ReceiveId != "" {
-			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex())
+			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex(), result.Id.Hex(), req)
 		}
 
 		ctx.JSON(http.StatusOK, result)

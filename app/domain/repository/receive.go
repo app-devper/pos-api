@@ -25,7 +25,7 @@ type IReceive interface {
 	RemoveReceiveById(id string) (*model.Receive, error)
 	UpdateReceiveById(id string, form request.UpdateReceive) (*model.Receive, error)
 	UpdateReceiveTotalCostById(id string, totalCost float64) (*model.Receive, error)
-	CreateReceiveItem(id string, lotId string) (*model.ReceiveItem, error)
+	CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*model.ReceiveItem, error)
 	GetReceiveItemsByReceiveId(receiveId string) ([]model.ReceiveItem, error)
 	GetReceiveItemByLotId(lotId string) (*model.ReceiveItem, error)
 	RemoveReceiveItemByLotId(lotId string) (*model.ReceiveItem, error)
@@ -194,7 +194,7 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 	return &data, nil
 }
 
-func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string) (*model.ReceiveItem, error) {
+func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*model.ReceiveItem, error) {
 	logrus.Info("CreateReceiveItem")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -206,9 +206,21 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string) (
 	if err != nil {
 		return nil, err
 	}
+	product, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
 	data := model.ReceiveItem{
-		ReceiveId: receive,
-		LotId:     lot,
+		Id:          primitive.NewObjectID(),
+		ReceiveId:   receive,
+		LotId:       lot,
+		ProductId:   product,
+		Quantity:    form.Quantity,
+		CostPrice:   form.CostPrice,
+		CreatedBy:   form.CreatedBy,
+		CreatedDate: time.Now(),
+		UpdatedBy:   form.CreatedBy,
+		UpdatedDate: time.Now(),
 	}
 	_, err = entity.receiveItemsRepo.InsertOne(ctx, data)
 	if err != nil {

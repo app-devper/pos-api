@@ -14,16 +14,9 @@ func DeleteReceiveItemByLotId(receiveEntity repository.IReceive, productEntity r
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		lot, err := productEntity.RemoveProductLotById(id)
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		_, err = productEntity.RemoveQuantityById(lot.ProductId.Hex(), lot.Quantity)
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
+		_, _ = productEntity.RemoveProductLotById(id)
+		_, _ = productEntity.RemoveQuantityById(result.ProductId.Hex(), result.Quantity)
+
 		ctx.JSON(http.StatusOK, result)
 	}
 }
