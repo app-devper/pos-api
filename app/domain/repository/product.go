@@ -561,9 +561,12 @@ func (entity *productEntity) GetProductLotsExpired() (items []model.ProductLot, 
 	logrus.Info("GetProductLotsExpired")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	cursor, err := entity.productLotsRepo.Find(ctx, bson.M{"expireDate": bson.M{
-		"$lte": time.Now(),
-	}})
+
+	opts := options.Find().SetSort(bson.D{{"expireDate", -1}})
+	cursor, err := entity.productLotsRepo.Find(ctx,
+		bson.M{"expireDate": bson.M{"$lte": time.Now()}},
+		opts,
+	)
 	if err != nil {
 		return nil, err
 	}
