@@ -186,7 +186,7 @@ func (entity *supplierEntity) UpdateSupplierById(id string, form request.Supplie
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.supplierRepo.FindOneAndUpdate(ctx, bson.M{"_id": id}, bson.M{"$set": data}, opts).Decode(&data)
+	err = entity.supplierRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": data}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
