@@ -45,7 +45,7 @@ type ProductLot struct {
 }
 
 type UpdateProductLot struct {
-	Quantity   int       `json:"quantity" binding:"required"`
+	Quantity   int       `json:"quantity"`
 	LotNumber  string    `json:"lotNumber" binding:"required"`
 	ExpireDate time.Time `json:"expireDate" binding:"required"`
 	CostPrice  float64   `json:"costPrice" binding:"required"`

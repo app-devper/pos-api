@@ -17,10 +17,10 @@ type Receive struct {
 type UpdateReceive struct {
 	SupplierId string  `json:"supplierId" binding:"required"`
 	Reference  string  `json:"reference"`
-	TotalCost  float64 `json:"totalCost" binding:"required"`
+	TotalCost  float64 `json:"totalCost"`
 	UpdatedBy  string
 }
 
 type UpdateReceiveTotalCode struct {
-	TotalCost float64 `json:"totalCost" binding:"required"`
+	TotalCost float64 `json:"totalCost"`
 }
