@@ -120,6 +120,12 @@ func ApplyProductAPI(
 		usecase.UpdateProductLotNotifyByLotId(repository.Product),
 	)
 
+	productRoute.PATCH("/lots/:lotId/quantity",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateProductLotQuantityByLotId(repository.Product),
+	)
+
 	productRoute.GET("/lots/expire-notify",
 		usecase.GetProductLotsExpireNotify(repository.Product),
 	)

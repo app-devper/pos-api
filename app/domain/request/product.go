@@ -64,6 +64,11 @@ type ProductPrice struct {
 	CreatedBy     string
 }
 
+type UpdateProductLotQuantity struct {
+	Quantity  int `json:"quantity"`
+	UpdatedBy string
+}
+
 type UpdateProductLotNotify struct {
 	Notify    bool `json:"notify" binding:"required"`
 	UpdatedBy string

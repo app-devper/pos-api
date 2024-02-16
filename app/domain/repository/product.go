@@ -47,6 +47,7 @@ type IProduct interface {
 	RemoveProductLotById(id string) (*model.ProductLot, error)
 	UpdateProductLotById(id string, form request.UpdateProductLot) (*model.ProductLot, error)
 	UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*model.ProductLot, error)
+	UpdateProductLotQuantityById(id string, form request.UpdateProductLotQuantity) (*model.ProductLot, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
@@ -682,6 +683,31 @@ func (entity *productEntity) UpdateProductLotNotifyById(id string, form request.
 	}
 
 	data.Notify = form.Notify
+	data.UpdatedDate = time.Now()
+	data.UpdatedBy = form.UpdatedBy
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (entity *productEntity) UpdateProductLotQuantityById(id string, form request.UpdateProductLotQuantity) (*model.ProductLot, error) {
+	logrus.Info("UpdateProductLotQuantityById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, _ := primitive.ObjectIDFromHex(id)
+	data, err := entity.GetProductLotById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	data.Quantity = form.Quantity
 	data.UpdatedDate = time.Now()
 	data.UpdatedBy = form.UpdatedBy
 
