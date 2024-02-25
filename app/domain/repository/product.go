@@ -39,6 +39,7 @@ type IProduct interface {
 
 	CreateProductLotByProductId(productId string, form request.Product) (*model.ProductLot, error)
 	CreateProductLot(form request.ProductLot) (*model.ProductLot, error)
+	GetProductLots(form request.GetExpireRange) ([]model.ProductLot, error)
 	GetProductLotsByProductId(productId string) ([]model.ProductLot, error)
 	GetProductLotsByIds(ids []string) ([]model.ProductLot, error)
 	GetProductLotsExpired() ([]model.ProductLot, error)
@@ -480,6 +481,38 @@ func (entity *productEntity) CreateProductLot(form request.ProductLot) (*model.P
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *productEntity) GetProductLots(form request.GetExpireRange) (items []model.ProductLot, err error) {
+	logrus.Info("GetProductLots")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	opts := options.Find().SetSort(bson.D{{"expireDate", -1}})
+	cursor, err := entity.productLotsRepo.Find(ctx,
+		bson.M{"expireDate": bson.M{
+			"$gt": form.StartDate,
+			"$lt": form.EndDate,
+		}},
+		opts,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		data := model.ProductLot{}
+		err = cursor.Decode(&data)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, data)
+		}
+	}
+	if items == nil {
+		items = []model.ProductLot{}
+	}
+	return items, nil
 }
 
 func (entity *productEntity) GetProductLotsByProductId(productId string) (items []model.ProductLot, err error) {
