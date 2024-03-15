@@ -23,9 +23,19 @@ type Product struct {
 }
 
 type ProductDetail struct {
-	Product
-	ProductUnits  []ProductUnit  `bson:"units" json:"units"`
-	ProductPrices []ProductPrice `bson:"prices"  json:"prices"`
+	Id            primitive.ObjectID `bson:"_id" json:"id"`
+	Name          string             `bson:"name" json:"name"`
+	NameEn        string             `bson:"nameEn" json:"nameEn"`
+	Description   string             `bson:"description" json:"description"`
+	Price         float64            `bson:"price" json:"price"`
+	CostPrice     float64            `bson:"costPrice" json:"costPrice"`
+	Unit          string             `bson:"unit" json:"unit"`
+	Quantity      int                `bson:"quantity" json:"quantity"`
+	SerialNumber  string             `bson:"serialNumber" json:"serialNumber"`
+	Category      string             `bson:"category"  json:"category"`
+	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
+	ProductUnits  []ProductUnit      `bson:"units" json:"units"`
+	ProductPrices []ProductPrice     `bson:"prices"  json:"prices"`
 }
 
 type ProductLot struct {
