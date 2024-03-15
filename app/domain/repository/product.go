@@ -1,12 +1,14 @@
 package repository
 
 import (
+	"errors"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
+	"pos/app/domain/constant"
 	"pos/app/domain/model"
 	"pos/app/domain/request"
 	"pos/db"
@@ -18,11 +20,13 @@ type productEntity struct {
 	productsRepo      *mongo.Collection
 	productPricesRepo *mongo.Collection
 	productLotsRepo   *mongo.Collection
+	productUnitsRepo  *mongo.Collection
+	productStockRepo  *mongo.Collection
 }
 
 type IProduct interface {
-	CreateIndex() (string, error)
-	GetProductAll(product request.GetProduct) ([]model.Product, error)
+	CreateIndex()
+	GetProductAll(product request.GetProduct) ([]model.ProductDetail, error)
 	GetProductBySerialNumber(serialNumber string) (*model.Product, error)
 	GetProductById(id string) (*model.Product, error)
 	CreateProduct(form request.Product) (*model.Product, error)
@@ -31,11 +35,6 @@ type IProduct interface {
 	RemoveQuantityById(id string, quantity int) (*model.Product, error)
 	AddQuantityById(id string, quantity int) (*model.Product, error)
 	GetTotalCostPrice(id string, quantity int) float64
-
-	GetProductPriceByProductCustomerId(productId string, customerId string) (*model.ProductPrice, error)
-	CreateProductPriceByProductId(form request.ProductPrice) (*model.ProductPrice, error)
-	GetProductPriceDetailByProductId(productId string) ([]model.ProductPriceDetail, error)
-	GetProductPriceDetailByCustomerId(customerId string) ([]model.ProductPriceDetail, error)
 
 	CreateProductLotByProductId(productId string, form request.Product) (*model.ProductLot, error)
 	CreateProductLot(form request.ProductLot) (*model.ProductLot, error)
@@ -49,22 +48,39 @@ type IProduct interface {
 	UpdateProductLotById(id string, form request.UpdateProductLot) (*model.ProductLot, error)
 	UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*model.ProductLot, error)
 	UpdateProductLotQuantityById(id string, form request.UpdateProductLotQuantity) (*model.ProductLot, error)
+
+	CreateProductUnitByProductId(productId string, form request.Product) (*model.ProductUnit, error)
+	GetProductUnitByProductIdAndUnit(productId string, unit string) (*model.ProductUnit, error)
+	GetProductUnitsByProductId(productId string) ([]model.ProductUnit, error)
+
+	CreateProductPriceByProductAndUnitId(productId string, unitId string, form request.Product) (*model.ProductPrice, error)
+	GetProductPricesByProductId(productId string) ([]model.ProductPrice, error)
+
+	CreateProductStockByProductAndUnitId(productId string, unitId string, form request.Product) (*model.ProductStock, error)
+	GetProductStocksByProductAndUnitId(productId string, unitId string) ([]model.ProductStock, error)
+	GetProductStockMaxSequence(productId string, unitId string) int
+	RemoveProductStockQuantityByProductAndUnitId(productId string, unitId string, quantity int) (*model.ProductStock, error)
+	AddProductStockQuantityByProductAndUnitId(productId string, unitId string, quantity int) (*model.ProductStock, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
 	productsRepo := resource.PosDb.Collection("products")
 	productPricesRepo := resource.PosDb.Collection("product_prices")
+	productUnitsRepo := resource.PosDb.Collection("product_units")
 	productLotsRepo := resource.PosDb.Collection("product_lots")
+	productStockRepo := resource.PosDb.Collection("product_stocks")
 	entity := &productEntity{
 		productsRepo:      productsRepo,
 		productPricesRepo: productPricesRepo,
 		productLotsRepo:   productLotsRepo,
+		productUnitsRepo:  productUnitsRepo,
+		productStockRepo:  productStockRepo,
 	}
-	_, _ = entity.CreateIndex()
+	entity.CreateIndex()
 	return entity
 }
 
-func (entity *productEntity) CreateIndex() (string, error) {
+func (entity *productEntity) CreateIndex() {
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	mod := mongo.IndexModel{
@@ -73,11 +89,13 @@ func (entity *productEntity) CreateIndex() (string, error) {
 		},
 		Options: options.Index().SetUnique(true),
 	}
-	ind, err := entity.productsRepo.Indexes().CreateOne(ctx, mod)
-	return ind, err
+	_, err := entity.productsRepo.Indexes().CreateOne(ctx, mod)
+	if err != nil {
+		logrus.Error(err)
+	}
 }
 
-func (entity *productEntity) GetProductAll(product request.GetProduct) ([]model.Product, error) {
+func (entity *productEntity) GetProductAll(product request.GetProduct) (items []model.ProductDetail, err error) {
 	logrus.Info("GetProductAll")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -85,25 +103,47 @@ func (entity *productEntity) GetProductAll(product request.GetProduct) ([]model.
 	if product.Category != "" {
 		query["category"] = product.Category
 	}
-	cursor, err := entity.productsRepo.Find(ctx, query)
+
+	pipeline := []bson.M{
+		{
+			"$match": query,
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "product_units",
+				"localField":   "_id",
+				"foreignField": "productId",
+				"as":           "units",
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "product_prices",
+				"localField":   "_id",
+				"foreignField": "productId",
+				"as":           "prices",
+			},
+		},
+	}
+	cursor, err := entity.productsRepo.Aggregate(ctx, pipeline)
+
 	if err != nil {
 		return nil, err
 	}
-	var products []model.Product
 	for cursor.Next(ctx) {
-		var user model.Product
-		err = cursor.Decode(&user)
+		item := model.ProductDetail{}
+		err = cursor.Decode(&item)
 		if err != nil {
 			logrus.Error(err)
 			logrus.Info(cursor.Current)
 		} else {
-			products = append(products, user)
+			items = append(items, item)
 		}
 	}
-	if products == nil {
-		products = []model.Product{}
+	if items == nil {
+		items = []model.ProductDetail{}
 	}
-	return products, nil
+	return items, nil
 }
 
 func (entity *productEntity) GetProductBySerialNumber(serialNumber string) (*model.Product, error) {
@@ -282,157 +322,6 @@ func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 
 		return 0
 	}
 	return data.CostPrice * float64(quantity)
-}
-
-func (entity *productEntity) GetProductPriceByProductCustomerId(productId string, customerId string) (*model.ProductPrice, error) {
-	logrus.Info("GetProductPriceByProductCustomerId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	var data model.ProductPrice
-	pid, err := primitive.ObjectIDFromHex(productId)
-	if err != nil {
-		return nil, err
-	}
-	cid, err := primitive.ObjectIDFromHex(customerId)
-	if err != nil {
-		return nil, err
-	}
-	err = entity.productPricesRepo.FindOne(ctx, bson.M{"productId": pid, "customerId": cid}).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
-func (entity *productEntity) CreateProductPriceByProductId(form request.ProductPrice) (data *model.ProductPrice, err error) {
-	logrus.Info("CreateProductPriceByProductId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	data, _ = entity.GetProductPriceByProductCustomerId(form.ProductId, form.CustomerId)
-	if data != nil {
-		data.CustomerPrice = form.CustomerPrice
-		data.UpdatedBy = form.CreatedBy
-		data.UpdatedDate = time.Now()
-
-		isReturnNewDoc := options.After
-		opts := &options.FindOneAndUpdateOptions{
-			ReturnDocument: &isReturnNewDoc,
-		}
-		err = entity.productPricesRepo.FindOneAndUpdate(ctx, bson.M{"productId": data.ProductId, "customerId": data.CustomerId}, bson.M{"$set": data}, opts).Decode(&data)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	} else {
-		pid, err := primitive.ObjectIDFromHex(form.ProductId)
-		if err != nil {
-			return nil, err
-		}
-		data.ProductId = pid
-		cid, err := primitive.ObjectIDFromHex(form.CustomerId)
-		if err != nil {
-			return nil, err
-		}
-		data.CustomerId = cid
-		data.CustomerPrice = form.CustomerPrice
-		data.CreatedBy = form.CreatedBy
-		data.CreatedDate = time.Now()
-		data.UpdatedBy = form.CreatedBy
-		data.UpdatedDate = time.Now()
-		_, err = entity.productPricesRepo.InsertOne(ctx, data)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
-}
-
-func (entity *productEntity) GetProductPriceDetailByProductId(productId string) ([]model.ProductPriceDetail, error) {
-	logrus.Info("GetProductPriceDetailByProductId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	pid, err := primitive.ObjectIDFromHex(productId)
-	if err != nil {
-		return nil, err
-	}
-	cursor, err := entity.productPricesRepo.Aggregate(ctx, []bson.M{
-		{
-			"$match": bson.M{
-				"productId": pid,
-			},
-		},
-		{
-			"$lookup": bson.M{
-				"from":         "customers",
-				"localField":   "customerId",
-				"foreignField": "_id",
-				"as":           "customer",
-			},
-		},
-		{"$unwind": "customer"},
-	})
-	if err != nil {
-		return nil, err
-	}
-	var items []model.ProductPriceDetail
-	for cursor.Next(ctx) {
-		var data model.ProductPriceDetail
-		err = cursor.Decode(&data)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, data)
-		}
-	}
-	if items == nil {
-		items = []model.ProductPriceDetail{}
-	}
-	return items, nil
-}
-
-func (entity *productEntity) GetProductPriceDetailByCustomerId(customerId string) ([]model.ProductPriceDetail, error) {
-	logrus.Info("GetProductPriceDetailByCustomerId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	cid, err := primitive.ObjectIDFromHex(customerId)
-	if err != nil {
-		return nil, err
-	}
-	cursor, err := entity.productPricesRepo.Aggregate(ctx, []bson.M{
-		{
-			"$match": bson.M{
-				"customerId": cid,
-			},
-		},
-		{
-			"$lookup": bson.M{
-				"from":         "products",
-				"localField":   "productId",
-				"foreignField": "_id",
-				"as":           "product",
-			},
-		},
-		{"$unwind": "product"},
-	})
-	if err != nil {
-		return nil, err
-	}
-	var items []model.ProductPriceDetail
-	for cursor.Next(ctx) {
-		var data model.ProductPriceDetail
-		err = cursor.Decode(&data)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, data)
-		}
-	}
-	if items == nil {
-		items = []model.ProductPriceDetail{}
-	}
-	return items, nil
 }
 
 func (entity *productEntity) CreateProductLotByProductId(productId string, form request.Product) (*model.ProductLot, error) {
@@ -649,7 +538,7 @@ func (entity *productEntity) GetProductLotsExpireNotify(form request.GetExpireRa
 		return nil, err
 	}
 	for cursor.Next(ctx) {
-		var data model.ProductLotDetail
+		data := model.ProductLotDetail{}
 		err = cursor.Decode(&data)
 		if err != nil {
 			logrus.Error(err)
@@ -753,4 +642,270 @@ func (entity *productEntity) UpdateProductLotQuantityById(id string, form reques
 		return nil, err
 	}
 	return data, nil
+}
+
+func (entity *productEntity) CreateProductUnitByProductId(productId string, form request.Product) (*model.ProductUnit, error) {
+	logrus.Info("CreateProductUnitByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	data := model.ProductUnit{}
+	product, _ := primitive.ObjectIDFromHex(productId)
+	err := entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": form.Unit}).Decode(&data)
+	if err != nil {
+		data.Id = primitive.NewObjectID()
+		data.ProductId, _ = primitive.ObjectIDFromHex(productId)
+		data.Unit = form.Unit
+		data.Size = 1
+		data.CostPrice = form.CostPrice
+		data.Volume = 0
+		data.VolumeUnit = ""
+		data.Barcode = form.SerialNumber
+		_, err = entity.productUnitsRepo.InsertOne(ctx, data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
+	} else {
+		data.CostPrice = form.CostPrice
+		data.Barcode = form.SerialNumber
+
+		isReturnNewDoc := options.After
+		opts := &options.FindOneAndUpdateOptions{
+			ReturnDocument: &isReturnNewDoc,
+		}
+		err = entity.productUnitsRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, opts).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+		return &data, nil
+	}
+}
+
+func (entity *productEntity) GetProductUnitByProductIdAndUnit(productId string, unit string) (*model.ProductUnit, error) {
+	logrus.Info("GetProductUnitByProductIdAndUnit")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	data := model.ProductUnit{}
+	product, _ := primitive.ObjectIDFromHex(productId)
+	err := entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) CreateProductPriceByProductAndUnitId(productId string, unitId string, form request.Product) (*model.ProductPrice, error) {
+	logrus.Info("CreateProductPriceByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	data := model.ProductPrice{}
+	product, _ := primitive.ObjectIDFromHex(productId)
+	unit, _ := primitive.ObjectIDFromHex(unitId)
+
+	err := entity.productPricesRepo.FindOne(ctx, bson.M{"productId": product, "unitId": unit}).Decode(&data)
+	if err != nil {
+		data.Id = primitive.NewObjectID()
+		data.ProductId, _ = primitive.ObjectIDFromHex(productId)
+		data.UnitId, _ = primitive.ObjectIDFromHex(unitId)
+		data.CustomerType = constant.CustomerTypeGeneral
+		data.Price = form.Price
+		_, err = entity.productPricesRepo.InsertOne(ctx, data)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		data.Price = form.Price
+		isReturnNewDoc := options.After
+		opts := &options.FindOneAndUpdateOptions{
+			ReturnDocument: &isReturnNewDoc,
+		}
+		err = entity.productPricesRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, opts).Decode(&data)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &data, nil
+}
+
+func (entity *productEntity) CreateProductStockByProductAndUnitId(productId string, unitId string, form request.Product) (*model.ProductStock, error) {
+	logrus.Info("CreateProductStockByProductAndUnitId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	data := model.ProductStock{}
+	product, _ := primitive.ObjectIDFromHex(productId)
+	unit, _ := primitive.ObjectIDFromHex(unitId)
+
+	data.Id = primitive.NewObjectID()
+	data.ProductId = product
+	data.UnitId = unit
+	data.Sequence = entity.GetProductStockMaxSequence(productId, unitId) + 1
+	data.LotNumber = form.LotNumber
+	data.CostPrice = form.CostPrice
+	data.Price = form.Price
+	data.Import = form.Quantity
+	data.Quantity = form.Quantity
+	_, err := entity.productStockRepo.InsertOne(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) GetProductStocksByProductAndUnitId(productId string, unitId string) (items []model.ProductStock, err error) {
+	logrus.Info("GetProductStocksByProductAndUnitId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	product, _ := primitive.ObjectIDFromHex(productId)
+	unit, _ := primitive.ObjectIDFromHex(unitId)
+	opts := options.Find().SetSort(bson.D{{"sequence", 1}})
+	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"productId": product, "unitId": unit}, opts)
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		item := model.ProductStock{}
+		err = cursor.Decode(&item)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, item)
+		}
+	}
+	if items == nil {
+		items = []model.ProductStock{}
+	}
+	return items, nil
+}
+
+func (entity *productEntity) GetProductStockMaxSequence(productId string, unitId string) int {
+	logrus.Info("GetProductStockMaxSequence")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	product, _ := primitive.ObjectIDFromHex(productId)
+	unit, _ := primitive.ObjectIDFromHex(unitId)
+	opts := options.FindOne().SetSort(bson.D{{"sequence", -1}})
+	data := model.ProductStock{}
+	err := entity.productStockRepo.FindOne(ctx, bson.M{"productId": product, "unitId": unit}, opts).Decode(&data)
+	if err != nil {
+		return 0
+	}
+	return data.Sequence
+}
+
+func (entity *productEntity) RemoveProductStockQuantityByProductAndUnitId(productId string, unitId string, quantity int) (*model.ProductStock, error) {
+	logrus.Info("RemoveProductStockQuantityByProductAndUnitId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	stocks, err := entity.GetProductStocksByProductAndUnitId(productId, unitId)
+	if err != nil {
+		return nil, err
+	}
+	if len(stocks) == 0 {
+		return nil, errors.New("not found product stock")
+	}
+
+	data := stocks[0]
+	for _, stock := range stocks {
+		if stock.Quantity > 0 {
+			data = stock
+			break
+		}
+	}
+
+	data.Quantity = data.Quantity - quantity
+	isReturnNewDoc := options.After
+	updateOpts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, updateOpts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) AddProductStockQuantityByProductAndUnitId(productId string, unitId string, quantity int) (*model.ProductStock, error) {
+	logrus.Info("AddProductStockQuantityByProductAndUnitId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	stocks, err := entity.GetProductStocksByProductAndUnitId(productId, unitId)
+	if err != nil {
+		return nil, err
+	}
+	if len(stocks) == 0 {
+		return nil, errors.New("not found product stock")
+	}
+
+	data := stocks[0]
+	for _, stock := range stocks {
+		if stock.Quantity > 0 {
+			data = stock
+			break
+		}
+	}
+
+	data.Quantity = data.Quantity + quantity
+	isReturnNewDoc := options.After
+	updateOpts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, updateOpts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) GetProductUnitsByProductId(productId string) (items []model.ProductUnit, err error) {
+	logrus.Info("GetProductUnitsByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	product, _ := primitive.ObjectIDFromHex(productId)
+	cursor, err := entity.productUnitsRepo.Find(ctx, bson.M{"productId": product})
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		item := model.ProductUnit{}
+		err = cursor.Decode(&item)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, item)
+		}
+	}
+	if items == nil {
+		items = []model.ProductUnit{}
+	}
+	return items, nil
+}
+
+func (entity *productEntity) GetProductPricesByProductId(productId string) (items []model.ProductPrice, err error) {
+	logrus.Info("GetProductPricesByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	product, _ := primitive.ObjectIDFromHex(productId)
+	cursor, err := entity.productPricesRepo.Find(ctx, bson.M{"productId": product})
+	if err != nil {
+		return nil, err
+	}
+	for cursor.Next(ctx) {
+		item := model.ProductPrice{}
+		err = cursor.Decode(&item)
+		if err != nil {
+			logrus.Error(err)
+			logrus.Info(cursor.Current)
+		} else {
+			items = append(items, item)
+		}
+	}
+	if items == nil {
+		items = []model.ProductPrice{}
+	}
+	return items, nil
 }

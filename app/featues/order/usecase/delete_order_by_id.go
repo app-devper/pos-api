@@ -21,6 +21,9 @@ func DeleteOrderById(orderEntity repository.IOrder, productEntity repository.IPr
 		var no = 1
 		for _, item := range result.Items {
 			_, _ = productEntity.AddQuantityById(item.ProductId.Hex(), item.Quantity)
+			if !item.UnitId.IsZero() {
+				_, _ = productEntity.AddProductStockQuantityByProductAndUnitId(item.ProductId.Hex(), item.UnitId.Hex(), item.Quantity)
+			}
 			message += fmt.Sprintf("%d. %s\n", no, item.GetMessage())
 			no += 1
 		}

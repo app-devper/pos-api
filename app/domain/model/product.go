@@ -22,6 +22,12 @@ type Product struct {
 	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
 }
 
+type ProductDetail struct {
+	Product
+	ProductUnits  []ProductUnit  `bson:"units" json:"units"`
+	ProductPrices []ProductPrice `bson:"prices"  json:"prices"`
+}
+
 type ProductLot struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
@@ -37,39 +43,39 @@ type ProductLot struct {
 }
 
 type ProductLotDetail struct {
-	Id          primitive.ObjectID `bson:"_id" json:"id"`
-	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	LotNumber   string             `bson:"lotNumber" json:"lotNumber"`
-	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
-	Quantity    int                `bson:"quantity" json:"quantity"`
-	ExpireDate  time.Time          `bson:"expireDate" json:"expireDate"`
-	Notify      bool               `bson:"notify" json:"notify"`
-	Product     Product            `bson:"product" json:"product"`
-	CreatedBy   string             `bson:"createdBy" json:"-"`
-	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"-"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
+	Product Product `bson:"product" json:"product"`
+	ProductLot
+}
+
+type ProductUnit struct {
+	Id         primitive.ObjectID `bson:"_id" json:"id"`
+	ProductId  primitive.ObjectID `bson:"productId" json:"productId"`
+	Unit       string             `bson:"unit" json:"unit"`
+	Size       int                `bson:"size" json:"size"`
+	CostPrice  float64            `bson:"costPrice" json:"costPrice"`
+	Volume     float64            `bson:"volume" json:"volume"`
+	VolumeUnit string             `bson:"volumeUnit" json:"volumeUnit"`
+	Barcode    string             `bson:"barcode" json:"barcode"`
 }
 
 type ProductPrice struct {
-	ProductId     primitive.ObjectID `bson:"productId" json:"productId"`
-	CustomerId    primitive.ObjectID `bson:"customerId" json:"customerId"`
-	CustomerPrice float64            `bson:"customerPrice" json:"customerPrice"`
-	CreatedBy     string             `bson:"createdBy" json:"-"`
-	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy     string             `bson:"updatedBy" json:"-"`
-	UpdatedDate   time.Time          `bson:"updatedDate" json:"-"`
+	Id           primitive.ObjectID `bson:"_id" json:"id"`
+	ProductId    primitive.ObjectID `bson:"productId" json:"productId"`
+	UnitId       primitive.ObjectID `bson:"unitId" json:"unitId"`
+	CustomerType string             `bson:"customerType" json:"customerType"`
+	Price        float64            `bson:"price" json:"price"`
 }
 
-type ProductPriceDetail struct {
-	Id            primitive.ObjectID `bson:"_id" json:"id"`
-	ProductId     primitive.ObjectID `bson:"productId" json:"productId"`
-	CustomerId    primitive.ObjectID `bson:"customerId" json:"customerId"`
-	CustomerPrice float64            `bson:"customerPrice" json:"customerPrice"`
-	Customer      Customer           `bson:"customer" json:"customer"`
-	Product       Product            `bson:"product" json:"product"`
-	CreatedBy     string             `bson:"createdBy" json:"-"`
-	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy     string             `bson:"updatedBy" json:"-"`
-	UpdatedDate   time.Time          `bson:"updatedDate" json:"-"`
+type ProductStock struct {
+	Id         primitive.ObjectID `bson:"_id" json:"id"`
+	ProductId  primitive.ObjectID `bson:"productId" json:"productId"`
+	UnitId     primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Sequence   int                `bson:"sequence" json:"sequence"`
+	LotNumber  string             `bson:"lotNumber" json:"lotNumber"`
+	CostPrice  float64            `bson:"costPrice" json:"costPrice"`
+	Price      float64            `bson:"price" json:"price"`
+	Import     int                `bson:"import" json:"import"`
+	Quantity   int                `bson:"quantity" json:"quantity"`
+	ExpireDate time.Time          `bson:"expireDate" json:"expireDate"`
+	ImportDate time.Time          `bson:"importDate" json:"importDate"`
 }

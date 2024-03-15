@@ -44,6 +44,9 @@ func CreateOrder(
 
 		for _, item := range req.Items {
 			_, _ = productEntity.RemoveQuantityById(item.ProductId, item.Quantity)
+			if item.UnitId != "" {
+				_, _ = productEntity.RemoveProductStockQuantityByProductAndUnitId(item.ProductId, item.UnitId, item.Quantity)
+			}
 		}
 
 		if req.Message != "" {

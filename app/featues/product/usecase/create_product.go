@@ -16,16 +16,20 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 		}
 		userId := ctx.GetString("UserId")
 		req.CreatedBy = userId
-		result, err := productEntity.CreateProduct(req)
+		product, err := productEntity.CreateProduct(req)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		lot, _ := productEntity.CreateProductLotByProductId(result.Id.Hex(), req)
+		unit, _ := productEntity.CreateProductUnitByProductId(product.Id.Hex(), req)
+		_, _ = productEntity.CreateProductPriceByProductAndUnitId(product.Id.Hex(), unit.Id.Hex(), req)
+		_, _ = productEntity.CreateProductStockByProductAndUnitId(product.Id.Hex(), unit.Id.Hex(), req)
+
+		lot, _ := productEntity.CreateProductLotByProductId(product.Id.Hex(), req)
 		if req.ReceiveId != "" {
-			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex(), result.Id.Hex(), req)
+			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex(), product.Id.Hex(), req)
 		}
 
-		ctx.JSON(http.StatusOK, result)
+		ctx.JSON(http.StatusOK, product)
 	}
 }

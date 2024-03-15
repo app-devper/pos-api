@@ -23,6 +23,10 @@ func DeleteOrderItemById(orderEntity repository.IOrder, productEntity repository
 
 		_, _ = productEntity.AddQuantityById(result.ProductId.Hex(), result.Quantity)
 
+		if !result.UnitId.IsZero() {
+			_, _ = productEntity.AddProductStockQuantityByProductAndUnitId(result.ProductId.Hex(), result.UnitId.Hex(), result.Quantity)
+		}
+
 		date := utils.ToFormat(result.CreatedDate)
 		_, _ = utils.NotifyMassage("ยกเลิกสินค้ารายการวันที่ " + date + "\n\n1. " + result.GetMessage())
 

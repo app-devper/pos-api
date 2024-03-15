@@ -14,11 +14,12 @@ func GetProducts(productEntity repository.IProduct) gin.HandlerFunc {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		result, err := productEntity.GetProductAll(req)
+		results, err := productEntity.GetProductAll(req)
+
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusOK, result)
+		ctx.JSON(http.StatusOK, results)
 	}
 }

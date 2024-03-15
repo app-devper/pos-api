@@ -22,6 +22,7 @@ type OrderItem struct {
 	Price     float64 `json:"price" binding:"required"`
 	CostPrice float64 `json:"costPrice"`
 	Discount  float64 `json:"discount"`
+	UnitId    string  `json:"unitId"`
 }
 
 type GetOrderRange struct {

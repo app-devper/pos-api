@@ -87,10 +87,12 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*model.Order, error)
 	for i := 0; i < count; i++ {
 		formItem := form.Items[i]
 		productId, _ := primitive.ObjectIDFromHex(formItem.ProductId)
+		unitId, _ := primitive.ObjectIDFromHex(formItem.UnitId)
 		item := model.OrderItem{
 			Id:          primitive.NewObjectID(),
 			OrderId:     orderId,
 			ProductId:   productId,
+			UnitId:      unitId,
 			Quantity:    formItem.Quantity,
 			Price:       formItem.Price,
 			CostPrice:   formItem.CostPrice,
