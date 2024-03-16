@@ -4,15 +4,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
+	repository2 "pos/app/data/repository"
 	"pos/app/domain/constant"
-	"pos/app/domain/repository"
 	"pos/app/domain/request"
 )
 
 func CreateOrder(
-	orderEntity repository.IOrder,
-	productEntity repository.IProduct,
-	sequenceEntity repository.ISequence,
+	orderEntity repository2.IOrder,
+	productEntity repository2.IProduct,
+	sequenceEntity repository2.ISequence,
 ) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Order{}

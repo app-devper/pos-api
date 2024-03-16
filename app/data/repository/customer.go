@@ -7,8 +7,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/domain/constant"
-	"pos/app/domain/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -31,7 +31,7 @@ type ICustomer interface {
 
 func NewCustomerEntity(resource *db.Resource) ICustomer {
 	customerRepo := resource.PosDb.Collection("customers")
-	var entity ICustomer = &customerEntity{customerRepo: customerRepo}
+	entity := &customerEntity{customerRepo: customerRepo}
 	_, _ = entity.CreateIndex()
 	return entity
 }

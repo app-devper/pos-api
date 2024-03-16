@@ -1,8 +1,8 @@
 package request
 
 import (
+	"pos/app/data/entities"
 	"pos/app/domain/constant"
-	"pos/app/domain/entities"
 	"strconv"
 )
 

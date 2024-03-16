@@ -6,7 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
-	"pos/app/domain/repository"
+	"pos/app/data/repository"
 	"strings"
 )
 

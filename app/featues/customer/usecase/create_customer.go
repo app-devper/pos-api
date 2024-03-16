@@ -4,12 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
+	repository2 "pos/app/data/repository"
 	"pos/app/domain/constant"
-	"pos/app/domain/repository"
 	"pos/app/domain/request"
 )
 
-func CreateCustomer(customerEntity repository.ICustomer, sequenceEntity repository.ISequence) gin.HandlerFunc {
+func CreateCustomer(customerEntity repository2.ICustomer, sequenceEntity repository2.ISequence) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Customer{}
 		if err := ctx.ShouldBind(&req); err != nil {

@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
-	"pos/app/domain/repository"
+	"pos/app/data/repository"
 	"pos/app/domain/request"
 	"time"
 )
@@ -43,7 +43,7 @@ func GetProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
 
 func GetProductLots(productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.GetExpireRange{}
+		req := request.GetProductLotsExpireRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -76,7 +76,7 @@ func GetProductLotsExpireNotify(productEntity repository.IProduct) gin.HandlerFu
 		today := time.Now().In(location)
 		startDate := utils.Bod(today)
 		endDate := startDate.Add(24 * time.Hour)
-		req := request.GetExpireRange{
+		req := request.GetProductLotsExpireRange{
 			StartDate: startDate.UTC(),
 			EndDate:   endDate.UTC(),
 		}

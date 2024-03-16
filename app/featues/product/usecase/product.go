@@ -3,14 +3,14 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	repository2 "pos/app/data/repository"
 	"pos/app/domain/constant"
-	"pos/app/domain/repository"
 	"pos/app/domain/request"
 	"strings"
 	"time"
 )
 
-func CreateProduct(productEntity repository.IProduct, receiveEntity repository.IReceive) gin.HandlerFunc {
+func CreateProduct(productEntity repository2.IProduct, receiveEntity repository2.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Product{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -108,7 +108,7 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 	}
 }
 
-func GetProducts(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProducts(productEntity repository2.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.GetProduct{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -125,7 +125,7 @@ func GetProducts(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductBySerialNumber(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductBySerialNumber(productEntity repository2.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		serialNumber := ctx.Param("serialNumber")
 		result, err := productEntity.GetProductBySerialNumber(serialNumber)
@@ -137,7 +137,7 @@ func GetProductBySerialNumber(productEntity repository.IProduct) gin.HandlerFunc
 	}
 }
 
-func DeleteProductById(productEntity repository.IProduct) gin.HandlerFunc {
+func DeleteProductById(productEntity repository2.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
 		result, err := productEntity.RemoveProductById(id)
@@ -149,7 +149,7 @@ func DeleteProductById(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductById(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductById(productEntity repository2.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
 		result, err := productEntity.GetProductById(id)
@@ -161,7 +161,7 @@ func GetProductById(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func UpdateProductById(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductById(productEntity repository2.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
 		req := request.UpdateProduct{}

@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
-	"pos/app/domain/entities"
+	"pos/app/data/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"strings"
@@ -30,7 +30,7 @@ type ICategory interface {
 
 func NewCategoryEntity(resource *db.Resource) ICategory {
 	categoryRepo := resource.PosDb.Collection("categories")
-	var entity ICategory = &categoryEntity{categoryRepo: categoryRepo}
+	entity := &categoryEntity{categoryRepo: categoryRepo}
 	_, _ = entity.CreateIndex()
 	return entity
 }

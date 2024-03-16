@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
-	"pos/app/domain/entities"
+	"pos/app/data/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"

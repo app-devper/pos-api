@@ -16,7 +16,7 @@ type ISession interface {
 }
 
 func NewSessionEntity(resource *db.Resource) ISession {
-	var entity ISession = &sessionEntity{rdb: resource.RdDb}
+	entity := &sessionEntity{rdb: resource.RdDb}
 	return entity
 }
 

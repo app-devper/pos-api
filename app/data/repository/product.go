@@ -8,8 +8,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/domain/constant"
-	"pos/app/domain/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"strings"
@@ -41,11 +41,11 @@ type IProduct interface {
 	// ProductLot
 	CreateProductLotByProductId(productId string, form request.Product) (*entities.ProductLot, error)
 	CreateProductLot(form request.ProductLot) (*entities.ProductLot, error)
-	GetProductLots(form request.GetExpireRange) ([]entities.ProductLot, error)
+	GetProductLots(form request.GetProductLotsExpireRange) ([]entities.ProductLot, error)
 	GetProductLotsByProductId(productId string) ([]entities.ProductLot, error)
 	GetProductLotsByIds(ids []string) ([]entities.ProductLot, error)
 	GetProductLotsExpired() ([]entities.ProductLot, error)
-	GetProductLotsExpireNotify(form request.GetExpireRange) ([]entities.ProductLotDetail, error)
+	GetProductLotsExpireNotify(form request.GetProductLotsExpireRange) ([]entities.ProductLotDetail, error)
 	GetProductLotById(id string) (*entities.ProductLot, error)
 	RemoveProductLotById(id string) (*entities.ProductLot, error)
 	UpdateProductLotById(id string, form request.UpdateProductLot) (*entities.ProductLot, error)
@@ -363,7 +363,7 @@ func (entity *productEntity) CreateProductLot(form request.ProductLot) (*entitie
 	return &data, nil
 }
 
-func (entity *productEntity) GetProductLots(form request.GetExpireRange) (items []entities.ProductLot, err error) {
+func (entity *productEntity) GetProductLots(form request.GetProductLotsExpireRange) (items []entities.ProductLot, err error) {
 	logrus.Info("GetProductLots")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -500,7 +500,7 @@ func (entity *productEntity) GetProductLotsExpired() (items []entities.ProductLo
 	return items, nil
 }
 
-func (entity *productEntity) GetProductLotsExpireNotify(form request.GetExpireRange) (items []entities.ProductLotDetail, err error) {
+func (entity *productEntity) GetProductLotsExpireNotify(form request.GetProductLotsExpireRange) (items []entities.ProductLotDetail, err error) {
 	logrus.Info("GetProductLotsExpireNotify")
 	ctx, cancel := utils.InitContext()
 	defer cancel()

@@ -7,8 +7,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/domain/constant"
-	"pos/app/domain/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -53,7 +53,7 @@ func NewOrderEntity(resource *db.Resource) IOrder {
 	orderRepo := resource.PosDb.Collection("orders")
 	orderItemRepo := resource.PosDb.Collection("order_items")
 	paymentRepo := resource.PosDb.Collection("payments")
-	var entity IOrder = &orderEntity{orderRepo: orderRepo, orderItemRepo: orderItemRepo, paymentRepo: paymentRepo}
+	entity := &orderEntity{orderRepo: orderRepo, orderItemRepo: orderItemRepo, paymentRepo: paymentRepo}
 	return entity
 }
 

@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
+	"pos/app/data/repository"
 	"pos/app/domain/constant"
-	"pos/app/domain/repository"
 	"pos/app/domain/request"
 )
 

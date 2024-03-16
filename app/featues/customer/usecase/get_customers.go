@@ -3,7 +3,7 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/domain/repository"
+	"pos/app/data/repository"
 )
 
 func GetCustomers(customerEntity repository.ICustomer) gin.HandlerFunc {
