@@ -93,6 +93,7 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 				ExpireDate:  req.ExpireDate,
 				LotNumber:   req.LotNumber,
 				ImportDate:  time.Now(),
+				UpdatedBy:   userId,
 			}
 			stock, _ := productEntity.CreateProductStock(productStock)
 

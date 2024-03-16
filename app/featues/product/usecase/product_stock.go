@@ -14,6 +14,8 @@ func CreateProductStock(productEntity repository.IProduct) gin.HandlerFunc {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		userId := ctx.GetString("UserId")
+		req.UpdatedBy = userId
 		stock, err := productEntity.CreateProductStock(req)
 
 		// Add product history
