@@ -115,6 +115,7 @@ type ProductHistory struct {
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Price       float64            `bson:"price" json:"price"`
+	Balance     int                `bson:"balance" json:"balance"`
 	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
 }

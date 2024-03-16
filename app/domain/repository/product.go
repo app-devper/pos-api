@@ -1202,7 +1202,8 @@ func (entity *productEntity) CreateProductHistory(form request.ProductHistory) (
 	data.Quantity = form.Quantity
 	data.Import = form.Import
 	data.CreatedBy = form.CreatedBy
-	data.CreatedDate = form.CreatedDate
+	data.CreatedDate = time.Now()
+	data.Balance = form.Balance
 
 	_, err := entity.productHistoryRepo.InsertOne(ctx, data)
 	if err != nil {

@@ -4,21 +4,19 @@ import (
 	"pos/app/domain/constant"
 	"pos/app/domain/entities"
 	"strconv"
-	"time"
 )
 
 type ProductHistory struct {
-	ProductId   string    `json:"productId" binding:"required"`
-	Type        string    `json:"type"`
-	Description string    `json:"description"`
-	Unit        string    `json:"unit"`
-	Import      int       `json:"import"`
-	Quantity    int       `json:"quantity"`
-	CostPrice   float64   `json:"costPrice"`
-	Price       float64   `json:"price"`
-	Balance     int       `json:"balance"`
-	CreatedBy   string    `json:"createdBy"`
-	CreatedDate time.Time `json:"createdDate"`
+	ProductId   string  `json:"productId" binding:"required"`
+	Type        string  `json:"type"`
+	Description string  `json:"description"`
+	Unit        string  `json:"unit"`
+	Import      int     `json:"import"`
+	Quantity    int     `json:"quantity"`
+	CostPrice   float64 `json:"costPrice"`
+	Price       float64 `json:"price"`
+	Balance     int     `json:"balance"`
+	CreatedBy   string  `json:"createdBy"`
 }
 
 func AddProductHistory(productId string, product Product) ProductHistory {
