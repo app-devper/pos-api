@@ -22,6 +22,7 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 
 		serialNumber := strings.TrimSpace(req.SerialNumber)
 		product, err := productEntity.GetProductBySerialNumber(serialNumber)
+
 		if product != nil {
 			updateProduct := request.UpdateProduct{
 				SerialNumber: req.SerialNumber,
@@ -38,11 +39,18 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
 		} else {
 			product, err = productEntity.CreateProduct(req)
-
-			// Add product history
-			_, _ = productEntity.CreateProductHistory(request.AddProductHistory(product.Id.Hex(), req))
+			if product != nil {
+				// Add product history
+				_, _ = productEntity.CreateProductHistory(request.AddProductHistory(product.Id.Hex(), req))
+			}
 		}
 
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Create product unit default
 		unit, _ := productEntity.GetProductUnitByDefault(product.Id.Hex(), req.Unit)
 		if unit == nil {
 			productUnit := request.ProductUnit{
@@ -51,6 +59,7 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 				Size:      1,
 				CostPrice: req.CostPrice,
 				Barcode:   req.SerialNumber,
+				UpdatedBy: userId,
 			}
 			unit, _ = productEntity.CreateProductUnit(productUnit)
 			productPrice := request.ProductPrice{
@@ -58,13 +67,9 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 				UnitId:       unit.Id.Hex(),
 				Price:        req.Price,
 				CustomerType: constant.CustomerTypeGeneral,
+				UpdatedBy:    userId,
 			}
 			_, _ = productEntity.CreateProductPrice(productPrice)
-		}
-
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
 		}
 
 		lot, _ := productEntity.CreateProductLotByProductId(product.Id.Hex(), req)
@@ -75,6 +80,8 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex(), product.Id.Hex(), req)
 		}
 
+		// Create product stock
+		unit, _ = productEntity.GetProductUnitByUnit(product.Id.Hex(), req.Unit)
 		if req.Quantity > 0 {
 			productStock := request.ProductStock{
 				ProductId:   product.Id.Hex(),
@@ -87,12 +94,13 @@ func CreateProduct(productEntity repository.IProduct, receiveEntity repository.I
 				LotNumber:   req.LotNumber,
 				ImportDate:  time.Now(),
 			}
-			_, _ = productEntity.CreateProductStock(productStock)
+			stock, _ := productEntity.CreateProductStock(productStock)
 
-			balance := productEntity.GetProductStockBalance(product.Id.Hex(), unit.Id.Hex())
-
-			// Add product history
-			_, _ = productEntity.CreateProductHistory(request.AddProductStockHistory(product.Id.Hex(), req.Unit, productStock, balance))
+			if stock != nil {
+				// Add product history
+				balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), stock.UnitId.Hex())
+				_, _ = productEntity.CreateProductHistory(request.AddProductStockHistory(stock.ProductId.Hex(), req.Unit, productStock, balance))
+			}
 		}
 
 		ctx.JSON(http.StatusOK, product)

@@ -56,6 +56,7 @@ type IProduct interface {
 	CreateProductUnit(form request.ProductUnit) (*entities.ProductUnit, error)
 	GetProductUnitById(id string) (*entities.ProductUnit, error)
 	GetProductUnitByDefault(productId string, unit string) (*entities.ProductUnit, error)
+	GetProductUnitByUnit(productId string, unit string) (*entities.ProductUnit, error)
 	UpdateProductUnitById(id string, form request.ProductUnit) (*entities.ProductUnit, error)
 	RemoveProductUnitById(id string) (*entities.ProductUnit, error)
 	GetProductUnitsByProductId(productId string) ([]entities.ProductUnit, error)
@@ -951,6 +952,19 @@ func (entity *productEntity) GetProductUnitByDefault(productId string, unit stri
 	product, err := primitive.ObjectIDFromHex(productId)
 	data := entities.ProductUnit{}
 	err = entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit, "size": 1}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) GetProductUnitByUnit(productId string, unit string) (*entities.ProductUnit, error) {
+	logrus.Info("GetProductUnitByUnit")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	product, err := primitive.ObjectIDFromHex(productId)
+	data := entities.ProductUnit{}
+	err = entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
