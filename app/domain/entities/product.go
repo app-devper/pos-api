@@ -23,10 +23,23 @@ type Product struct {
 }
 
 type ProductDetail struct {
-	ProductUnits  []ProductUnit  `bson:"units" json:"units"`
-	ProductPrices []ProductPrice `bson:"prices"  json:"prices"`
-	ProductStocks []ProductStock `bson:"stocks"  json:"stocks"`
-	Product
+	Id            primitive.ObjectID `bson:"_id" json:"id"`
+	Name          string             `bson:"name" json:"name"`
+	NameEn        string             `bson:"nameEn" json:"nameEn"`
+	Description   string             `bson:"description" json:"description"`
+	Price         float64            `bson:"price" json:"price"`
+	CostPrice     float64            `bson:"costPrice" json:"costPrice"`
+	Unit          string             `bson:"unit" json:"unit"`
+	Quantity      int                `bson:"quantity" json:"quantity"`
+	SerialNumber  string             `bson:"serialNumber" json:"serialNumber"`
+	Category      string             `bson:"category"  json:"category"`
+	CreatedBy     string             `bson:"createdBy" json:"-"`
+	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy     string             `bson:"updatedBy" json:"-"`
+	UpdatedDate   time.Time          `bson:"updatedDate" json:"-"`
+	ProductUnits  []ProductUnit      `bson:"units" json:"units"`
+	ProductPrices []ProductPrice     `bson:"prices"  json:"prices"`
+	ProductStocks []ProductStock     `bson:"stocks"  json:"stocks"`
 }
 
 type ProductLot struct {
@@ -44,8 +57,18 @@ type ProductLot struct {
 }
 
 type ProductLotDetail struct {
-	Product Product `bson:"product" json:"product"`
-	ProductLot
+	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
+	LotNumber   string             `bson:"lotNumber" json:"lotNumber"`
+	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
+	Quantity    int                `bson:"quantity" json:"quantity"`
+	ExpireDate  time.Time          `bson:"expireDate" json:"expireDate"`
+	Notify      bool               `bson:"notify" json:"notify"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
+	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy   string             `bson:"updatedBy" json:"-"`
+	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
+	Product     Product            `bson:"product" json:"product"`
 }
 
 type ProductUnit struct {

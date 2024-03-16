@@ -7,6 +7,10 @@ const (
 	CustomerTypeRegular    = "Regular"
 )
 
+func CustomerTypes() []string {
+	return []string{CustomerTypeGeneral, CustomerTypeMember, CustomerTypeWholesaler, CustomerTypeRegular}
+}
+
 const (
 	HistoryTypeAddProduct                 = "AddProduct"
 	HistoryTypeUpdateProduct              = "UpdateProduct"

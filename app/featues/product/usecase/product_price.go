@@ -3,6 +3,8 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/utils"
+	"pos/app/domain/constant"
 	"pos/app/domain/repository"
 	"pos/app/domain/request"
 )
@@ -14,6 +16,13 @@ func CreateProductPrice(productEntity repository.IProduct) gin.HandlerFunc {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		customerTypes := constant.CustomerTypes()
+		if customerTypeIsValid := utils.InArrayString(req.CustomerType, customerTypes); !customerTypeIsValid {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "customer type is not valid"})
+			return
+		}
+
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 
@@ -49,6 +58,12 @@ func UpdateProductPriceById(productEntity repository.IProduct) gin.HandlerFunc {
 		id := ctx.Param("id")
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		customerTypes := constant.CustomerTypes()
+		if customerTypeIsValid := utils.InArrayString(req.CustomerType, customerTypes); !customerTypeIsValid {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "customer type is not valid"})
 			return
 		}
 
