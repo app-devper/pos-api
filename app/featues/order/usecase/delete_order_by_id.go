@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"pos/app/core/utils"
 	"pos/app/domain/repository"
+	"pos/app/domain/request"
 )
 
 func DeleteOrderById(orderEntity repository.IOrder, productEntity repository.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		orderId := ctx.Param("orderId")
+		userId := ctx.GetString("UserId")
 		result, err := orderEntity.RemoveOrderById(orderId)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -21,8 +23,14 @@ func DeleteOrderById(orderEntity repository.IOrder, productEntity repository.IPr
 		var no = 1
 		for _, item := range result.Items {
 			_, _ = productEntity.AddQuantityById(item.ProductId.Hex(), item.Quantity)
-			if !item.UnitId.IsZero() {
-				_, _ = productEntity.AddProductStockQuantityByProductAndUnitId(item.ProductId.Hex(), item.UnitId.Hex(), item.Quantity)
+			if !item.StockId.IsZero() {
+				_, _ = productEntity.AddProductStockQuantityById(item.StockId.Hex(), item.Quantity)
+
+				// Add product history
+				stock, _ := productEntity.GetProductStockById(item.StockId.Hex())
+				unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
+				balance := productEntity.GetProductStockBalance(item.ProductId.Hex(), unit.Id.Hex())
+				_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(item.ProductId.Hex(), unit.Unit, &item, balance, userId))
 			}
 			message += fmt.Sprintf("%d. %s\n", no, item.GetMessage())
 			no += 1

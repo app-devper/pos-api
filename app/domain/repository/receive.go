@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
-	"pos/app/domain/model"
+	"pos/app/domain/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -19,16 +19,16 @@ type receiveEntity struct {
 }
 
 type IReceive interface {
-	GetReceives(form request.GetReceiveRange) ([]model.Receive, error)
-	CreateReceive(form request.Receive) (*model.Receive, error)
-	GetReceiveById(id string) (*model.Receive, error)
-	RemoveReceiveById(id string) (*model.Receive, error)
-	UpdateReceiveById(id string, form request.UpdateReceive) (*model.Receive, error)
-	UpdateReceiveTotalCostById(id string, totalCost float64) (*model.Receive, error)
-	CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*model.ReceiveItem, error)
-	GetReceiveItemsByReceiveId(receiveId string) ([]model.ReceiveItem, error)
-	GetReceiveItemByLotId(lotId string) (*model.ReceiveItem, error)
-	RemoveReceiveItemByLotId(lotId string) (*model.ReceiveItem, error)
+	GetReceives(form request.GetReceiveRange) ([]entities.Receive, error)
+	CreateReceive(form request.Receive) (*entities.Receive, error)
+	GetReceiveById(id string) (*entities.Receive, error)
+	RemoveReceiveById(id string) (*entities.Receive, error)
+	UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error)
+	UpdateReceiveTotalCostById(id string, totalCost float64) (*entities.Receive, error)
+	CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*entities.ReceiveItem, error)
+	GetReceiveItemsByReceiveId(receiveId string) ([]entities.ReceiveItem, error)
+	GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
+	RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 }
 
 func NewReceiveEntity(resource *db.Resource) IReceive {
@@ -41,7 +41,7 @@ func NewReceiveEntity(resource *db.Resource) IReceive {
 	return entity
 }
 
-func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []model.Receive, err error) {
+func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []entities.Receive, err error) {
 	logrus.Info("GetReceives")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -56,7 +56,7 @@ func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []
 		return nil, err
 	}
 	for cursor.Next(ctx) {
-		item := model.Receive{}
+		item := entities.Receive{}
 		err = cursor.Decode(&item)
 		if err != nil {
 			logrus.Error(err)
@@ -65,12 +65,12 @@ func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []
 		}
 	}
 	if items == nil {
-		items = []model.Receive{}
+		items = []entities.Receive{}
 	}
 	return items, nil
 }
 
-func (entity *receiveEntity) CreateReceive(form request.Receive) (*model.Receive, error) {
+func (entity *receiveEntity) CreateReceive(form request.Receive) (*entities.Receive, error) {
 	logrus.Info("CreateReceive")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -78,7 +78,7 @@ func (entity *receiveEntity) CreateReceive(form request.Receive) (*model.Receive
 	if err != nil {
 		return nil, err
 	}
-	data := model.Receive{
+	data := entities.Receive{
 		Id:          primitive.NewObjectID(),
 		Code:        form.Code,
 		Reference:   form.Reference,
@@ -95,12 +95,12 @@ func (entity *receiveEntity) CreateReceive(form request.Receive) (*model.Receive
 	return &data, nil
 }
 
-func (entity *receiveEntity) GetReceiveById(id string) (*model.Receive, error) {
+func (entity *receiveEntity) GetReceiveById(id string) (*entities.Receive, error) {
 	logrus.Info("GetReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	objId, _ := primitive.ObjectIDFromHex(id)
-	data := model.Receive{}
+	data := entities.Receive{}
 	err := entity.receiveRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -108,11 +108,11 @@ func (entity *receiveEntity) GetReceiveById(id string) (*model.Receive, error) {
 	return &data, nil
 }
 
-func (entity *receiveEntity) RemoveReceiveById(id string) (*model.Receive, error) {
+func (entity *receiveEntity) RemoveReceiveById(id string) (*entities.Receive, error) {
 	logrus.Info("RemoveReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Receive{}
+	data := entities.Receive{}
 	obId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (entity *receiveEntity) RemoveReceiveById(id string) (*model.Receive, error
 	return &data, nil
 }
 
-func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost float64) (*model.Receive, error) {
+func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost float64) (*entities.Receive, error) {
 	logrus.Info("UpdateReceiveTotalCostById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -140,7 +140,7 @@ func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost flo
 	if err != nil {
 		return nil, err
 	}
-	data := model.Receive{}
+	data := entities.Receive{}
 	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": obId}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost flo
 	return &data, nil
 }
 
-func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateReceive) (*model.Receive, error) {
+func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error) {
 	logrus.Info("UpdateReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -168,7 +168,7 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 	if err != nil {
 		return nil, err
 	}
-	data := model.Receive{}
+	data := entities.Receive{}
 	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": obId}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -194,7 +194,7 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 	return &data, nil
 }
 
-func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*model.ReceiveItem, error) {
+func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*entities.ReceiveItem, error) {
 	logrus.Info("CreateReceiveItem")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -210,7 +210,7 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, p
 	if err != nil {
 		return nil, err
 	}
-	data := model.ReceiveItem{
+	data := entities.ReceiveItem{
 		Id:          primitive.NewObjectID(),
 		ReceiveId:   receive,
 		LotId:       lot,
@@ -229,7 +229,7 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, p
 	return &data, nil
 }
 
-func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items []model.ReceiveItem, err error) {
+func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items []entities.ReceiveItem, err error) {
 	logrus.Info("GetReceiveItemsByReceiveId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -242,7 +242,7 @@ func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items
 		return nil, err
 	}
 	for cursor.Next(ctx) {
-		item := model.ReceiveItem{}
+		item := entities.ReceiveItem{}
 		err = cursor.Decode(&item)
 		if err != nil {
 			logrus.Error(err)
@@ -251,17 +251,17 @@ func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items
 		}
 	}
 	if items == nil {
-		items = []model.ReceiveItem{}
+		items = []entities.ReceiveItem{}
 	}
 	return items, nil
 }
 
-func (entity *receiveEntity) GetReceiveItemByLotId(lotId string) (*model.ReceiveItem, error) {
+func (entity *receiveEntity) GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error) {
 	logrus.Info("GetReceiveItemByLotId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	lot, _ := primitive.ObjectIDFromHex(lotId)
-	data := model.ReceiveItem{}
+	data := entities.ReceiveItem{}
 	err := entity.receiveItemsRepo.FindOne(ctx, bson.M{"lotId": lot}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -269,11 +269,11 @@ func (entity *receiveEntity) GetReceiveItemByLotId(lotId string) (*model.Receive
 	return &data, nil
 }
 
-func (entity *receiveEntity) RemoveReceiveItemByLotId(lotId string) (*model.ReceiveItem, error) {
+func (entity *receiveEntity) RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error) {
 	logrus.Info("RemoveReceiveItemByLotId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.ReceiveItem{}
+	data := entities.ReceiveItem{}
 	lot, err := primitive.ObjectIDFromHex(lotId)
 	if err != nil {
 		return nil, err

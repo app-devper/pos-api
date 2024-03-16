@@ -1,4 +1,4 @@
-package model
+package entities
 
 import (
 	"fmt"
@@ -22,16 +22,16 @@ type Order struct {
 }
 
 type OrderDetail struct {
-	Order
 	Items   []OrderItemProductDetail `json:"items"`
 	Payment Payment                  `json:"payment"`
+	Order
 }
 
 type OrderItem struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
+	StockId     primitive.ObjectID `bson:"stockId" json:"stockId"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
@@ -43,13 +43,13 @@ type OrderItem struct {
 }
 
 type OrderItemProductDetail struct {
-	OrderItem
 	Product Product `bson:"product" json:"product"`
+	OrderItem
 }
 
 type OrderItemOrderDetail struct {
-	OrderItem
 	Order Order `bson:"order" json:"order"`
+	OrderItem
 }
 
 func (item OrderItemProductDetail) GetMessage() string {

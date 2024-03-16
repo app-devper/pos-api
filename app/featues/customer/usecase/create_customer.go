@@ -17,6 +17,10 @@ func CreateCustomer(customerEntity repository.ICustomer, sequenceEntity reposito
 			return
 		}
 
+		if req.CustomerType == "" {
+			req.CustomerType = constant.CustomerTypeGeneral
+		}
+
 		userId := utils.GetUserId(ctx)
 		req.CreatedBy = userId
 

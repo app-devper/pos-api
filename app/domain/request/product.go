@@ -1,6 +1,8 @@
 package request
 
-import "time"
+import (
+	"time"
+)
 
 type GetProduct struct {
 	Category string `json:"category"`
@@ -20,6 +22,7 @@ type Product struct {
 	ExpireDate   time.Time `json:"expireDate" binding:"required"`
 	ReceiveId    string    `json:"receiveId"`
 	CreatedBy    string
+	ReceiveCode  string
 }
 
 type UpdateProduct struct {
@@ -33,6 +36,30 @@ type UpdateProduct struct {
 	SerialNumber string  `json:"serialNumber" binding:"required"`
 	Category     string  `json:"category"`
 	UpdatedBy    string
+}
+
+type ProductPrice struct {
+	ProductId    string  `json:"productId" binding:"required"`
+	UnitId       string  `json:"unitId" binding:"required"`
+	Price        float64 `json:"price" binding:"required"`
+	CustomerType string  `json:"customerType" binding:"required"`
+	UpdatedBy    string
+}
+
+type CreateProductUnit struct {
+	Price float64 `json:"price" binding:"required"`
+	ProductUnit
+}
+
+type ProductUnit struct {
+	ProductId  string  `json:"productId" binding:"required"`
+	Unit       string  `json:"unit" binding:"required"`
+	Size       int     `json:"size" binding:"required"`
+	CostPrice  float64 `json:"costPrice" binding:"required"`
+	Volume     float64 `json:"volume"`
+	VolumeUnit string  `json:"volumeUnit"`
+	Barcode    string  `json:"barcode"`
+	UpdatedBy  string
 }
 
 type ProductLot struct {
@@ -55,13 +82,6 @@ type UpdateProductLot struct {
 type GetExpireRange struct {
 	StartDate time.Time `form:"startDate" binding:"required"`
 	EndDate   time.Time `form:"endDate" binding:"required"`
-}
-
-type ProductPrice struct {
-	ProductId     string  `json:"productId" binding:"required"`
-	CustomerId    string  `json:"customerId" binding:"required"`
-	CustomerPrice float64 `json:"customerPrice" binding:"required"`
-	CreatedBy     string
 }
 
 type UpdateProductLotQuantity struct {

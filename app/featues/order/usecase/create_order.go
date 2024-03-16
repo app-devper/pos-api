@@ -44,8 +44,14 @@ func CreateOrder(
 
 		for _, item := range req.Items {
 			_, _ = productEntity.RemoveQuantityById(item.ProductId, item.Quantity)
-			if item.UnitId != "" {
-				_, _ = productEntity.RemoveProductStockQuantityByProductAndUnitId(item.ProductId, item.UnitId, item.Quantity)
+			if item.StockId != "" {
+				_, _ = productEntity.RemoveProductStockQuantityById(item.StockId, item.Quantity)
+
+				// Add product history
+				stock, _ := productEntity.GetProductStockById(item.StockId)
+				unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
+				balance := productEntity.GetProductStockBalance(item.ProductId, unit.Id.Hex())
+				_, _ = productEntity.CreateProductHistory(request.AddOrderItemProductHistory(item.ProductId, unit.Unit, item, balance, req.CreatedBy))
 			}
 		}
 

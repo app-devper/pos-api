@@ -15,6 +15,7 @@ func ApplyProductAPI(
 
 	productRoute := route.Group("products")
 
+	// Product
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
@@ -60,6 +61,94 @@ func ApplyProductAPI(
 		usecase.GenerateSerialNumber(repository.Sequence),
 	)
 
+	// Product Stock
+	productRoute.GET("/:productId/stocks",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductStocksByProductId(repository.Product),
+	)
+
+	productRoute.POST("/stocks",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.CreateProductStock(repository.Product),
+	)
+
+	productRoute.PUT("/stocks/:id",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateProductStockById(repository.Product),
+	)
+
+	productRoute.DELETE("/stocks/:id",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.RemoveProductStockById(repository.Product),
+	)
+
+	productRoute.PATCH("/stocks/:id/quantity",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateProductStockQuantityById(repository.Product),
+	)
+
+	productRoute.PATCH("/stocks/sequence",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateProductStockSequence(repository.Product),
+	)
+
+	// Product Unit
+	productRoute.POST("/units",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.CreateProductUnit(repository.Product),
+	)
+
+	productRoute.PUT("/units/:unitId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateProductUnitById(repository.Product),
+	)
+
+	productRoute.DELETE("/units/:unitId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.RemoveProductUnitById(repository.Product),
+	)
+
+	productRoute.GET("/:productId/units",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductUnitsByProductId(repository.Product),
+	)
+
+	// Product Price
+	productRoute.GET("/:productId/prices",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetProductPricesByProductId(repository.Product),
+	)
+
+	productRoute.POST("/prices",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.CreateProductPrice(repository.Product),
+	)
+
+	productRoute.PUT("/prices/:priceId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.UpdateProductPriceById(repository.Product),
+	)
+
+	productRoute.DELETE("/prices/:priceId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.RemoveProductPriceById(repository.Product),
+	)
+
+	// Product Lot
 	productRoute.GET("/:productId/lots",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),

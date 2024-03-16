@@ -1,4 +1,4 @@
-package model
+package entities
 
 import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,19 +23,10 @@ type Product struct {
 }
 
 type ProductDetail struct {
-	Id            primitive.ObjectID `bson:"_id" json:"id"`
-	Name          string             `bson:"name" json:"name"`
-	NameEn        string             `bson:"nameEn" json:"nameEn"`
-	Description   string             `bson:"description" json:"description"`
-	Price         float64            `bson:"price" json:"price"`
-	CostPrice     float64            `bson:"costPrice" json:"costPrice"`
-	Unit          string             `bson:"unit" json:"unit"`
-	Quantity      int                `bson:"quantity" json:"quantity"`
-	SerialNumber  string             `bson:"serialNumber" json:"serialNumber"`
-	Category      string             `bson:"category"  json:"category"`
-	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
-	ProductUnits  []ProductUnit      `bson:"units" json:"units"`
-	ProductPrices []ProductPrice     `bson:"prices"  json:"prices"`
+	ProductUnits  []ProductUnit  `bson:"units" json:"units"`
+	ProductPrices []ProductPrice `bson:"prices"  json:"prices"`
+	ProductStocks []ProductStock `bson:"stocks"  json:"stocks"`
+	Product
 }
 
 type ProductLot struct {
@@ -77,15 +68,30 @@ type ProductPrice struct {
 }
 
 type ProductStock struct {
-	Id         primitive.ObjectID `bson:"_id" json:"id"`
-	ProductId  primitive.ObjectID `bson:"productId" json:"productId"`
-	UnitId     primitive.ObjectID `bson:"unitId" json:"unitId"`
-	Sequence   int                `bson:"sequence" json:"sequence"`
-	LotNumber  string             `bson:"lotNumber" json:"lotNumber"`
-	CostPrice  float64            `bson:"costPrice" json:"costPrice"`
-	Price      float64            `bson:"price" json:"price"`
-	Import     int                `bson:"import" json:"import"`
-	Quantity   int                `bson:"quantity" json:"quantity"`
-	ExpireDate time.Time          `bson:"expireDate" json:"expireDate"`
-	ImportDate time.Time          `bson:"importDate" json:"importDate"`
+	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
+	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
+	ReceiveCode string             `bson:"receiveCode" json:"receiveCode"`
+	Sequence    int                `bson:"sequence" json:"sequence"`
+	LotNumber   string             `bson:"lotNumber" json:"lotNumber"`
+	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
+	Price       float64            `bson:"price" json:"price"`
+	Import      int                `bson:"import" json:"import"`
+	Quantity    int                `bson:"quantity" json:"quantity"`
+	ExpireDate  time.Time          `bson:"expireDate" json:"expireDate"`
+	ImportDate  time.Time          `bson:"importDate" json:"importDate"`
+}
+
+type ProductHistory struct {
+	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
+	Type        string             `bson:"type" json:"type"`
+	Description string             `bson:"description" json:"description"`
+	Unit        string             `bson:"unit" json:"unit"`
+	Import      int                `bson:"import" json:"import"`
+	Quantity    int                `bson:"quantity" json:"quantity"`
+	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
+	Price       float64            `bson:"price" json:"price"`
+	CreatedBy   string             `bson:"createdBy" json:"-"`
+	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
 }

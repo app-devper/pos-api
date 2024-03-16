@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
-	"pos/app/domain/model"
+	"pos/app/domain/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -18,13 +18,13 @@ type supplierEntity struct {
 }
 
 type ISupplier interface {
-	GetSupplierByClientId(id string) (*model.Supplier, error)
-	GetSupplierById(id string) (*model.Supplier, error)
-	RemoveSupplierById(id string) (*model.Supplier, error)
-	GetSuppliers() ([]model.Supplier, error)
-	CreateOrUpdateSupplierByClientId(id string, form request.Supplier) (*model.Supplier, error)
-	CreateSupplier(form request.Supplier) (*model.Supplier, error)
-	UpdateSupplierById(id string, form request.Supplier) (*model.Supplier, error)
+	GetSupplierByClientId(id string) (*entities.Supplier, error)
+	GetSupplierById(id string) (*entities.Supplier, error)
+	RemoveSupplierById(id string) (*entities.Supplier, error)
+	GetSuppliers() ([]entities.Supplier, error)
+	CreateOrUpdateSupplierByClientId(id string, form request.Supplier) (*entities.Supplier, error)
+	CreateSupplier(form request.Supplier) (*entities.Supplier, error)
+	UpdateSupplierById(id string, form request.Supplier) (*entities.Supplier, error)
 }
 
 func NewSupplierEntity(resource *db.Resource) ISupplier {
@@ -33,11 +33,11 @@ func NewSupplierEntity(resource *db.Resource) ISupplier {
 	return entity
 }
 
-func (entity *supplierEntity) GetSupplierByClientId(id string) (*model.Supplier, error) {
+func (entity *supplierEntity) GetSupplierByClientId(id string) (*entities.Supplier, error) {
 	logrus.Info("GetSupplierByClientId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Supplier{}
+	data := entities.Supplier{}
 	err := entity.supplierRepo.FindOne(ctx, bson.M{"clientId": id}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -45,11 +45,11 @@ func (entity *supplierEntity) GetSupplierByClientId(id string) (*model.Supplier,
 	return &data, nil
 }
 
-func (entity *supplierEntity) GetSupplierById(id string) (*model.Supplier, error) {
+func (entity *supplierEntity) GetSupplierById(id string) (*entities.Supplier, error) {
 	logrus.Info("GetSupplierById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Supplier{}
+	data := entities.Supplier{}
 	err := entity.supplierRepo.FindOne(ctx, bson.M{"_id": id}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -57,11 +57,11 @@ func (entity *supplierEntity) GetSupplierById(id string) (*model.Supplier, error
 	return &data, nil
 }
 
-func (entity *supplierEntity) RemoveSupplierById(id string) (*model.Supplier, error) {
+func (entity *supplierEntity) RemoveSupplierById(id string) (*entities.Supplier, error) {
 	logrus.Info("RemoveSupplierById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Supplier{}
+	data := entities.Supplier{}
 	obId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (entity *supplierEntity) RemoveSupplierById(id string) (*model.Supplier, er
 	return &data, nil
 }
 
-func (entity *supplierEntity) GetSuppliers() (items []model.Supplier, err error) {
+func (entity *supplierEntity) GetSuppliers() (items []entities.Supplier, err error) {
 	logrus.Info("GetSuppliers")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -86,7 +86,7 @@ func (entity *supplierEntity) GetSuppliers() (items []model.Supplier, err error)
 		return nil, err
 	}
 	for cursor.Next(ctx) {
-		item := model.Supplier{}
+		item := entities.Supplier{}
 		err = cursor.Decode(&item)
 		if err != nil {
 			logrus.Error(err)
@@ -95,16 +95,16 @@ func (entity *supplierEntity) GetSuppliers() (items []model.Supplier, err error)
 		}
 	}
 	if items == nil {
-		items = []model.Supplier{}
+		items = []entities.Supplier{}
 	}
 	return items, nil
 }
 
-func (entity *supplierEntity) CreateOrUpdateSupplierByClientId(id string, form request.Supplier) (*model.Supplier, error) {
+func (entity *supplierEntity) CreateOrUpdateSupplierByClientId(id string, form request.Supplier) (*entities.Supplier, error) {
 	logrus.Info("CreateOrUpdateSupplierByClientId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Supplier{}
+	data := entities.Supplier{}
 	err := entity.supplierRepo.FindOne(ctx, bson.M{"clientId": id}).Decode(&data)
 	if err == nil {
 		data.Name = form.Name
@@ -141,11 +141,11 @@ func (entity *supplierEntity) CreateOrUpdateSupplierByClientId(id string, form r
 	}
 }
 
-func (entity *supplierEntity) CreateSupplier(form request.Supplier) (*model.Supplier, error) {
+func (entity *supplierEntity) CreateSupplier(form request.Supplier) (*entities.Supplier, error) {
 	logrus.Info("CreateSupplier")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Supplier{}
+	data := entities.Supplier{}
 	data.Id = primitive.NewObjectID()
 	data.Name = form.Name
 	data.Address = form.Address
@@ -162,7 +162,7 @@ func (entity *supplierEntity) CreateSupplier(form request.Supplier) (*model.Supp
 	return &data, nil
 }
 
-func (entity *supplierEntity) UpdateSupplierById(id string, form request.Supplier) (*model.Supplier, error) {
+func (entity *supplierEntity) UpdateSupplierById(id string, form request.Supplier) (*entities.Supplier, error) {
 	logrus.Info("UpdateSupplierById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -170,7 +170,7 @@ func (entity *supplierEntity) UpdateSupplierById(id string, form request.Supplie
 	if err != nil {
 		return nil, err
 	}
-	data := model.Supplier{}
+	data := entities.Supplier{}
 	err = entity.supplierRepo.FindOne(ctx, bson.M{"_id": obId}).Decode(&data)
 	if err != nil {
 		return nil, err

@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
 	"pos/app/domain/constant"
-	"pos/app/domain/model"
+	"pos/app/domain/entities"
 	"pos/db"
 	"time"
 )
@@ -18,9 +18,9 @@ type sequenceEntity struct {
 }
 
 type ISequence interface {
-	NextSequence(field string) (*model.Sequence, error)
-	CreateSequence(field string, value int) (*model.Sequence, error)
-	GetSequenceByField(field string) (*model.Sequence, error)
+	NextSequence(field string) (*entities.Sequence, error)
+	CreateSequence(field string, value int) (*entities.Sequence, error)
+	GetSequenceByField(field string) (*entities.Sequence, error)
 }
 
 func NewSequenceEntity(resource *db.Resource) ISequence {
@@ -29,7 +29,7 @@ func NewSequenceEntity(resource *db.Resource) ISequence {
 	return entity
 }
 
-func (entity *sequenceEntity) CreateSequence(field string, value int) (*model.Sequence, error) {
+func (entity *sequenceEntity) CreateSequence(field string, value int) (*entities.Sequence, error) {
 	logrus.Info("CreateSequence")
 	data, _ := entity.GetSequenceByField(field)
 	if data != nil {
@@ -37,7 +37,7 @@ func (entity *sequenceEntity) CreateSequence(field string, value int) (*model.Se
 	} else {
 		ctx, cancel := utils.InitContext()
 		defer cancel()
-		data := model.Sequence{}
+		data := entities.Sequence{}
 		data.Id = primitive.NewObjectID()
 		data.Field = field
 		data.Value = value
@@ -67,11 +67,11 @@ func (entity *sequenceEntity) CreateSequence(field string, value int) (*model.Se
 	}
 }
 
-func (entity *sequenceEntity) GetSequenceByField(field string) (*model.Sequence, error) {
+func (entity *sequenceEntity) GetSequenceByField(field string) (*entities.Sequence, error) {
 	logrus.Info("GetSequenceByField")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var data model.Sequence
+	var data entities.Sequence
 	err := entity.sequenceRepo.FindOne(ctx, bson.M{"field": field}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (entity *sequenceEntity) GetSequenceByField(field string) (*model.Sequence,
 	return &data, nil
 }
 
-func (entity *sequenceEntity) NextSequence(field string) (*model.Sequence, error) {
+func (entity *sequenceEntity) NextSequence(field string) (*entities.Sequence, error) {
 	logrus.Info("NextSequence")
 	data, _ := entity.GetSequenceByField(field)
 	if data != nil {

@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
 	"pos/app/domain/constant"
-	"pos/app/domain/model"
+	"pos/app/domain/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -20,13 +20,13 @@ type customerEntity struct {
 
 type ICustomer interface {
 	CreateIndex() (string, error)
-	GetCustomerAll() ([]model.Customer, error)
-	CreateCustomer(form request.Customer) (*model.Customer, error)
-	GetCustomerById(id string) (*model.Customer, error)
-	GetCustomerByCode(code string) (*model.Customer, error)
-	RemoveCustomerById(id string) (*model.Customer, error)
-	UpdateCustomerById(id string, form request.UpdateCustomer) (*model.Customer, error)
-	UpdateCustomerStatusById(id string, form request.UpdateCustomerStatus) (*model.Customer, error)
+	GetCustomerAll() ([]entities.Customer, error)
+	CreateCustomer(form request.Customer) (*entities.Customer, error)
+	GetCustomerById(id string) (*entities.Customer, error)
+	GetCustomerByCode(code string) (*entities.Customer, error)
+	RemoveCustomerById(id string) (*entities.Customer, error)
+	UpdateCustomerById(id string, form request.UpdateCustomer) (*entities.Customer, error)
+	UpdateCustomerStatusById(id string, form request.UpdateCustomerStatus) (*entities.Customer, error)
 }
 
 func NewCustomerEntity(resource *db.Resource) ICustomer {
@@ -36,17 +36,17 @@ func NewCustomerEntity(resource *db.Resource) ICustomer {
 	return entity
 }
 
-func (entity *customerEntity) GetCustomerAll() ([]model.Customer, error) {
+func (entity *customerEntity) GetCustomerAll() ([]entities.Customer, error) {
 	logrus.Info("GetCustomerAll")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var items []model.Customer
+	var items []entities.Customer
 	cursor, err := entity.customerRepo.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, err
 	}
 	for cursor.Next(ctx) {
-		var item model.Customer
+		var item entities.Customer
 		err = cursor.Decode(&item)
 		if err != nil {
 			logrus.Error(err)
@@ -55,27 +55,28 @@ func (entity *customerEntity) GetCustomerAll() ([]model.Customer, error) {
 		}
 	}
 	if items == nil {
-		items = []model.Customer{}
+		items = []entities.Customer{}
 	}
 	return items, nil
 }
 
-func (entity *customerEntity) CreateCustomer(form request.Customer) (*model.Customer, error) {
+func (entity *customerEntity) CreateCustomer(form request.Customer) (*entities.Customer, error) {
 	logrus.Info("CreateCustomer")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := model.Customer{
-		Id:          primitive.NewObjectID(),
-		Code:        form.Code,
-		Name:        form.Name,
-		Address:     form.Address,
-		Phone:       form.Phone,
-		Email:       form.Email,
-		Status:      constant.ACTIVE,
-		CreatedBy:   form.CreatedBy,
-		UpdatedBy:   form.CreatedBy,
-		CreatedDate: time.Now(),
-		UpdatedDate: time.Now(),
+	data := entities.Customer{
+		Id:           primitive.NewObjectID(),
+		CustomerType: form.CustomerType,
+		Code:         form.Code,
+		Name:         form.Name,
+		Address:      form.Address,
+		Phone:        form.Phone,
+		Email:        form.Email,
+		Status:       constant.ACTIVE,
+		CreatedBy:    form.CreatedBy,
+		UpdatedBy:    form.CreatedBy,
+		CreatedDate:  time.Now(),
+		UpdatedDate:  time.Now(),
 	}
 	_, err := entity.customerRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -84,12 +85,12 @@ func (entity *customerEntity) CreateCustomer(form request.Customer) (*model.Cust
 	return &data, nil
 }
 
-func (entity *customerEntity) GetCustomerById(id string) (*model.Customer, error) {
+func (entity *customerEntity) GetCustomerById(id string) (*entities.Customer, error) {
 	logrus.Info("GetCustomerById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	objId, _ := primitive.ObjectIDFromHex(id)
-	var data model.Customer
+	var data entities.Customer
 	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -97,11 +98,11 @@ func (entity *customerEntity) GetCustomerById(id string) (*model.Customer, error
 	return &data, nil
 }
 
-func (entity *customerEntity) GetCustomerByCode(code string) (*model.Customer, error) {
+func (entity *customerEntity) GetCustomerByCode(code string) (*entities.Customer, error) {
 	logrus.Info("GetCustomerByCode")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var data model.Customer
+	var data entities.Customer
 	err := entity.customerRepo.FindOne(ctx, bson.M{"code": code}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -109,11 +110,11 @@ func (entity *customerEntity) GetCustomerByCode(code string) (*model.Customer, e
 	return &data, nil
 }
 
-func (entity *customerEntity) RemoveCustomerById(id string) (*model.Customer, error) {
+func (entity *customerEntity) RemoveCustomerById(id string) (*entities.Customer, error) {
 	logrus.Info("RemoveCustomerById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var data model.Customer
+	var data entities.Customer
 	objId, _ := primitive.ObjectIDFromHex(id)
 	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
@@ -126,16 +127,18 @@ func (entity *customerEntity) RemoveCustomerById(id string) (*model.Customer, er
 	return &data, nil
 }
 
-func (entity *customerEntity) UpdateCustomerById(id string, form request.UpdateCustomer) (*model.Customer, error) {
+func (entity *customerEntity) UpdateCustomerById(id string, form request.UpdateCustomer) (*entities.Customer, error) {
 	logrus.Info("UpdateCustomerById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	objId, _ := primitive.ObjectIDFromHex(id)
-	var data model.Customer
+	var data entities.Customer
 	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
+
+	data.CustomerType = form.CustomerType
 	data.Name = form.Name
 	data.Address = form.Address
 	data.Phone = form.Phone
@@ -154,12 +157,12 @@ func (entity *customerEntity) UpdateCustomerById(id string, form request.UpdateC
 	return &data, nil
 }
 
-func (entity *customerEntity) UpdateCustomerStatusById(id string, form request.UpdateCustomerStatus) (*model.Customer, error) {
+func (entity *customerEntity) UpdateCustomerStatusById(id string, form request.UpdateCustomerStatus) (*entities.Customer, error) {
 	logrus.Info("UpdateCustomerStatusById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	cid, _ := primitive.ObjectIDFromHex(id)
-	var data model.Customer
+	var data entities.Customer
 	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": cid}).Decode(&data)
 	if err != nil {
 		return nil, err
