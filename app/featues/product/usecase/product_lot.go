@@ -5,12 +5,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 	"time"
 )
 
-func CreateProductLot(productEntity repository.IProduct) gin.HandlerFunc {
+func CreateProductLot(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductLot{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -28,7 +28,7 @@ func CreateProductLot(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLotByLotId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		lotId := ctx.Param("lotId")
 
@@ -41,7 +41,7 @@ func GetProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductLots(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLots(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.GetProductLotsExpireRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -57,7 +57,7 @@ func GetProductLots(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductLotsByProductId(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLotsByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
 
@@ -70,7 +70,7 @@ func GetProductLotsByProductId(productEntity repository.IProduct) gin.HandlerFun
 	}
 }
 
-func GetProductLotsExpireNotify(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		location := utils.GetLocation()
 		today := time.Now().In(location)
@@ -109,7 +109,7 @@ func GetProductLotsExpireNotify(productEntity repository.IProduct) gin.HandlerFu
 	}
 }
 
-func GetProductLotsExpired(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductLotsExpired(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		result, err := productEntity.GetProductLotsExpired()
 		if err != nil {
@@ -120,7 +120,7 @@ func GetProductLotsExpired(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func UpdateProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductLotByLotId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("lotId")
 		req := request.UpdateProductLot{}
@@ -139,7 +139,7 @@ func UpdateProductLotByLotId(productEntity repository.IProduct) gin.HandlerFunc 
 	}
 }
 
-func UpdateProductLotNotifyByLotId(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductLotNotifyByLotId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("lotId")
 		req := request.UpdateProductLotNotify{}
@@ -158,7 +158,7 @@ func UpdateProductLotNotifyByLotId(productEntity repository.IProduct) gin.Handle
 	}
 }
 
-func UpdateProductLotQuantityByLotId(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductLotQuantityByLotId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("lotId")
 		req := request.UpdateProductLotQuantity{}

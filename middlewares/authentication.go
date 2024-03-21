@@ -6,7 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"os"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"strings"
 )
 
@@ -66,7 +66,7 @@ func RequireAuthenticated() gin.HandlerFunc {
 	}
 }
 
-func RequireSession(sessionEntity repository.ISession) gin.HandlerFunc {
+func RequireSession(sessionEntity repositories.ISession) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		sessionId := ctx.GetString("SessionId")
 		userId, err := sessionEntity.GetSessionById(sessionId)

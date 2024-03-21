@@ -3,10 +3,10 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 )
 
-func GetCategories(entity repository.ICategory) gin.HandlerFunc {
+func GetCategories(entity repositories.ICategory) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		result, err := entity.GetCategoryAll()
 		if err != nil {

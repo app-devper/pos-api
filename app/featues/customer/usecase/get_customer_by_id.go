@@ -3,10 +3,10 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 )
 
-func GetCustomerById(customerEntity repository.ICustomer) gin.HandlerFunc {
+func GetCustomerById(customerEntity repositories.ICustomer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		customerId := ctx.Param("customerId")
 		result, err := customerEntity.GetCustomerById(customerId)

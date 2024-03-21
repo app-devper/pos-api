@@ -3,11 +3,11 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func CreateCategory(entity repository.ICategory) gin.HandlerFunc {
+func CreateCategory(entity repositories.ICategory) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Category{}
 		if err := ctx.ShouldBind(&req); err != nil {

@@ -3,12 +3,12 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 )
 
-func CreateProductUnit(productEntity repository.IProduct) gin.HandlerFunc {
+func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.CreateProductUnit{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -45,7 +45,7 @@ func CreateProductUnit(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductUnitsByProductId(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductUnitsByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
 		result, err := productEntity.GetProductUnitsByProductId(productId)
@@ -57,7 +57,7 @@ func GetProductUnitsByProductId(productEntity repository.IProduct) gin.HandlerFu
 	}
 }
 
-func UpdateProductUnitById(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductUnit{}
 		id := ctx.Param("id")
@@ -81,7 +81,7 @@ func UpdateProductUnitById(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func RemoveProductUnitById(productEntity repository.IProduct) gin.HandlerFunc {
+func RemoveProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		userId := ctx.GetString("UserId")

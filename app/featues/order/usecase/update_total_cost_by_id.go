@@ -3,11 +3,11 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	repository2 "pos/app/data/repository"
+	repositories "pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func UpdateTotalCostById(orderEntity repository2.IOrder, productEntity repository2.IProduct) gin.HandlerFunc {
+func UpdateTotalCostById(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		orderId := ctx.Param("orderId")
 		order, err := orderEntity.GetOrderDetailById(orderId)

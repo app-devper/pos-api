@@ -4,12 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 )
 
-func CreateProductPrice(productEntity repository.IProduct) gin.HandlerFunc {
+func CreateProductPrice(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductPrice{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -40,7 +40,7 @@ func CreateProductPrice(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductPricesByProductId(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductPricesByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
 		result, err := productEntity.GetProductPricesByProductId(productId)
@@ -52,7 +52,7 @@ func GetProductPricesByProductId(productEntity repository.IProduct) gin.HandlerF
 	}
 }
 
-func UpdateProductPriceById(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductPrice{}
 		id := ctx.Param("id")
@@ -83,7 +83,7 @@ func UpdateProductPriceById(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func RemoveProductPriceById(productEntity repository.IProduct) gin.HandlerFunc {
+func RemoveProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		userId := ctx.GetString("UserId")

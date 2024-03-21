@@ -3,11 +3,11 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func GetOrderItemRange(orderEntity repository.IOrder) gin.HandlerFunc {
+func GetOrderItemRange(orderEntity repositories.IOrder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.GetOrderRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {

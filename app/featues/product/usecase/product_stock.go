@@ -3,11 +3,11 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func CreateProductStock(productEntity repository.IProduct) gin.HandlerFunc {
+func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductStock{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -31,7 +31,7 @@ func CreateProductStock(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductStocksByProductId(productEntity repository.IProduct) gin.HandlerFunc {
+func GetProductStocksByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
 		result, err := productEntity.GetProductStocksByProductId(productId)
@@ -44,7 +44,7 @@ func GetProductStocksByProductId(productEntity repository.IProduct) gin.HandlerF
 
 }
 
-func UpdateProductStockById(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStock{}
 		id := ctx.Param("id")
@@ -70,7 +70,7 @@ func UpdateProductStockById(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func UpdateProductStockQuantityById(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockQuantity{}
 		id := ctx.Param("id")
@@ -96,7 +96,7 @@ func UpdateProductStockQuantityById(productEntity repository.IProduct) gin.Handl
 	}
 }
 
-func RemoveProductStockById(productEntity repository.IProduct) gin.HandlerFunc {
+func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		userId := ctx.GetString("UserId")
@@ -116,7 +116,7 @@ func RemoveProductStockById(productEntity repository.IProduct) gin.HandlerFunc {
 	}
 }
 
-func UpdateProductStockSequence(productEntity repository.IProduct) gin.HandlerFunc {
+func UpdateProductStockSequence(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockSequence{}
 		if err := ctx.ShouldBind(&req); err != nil {

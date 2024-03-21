@@ -1,4 +1,4 @@
-package repository
+package repositories
 
 import (
 	"errors"
@@ -28,52 +28,52 @@ type productEntity struct {
 type IProduct interface {
 
 	// Product
-	GetProductAll(product request.GetProduct) ([]entities.ProductDetail, error)
+	GetProductAll(param request.GetProduct) ([]entities.ProductDetail, error)
 	GetProductBySerialNumber(serialNumber string) (*entities.Product, error)
 	GetProductById(id string) (*entities.Product, error)
-	CreateProduct(form request.Product) (*entities.Product, error)
+	CreateProduct(param request.Product) (*entities.Product, error)
 	RemoveProductById(id string) (*entities.Product, error)
-	UpdateProductById(id string, form request.UpdateProduct) (*entities.Product, error)
+	UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error)
 	RemoveQuantityById(id string, quantity int) (*entities.Product, error)
 	AddQuantityById(id string, quantity int) (*entities.Product, error)
 	GetTotalCostPrice(id string, quantity int) float64
 
 	// ProductLot
-	CreateProductLotByProductId(productId string, form request.Product) (*entities.ProductLot, error)
-	CreateProductLot(form request.ProductLot) (*entities.ProductLot, error)
-	GetProductLots(form request.GetProductLotsExpireRange) ([]entities.ProductLot, error)
+	CreateProductLotByProductId(productId string, param request.Product) (*entities.ProductLot, error)
+	CreateProductLot(param request.ProductLot) (*entities.ProductLot, error)
+	GetProductLots(param request.GetProductLotsExpireRange) ([]entities.ProductLot, error)
 	GetProductLotsByProductId(productId string) ([]entities.ProductLot, error)
 	GetProductLotsByIds(ids []string) ([]entities.ProductLot, error)
 	GetProductLotsExpired() ([]entities.ProductLot, error)
-	GetProductLotsExpireNotify(form request.GetProductLotsExpireRange) ([]entities.ProductLotDetail, error)
+	GetProductLotsExpireNotify(param request.GetProductLotsExpireRange) ([]entities.ProductLotDetail, error)
 	GetProductLotById(id string) (*entities.ProductLot, error)
 	RemoveProductLotById(id string) (*entities.ProductLot, error)
-	UpdateProductLotById(id string, form request.UpdateProductLot) (*entities.ProductLot, error)
-	UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*entities.ProductLot, error)
-	UpdateProductLotQuantityById(id string, form request.UpdateProductLotQuantity) (*entities.ProductLot, error)
+	UpdateProductLotById(id string, param request.UpdateProductLot) (*entities.ProductLot, error)
+	UpdateProductLotNotifyById(id string, param request.UpdateProductLotNotify) (*entities.ProductLot, error)
+	UpdateProductLotQuantityById(id string, param request.UpdateProductLotQuantity) (*entities.ProductLot, error)
 
 	// ProductUnit
-	CreateProductUnit(form request.ProductUnit) (*entities.ProductUnit, error)
+	CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error)
 	GetProductUnitById(id string) (*entities.ProductUnit, error)
 	GetProductUnitByDefault(productId string, unit string) (*entities.ProductUnit, error)
 	GetProductUnitByUnit(productId string, unit string) (*entities.ProductUnit, error)
-	UpdateProductUnitById(id string, form request.ProductUnit) (*entities.ProductUnit, error)
+	UpdateProductUnitById(id string, param request.ProductUnit) (*entities.ProductUnit, error)
 	RemoveProductUnitById(id string) (*entities.ProductUnit, error)
 	GetProductUnitsByProductId(productId string) ([]entities.ProductUnit, error)
 
 	// ProductPrice
 	GetProductPricesByProductId(productId string) ([]entities.ProductPrice, error)
-	CreateProductPrice(form request.ProductPrice) (*entities.ProductPrice, error)
+	CreateProductPrice(param request.ProductPrice) (*entities.ProductPrice, error)
 	RemoveProductPriceById(id string) (*entities.ProductPrice, error)
 	RemoveProductPricesByUnitId(unitId string) error
-	UpdateProductPriceById(id string, form request.ProductPrice) (*entities.ProductPrice, error)
+	UpdateProductPriceById(id string, param request.ProductPrice) (*entities.ProductPrice, error)
 
 	// ProductStock
-	CreateProductStock(form request.ProductStock) (*entities.ProductStock, error)
+	CreateProductStock(param request.ProductStock) (*entities.ProductStock, error)
 	GetProductStockById(id string) (*entities.ProductStock, error)
-	UpdateProductStockById(id string, form request.UpdateProductStock) (*entities.ProductStock, error)
+	UpdateProductStockById(id string, param request.UpdateProductStock) (*entities.ProductStock, error)
 	UpdateProductStockQuantityById(id string, quantity int) (*entities.ProductStock, error)
-	UpdateProductStockSequence(form request.UpdateProductStockSequence) ([]entities.ProductStock, error)
+	UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error)
 	RemoveProductStockById(id string) (*entities.ProductStock, error)
 	GetProductStocksByProductId(productId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string) int
@@ -82,7 +82,7 @@ type IProduct interface {
 	AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
 
 	// ProductHistory
-	CreateProductHistory(form request.ProductHistory) (*entities.ProductHistory, error)
+	CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
@@ -103,13 +103,13 @@ func NewProductEntity(resource *db.Resource) IProduct {
 	return entity
 }
 
-func (entity *productEntity) GetProductAll(product request.GetProduct) (items []entities.ProductDetail, err error) {
+func (entity *productEntity) GetProductAll(param request.GetProduct) (items []entities.ProductDetail, err error) {
 	logrus.Info("GetProductAll")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	query := bson.M{}
-	if product.Category != "" {
-		query["category"] = product.Category
+	if param.Category != "" {
+		query["category"] = param.Category
 	}
 
 	pipeline := []bson.M{
@@ -174,25 +174,25 @@ func (entity *productEntity) GetProductBySerialNumber(serialNumber string) (*ent
 	return &data, nil
 }
 
-func (entity *productEntity) CreateProduct(form request.Product) (*entities.Product, error) {
+func (entity *productEntity) CreateProduct(param request.Product) (*entities.Product, error) {
 	logrus.Info("CreateProduct")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	serialNumber := strings.TrimSpace(form.SerialNumber)
+	serialNumber := strings.TrimSpace(param.SerialNumber)
 	data := entities.Product{}
 	data.Id = primitive.NewObjectID()
-	data.Name = form.Name
-	data.NameEn = form.NameEn
-	data.Description = form.Description
+	data.Name = param.Name
+	data.NameEn = param.NameEn
+	data.Description = param.Description
 	data.SerialNumber = serialNumber
-	data.Unit = form.Unit
-	data.Price = form.Price
-	data.CostPrice = form.CostPrice
-	data.Quantity = form.Quantity
-	data.CreatedBy = form.CreatedBy
-	data.Category = form.Category
+	data.Unit = param.Unit
+	data.Price = param.Price
+	data.CostPrice = param.CostPrice
+	data.Quantity = param.Quantity
+	data.Category = param.Category
+	data.CreatedBy = param.CreatedBy
 	data.CreatedDate = time.Now()
-	data.UpdatedBy = form.CreatedBy
+	data.UpdatedBy = param.CreatedBy
 	data.UpdatedDate = time.Now()
 	_, err := entity.productsRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -228,7 +228,7 @@ func (entity *productEntity) RemoveProductById(id string) (*entities.Product, er
 	return &data, nil
 }
 
-func (entity *productEntity) UpdateProductById(id string, form request.UpdateProduct) (*entities.Product, error) {
+func (entity *productEntity) UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error) {
 	logrus.Info("UpdateProductById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -237,16 +237,16 @@ func (entity *productEntity) UpdateProductById(id string, form request.UpdatePro
 	if err != nil {
 		return nil, err
 	}
-	data.SerialNumber = form.SerialNumber
-	data.Name = form.Name
-	data.NameEn = form.NameEn
-	data.Description = form.Description
-	data.Price = form.Price
-	data.CostPrice = form.CostPrice
-	data.Unit = form.Unit
-	data.Quantity = form.Quantity
-	data.Category = form.Category
-	data.UpdatedBy = form.UpdatedBy
+	data.SerialNumber = param.SerialNumber
+	data.Name = param.Name
+	data.NameEn = param.NameEn
+	data.Description = param.Description
+	data.Price = param.Price
+	data.CostPrice = param.CostPrice
+	data.Unit = param.Unit
+	data.Quantity = param.Quantity
+	data.Category = param.Category
+	data.UpdatedBy = param.UpdatedBy
 	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
@@ -315,20 +315,20 @@ func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 
 	return data.CostPrice * float64(quantity)
 }
 
-func (entity *productEntity) CreateProductLotByProductId(productId string, form request.Product) (*entities.ProductLot, error) {
+func (entity *productEntity) CreateProductLotByProductId(productId string, param request.Product) (*entities.ProductLot, error) {
 	logrus.Info("CreateProductLotByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductLot{}
 	data.Id = primitive.NewObjectID()
 	data.ProductId, _ = primitive.ObjectIDFromHex(productId)
-	data.LotNumber = form.LotNumber
-	data.ExpireDate = form.ExpireDate
-	data.Quantity = form.Quantity
-	data.CostPrice = form.CostPrice
-	data.CreatedBy = form.CreatedBy
+	data.LotNumber = param.LotNumber
+	data.ExpireDate = param.ExpireDate
+	data.Quantity = param.Quantity
+	data.CostPrice = param.CostPrice
+	data.CreatedBy = param.CreatedBy
 	data.Notify = true
-	data.UpdatedBy = form.CreatedBy
+	data.UpdatedBy = param.CreatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedDate = time.Now()
 
@@ -339,20 +339,20 @@ func (entity *productEntity) CreateProductLotByProductId(productId string, form 
 	return &data, nil
 }
 
-func (entity *productEntity) CreateProductLot(form request.ProductLot) (*entities.ProductLot, error) {
+func (entity *productEntity) CreateProductLot(param request.ProductLot) (*entities.ProductLot, error) {
 	logrus.Info("CreateProductLot")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductLot{}
 	data.Id = primitive.NewObjectID()
-	data.ProductId, _ = primitive.ObjectIDFromHex(form.ProductId)
-	data.LotNumber = form.LotNumber
-	data.ExpireDate = form.ExpireDate
-	data.Quantity = form.Quantity
-	data.CostPrice = form.CostPrice
-	data.CreatedBy = form.UpdatedBy
+	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
+	data.LotNumber = param.LotNumber
+	data.ExpireDate = param.ExpireDate
+	data.Quantity = param.Quantity
+	data.CostPrice = param.CostPrice
+	data.CreatedBy = param.UpdatedBy
 	data.Notify = true
-	data.UpdatedBy = form.UpdatedBy
+	data.UpdatedBy = param.UpdatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedDate = time.Now()
 
@@ -363,15 +363,15 @@ func (entity *productEntity) CreateProductLot(form request.ProductLot) (*entitie
 	return &data, nil
 }
 
-func (entity *productEntity) GetProductLots(form request.GetProductLotsExpireRange) (items []entities.ProductLot, err error) {
+func (entity *productEntity) GetProductLots(param request.GetProductLotsExpireRange) (items []entities.ProductLot, err error) {
 	logrus.Info("GetProductLots")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	opts := options.Find().SetSort(bson.D{{"expireDate", -1}})
 	cursor, err := entity.productLotsRepo.Find(ctx,
 		bson.M{"expireDate": bson.M{
-			"$gt": form.StartDate,
-			"$lt": form.EndDate,
+			"$gt": param.StartDate,
+			"$lt": param.EndDate,
 		}},
 		opts,
 	)
@@ -500,7 +500,7 @@ func (entity *productEntity) GetProductLotsExpired() (items []entities.ProductLo
 	return items, nil
 }
 
-func (entity *productEntity) GetProductLotsExpireNotify(form request.GetProductLotsExpireRange) (items []entities.ProductLotDetail, err error) {
+func (entity *productEntity) GetProductLotsExpireNotify(param request.GetProductLotsExpireRange) (items []entities.ProductLotDetail, err error) {
 	logrus.Info("GetProductLotsExpireNotify")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -508,8 +508,8 @@ func (entity *productEntity) GetProductLotsExpireNotify(form request.GetProductL
 		{
 			"$match": bson.M{
 				"expireDate": bson.M{
-					"$gte": form.StartDate,
-					"$lt":  form.EndDate,
+					"$gte": param.StartDate,
+					"$lt":  param.EndDate,
 				},
 				"notify": true,
 			},
@@ -557,7 +557,7 @@ func (entity *productEntity) GetProductLotById(id string) (*entities.ProductLot,
 	return &data, nil
 }
 
-func (entity *productEntity) UpdateProductLotById(id string, form request.UpdateProductLot) (*entities.ProductLot, error) {
+func (entity *productEntity) UpdateProductLotById(id string, param request.UpdateProductLot) (*entities.ProductLot, error) {
 	logrus.Info("UpdateProductLotById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -567,12 +567,12 @@ func (entity *productEntity) UpdateProductLotById(id string, form request.Update
 		return nil, err
 	}
 
-	data.LotNumber = form.LotNumber
-	data.ExpireDate = form.ExpireDate
-	data.Quantity = form.Quantity
-	data.CostPrice = form.CostPrice
+	data.LotNumber = param.LotNumber
+	data.ExpireDate = param.ExpireDate
+	data.Quantity = param.Quantity
+	data.CostPrice = param.CostPrice
 	data.UpdatedDate = time.Now()
-	data.UpdatedBy = form.UpdatedBy
+	data.UpdatedBy = param.UpdatedBy
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
@@ -585,7 +585,7 @@ func (entity *productEntity) UpdateProductLotById(id string, form request.Update
 	return data, nil
 }
 
-func (entity *productEntity) UpdateProductLotNotifyById(id string, form request.UpdateProductLotNotify) (*entities.ProductLot, error) {
+func (entity *productEntity) UpdateProductLotNotifyById(id string, param request.UpdateProductLotNotify) (*entities.ProductLot, error) {
 	logrus.Info("UpdateProductLotNotifyById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -595,9 +595,9 @@ func (entity *productEntity) UpdateProductLotNotifyById(id string, form request.
 		return nil, err
 	}
 
-	data.Notify = form.Notify
+	data.Notify = param.Notify
 	data.UpdatedDate = time.Now()
-	data.UpdatedBy = form.UpdatedBy
+	data.UpdatedBy = param.UpdatedBy
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
@@ -610,7 +610,7 @@ func (entity *productEntity) UpdateProductLotNotifyById(id string, form request.
 	return data, nil
 }
 
-func (entity *productEntity) UpdateProductLotQuantityById(id string, form request.UpdateProductLotQuantity) (*entities.ProductLot, error) {
+func (entity *productEntity) UpdateProductLotQuantityById(id string, param request.UpdateProductLotQuantity) (*entities.ProductLot, error) {
 	logrus.Info("UpdateProductLotQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -620,9 +620,9 @@ func (entity *productEntity) UpdateProductLotQuantityById(id string, form reques
 		return nil, err
 	}
 
-	data.Quantity = form.Quantity
+	data.Quantity = param.Quantity
 	data.UpdatedDate = time.Now()
-	data.UpdatedBy = form.UpdatedBy
+	data.UpdatedBy = param.UpdatedBy
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
@@ -635,30 +635,30 @@ func (entity *productEntity) UpdateProductLotQuantityById(id string, form reques
 	return data, nil
 }
 
-func (entity *productEntity) CreateProductUnitByProductId(productId string, form request.Product) (*entities.ProductUnit, error) {
+func (entity *productEntity) CreateProductUnitByProductId(productId string, param request.Product) (*entities.ProductUnit, error) {
 	logrus.Info("CreateProductUnitByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductUnit{}
 	product, _ := primitive.ObjectIDFromHex(productId)
-	err := entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": form.Unit}).Decode(&data)
+	err := entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": param.Unit}).Decode(&data)
 	if err != nil {
 		data.Id = primitive.NewObjectID()
 		data.ProductId, _ = primitive.ObjectIDFromHex(productId)
-		data.Unit = form.Unit
+		data.Unit = param.Unit
 		data.Size = 1
-		data.CostPrice = form.CostPrice
+		data.CostPrice = param.CostPrice
 		data.Volume = 0
 		data.VolumeUnit = ""
-		data.Barcode = form.SerialNumber
+		data.Barcode = param.SerialNumber
 		_, err = entity.productUnitsRepo.InsertOne(ctx, data)
 		if err != nil {
 			return nil, err
 		}
 		return &data, nil
 	} else {
-		data.CostPrice = form.CostPrice
-		data.Barcode = form.SerialNumber
+		data.CostPrice = param.CostPrice
+		data.Barcode = param.SerialNumber
 
 		isReturnNewDoc := options.After
 		opts := &options.FindOneAndUpdateOptions{
@@ -672,7 +672,7 @@ func (entity *productEntity) CreateProductUnitByProductId(productId string, form
 	}
 }
 
-func (entity *productEntity) CreateProductStockByProductAndUnitId(productId string, unitId string, form request.Product) (*entities.ProductStock, error) {
+func (entity *productEntity) CreateProductStockByProductAndUnitId(productId string, unitId string, param request.Product) (*entities.ProductStock, error) {
 	logrus.Info("CreateProductStockByProductAndUnitId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -685,14 +685,14 @@ func (entity *productEntity) CreateProductStockByProductAndUnitId(productId stri
 	data.ProductId = product
 	data.UnitId = unit
 	data.Sequence = entity.GetProductStockMaxSequence(productId, unitId) + 1
-	data.LotNumber = form.LotNumber
-	data.CostPrice = form.CostPrice
-	data.Price = form.Price
-	data.Import = form.Quantity
-	data.Quantity = form.Quantity
-	data.ExpireDate = form.ExpireDate
+	data.LotNumber = param.LotNumber
+	data.CostPrice = param.CostPrice
+	data.Price = param.Price
+	data.Import = param.Quantity
+	data.Quantity = param.Quantity
+	data.ExpireDate = param.ExpireDate
 	data.ImportDate = time.Now()
-	data.ReceiveCode = form.ReceiveCode
+	data.ReceiveCode = param.ReceiveCode
 
 	_, err := entity.productStockRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -839,16 +839,16 @@ func (entity *productEntity) GetProductPricesByProductId(productId string) (item
 	return items, nil
 }
 
-func (entity *productEntity) CreateProductPrice(form request.ProductPrice) (*entities.ProductPrice, error) {
+func (entity *productEntity) CreateProductPrice(param request.ProductPrice) (*entities.ProductPrice, error) {
 	logrus.Info("CreateProductPrice")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductPrice{}
 	data.Id = primitive.NewObjectID()
-	data.ProductId, _ = primitive.ObjectIDFromHex(form.ProductId)
-	data.UnitId, _ = primitive.ObjectIDFromHex(form.UnitId)
-	data.CustomerType = form.CustomerType
-	data.Price = form.Price
+	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
+	data.UnitId, _ = primitive.ObjectIDFromHex(param.UnitId)
+	data.CustomerType = param.CustomerType
+	data.Price = param.Price
 	_, err := entity.productPricesRepo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
@@ -856,7 +856,7 @@ func (entity *productEntity) CreateProductPrice(form request.ProductPrice) (*ent
 	return &data, nil
 }
 
-func (entity *productEntity) UpdateProductPriceById(id string, form request.ProductPrice) (*entities.ProductPrice, error) {
+func (entity *productEntity) UpdateProductPriceById(id string, param request.ProductPrice) (*entities.ProductPrice, error) {
 	logrus.Info("UpdateProductPriceById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -866,8 +866,8 @@ func (entity *productEntity) UpdateProductPriceById(id string, form request.Prod
 	if err != nil {
 		return nil, err
 	}
-	data.CustomerType = form.CustomerType
-	data.Price = form.Price
+	data.CustomerType = param.CustomerType
+	data.Price = param.Price
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
@@ -912,19 +912,19 @@ func (entity *productEntity) RemoveProductPricesByUnitId(unitId string) error {
 
 }
 
-func (entity *productEntity) CreateProductUnit(form request.ProductUnit) (*entities.ProductUnit, error) {
+func (entity *productEntity) CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error) {
 	logrus.Info("CreateProductUnit")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductUnit{}
 	data.Id = primitive.NewObjectID()
-	data.ProductId, _ = primitive.ObjectIDFromHex(form.ProductId)
-	data.Unit = form.Unit
-	data.Size = form.Size
-	data.CostPrice = form.CostPrice
-	data.Volume = form.Volume
-	data.VolumeUnit = form.VolumeUnit
-	data.Barcode = form.Barcode
+	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
+	data.Unit = param.Unit
+	data.Size = param.Size
+	data.CostPrice = param.CostPrice
+	data.Volume = param.Volume
+	data.VolumeUnit = param.VolumeUnit
+	data.Barcode = param.Barcode
 	_, err := entity.productUnitsRepo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
@@ -971,7 +971,7 @@ func (entity *productEntity) GetProductUnitByUnit(productId string, unit string)
 	return &data, nil
 }
 
-func (entity *productEntity) UpdateProductUnitById(id string, form request.ProductUnit) (*entities.ProductUnit, error) {
+func (entity *productEntity) UpdateProductUnitById(id string, param request.ProductUnit) (*entities.ProductUnit, error) {
 	logrus.Info("UpdateProductUnitById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -981,12 +981,12 @@ func (entity *productEntity) UpdateProductUnitById(id string, form request.Produ
 	if err != nil {
 		return nil, err
 	}
-	data.Unit = form.Unit
-	data.Size = form.Size
-	data.CostPrice = form.CostPrice
-	data.Volume = form.Volume
-	data.VolumeUnit = form.VolumeUnit
-	data.Barcode = form.Barcode
+	data.Unit = param.Unit
+	data.Size = param.Size
+	data.CostPrice = param.CostPrice
+	data.Volume = param.Volume
+	data.VolumeUnit = param.VolumeUnit
+	data.Barcode = param.Barcode
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
@@ -1018,23 +1018,23 @@ func (entity *productEntity) RemoveProductUnitById(id string) (*entities.Product
 	return &data, nil
 }
 
-func (entity *productEntity) CreateProductStock(form request.ProductStock) (*entities.ProductStock, error) {
+func (entity *productEntity) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
 	logrus.Info("CreateProductStock")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductStock{}
 	data.Id = primitive.NewObjectID()
-	data.ProductId, _ = primitive.ObjectIDFromHex(form.ProductId)
-	data.UnitId, _ = primitive.ObjectIDFromHex(form.UnitId)
-	data.Sequence = entity.GetProductStockMaxSequence(form.ProductId, form.UnitId) + 1
-	data.LotNumber = form.LotNumber
-	data.CostPrice = form.CostPrice
-	data.Price = form.Price
-	data.Import = form.Quantity
-	data.Quantity = form.Quantity
-	data.ExpireDate = form.ExpireDate
-	data.ImportDate = form.ImportDate
-	data.ReceiveCode = form.ReceiveCode
+	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
+	data.UnitId, _ = primitive.ObjectIDFromHex(param.UnitId)
+	data.Sequence = entity.GetProductStockMaxSequence(param.ProductId, param.UnitId) + 1
+	data.LotNumber = param.LotNumber
+	data.CostPrice = param.CostPrice
+	data.Price = param.Price
+	data.Import = param.Quantity
+	data.Quantity = param.Quantity
+	data.ExpireDate = param.ExpireDate
+	data.ImportDate = param.ImportDate
+	data.ReceiveCode = param.ReceiveCode
 	_, err := entity.productStockRepo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
@@ -1082,7 +1082,7 @@ func (entity *productEntity) GetProductStocksByProductId(productId string) (item
 
 }
 
-func (entity *productEntity) UpdateProductStockById(id string, form request.UpdateProductStock) (*entities.ProductStock, error) {
+func (entity *productEntity) UpdateProductStockById(id string, param request.UpdateProductStock) (*entities.ProductStock, error) {
 	logrus.Info("UpdateProductStockById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -1092,11 +1092,11 @@ func (entity *productEntity) UpdateProductStockById(id string, form request.Upda
 	if err != nil {
 		return nil, err
 	}
-	data.LotNumber = form.LotNumber
-	data.CostPrice = form.CostPrice
-	data.Price = form.Price
-	data.ExpireDate = form.ExpireDate
-	data.ImportDate = form.ImportDate
+	data.LotNumber = param.LotNumber
+	data.CostPrice = param.CostPrice
+	data.Price = param.Price
+	data.ExpireDate = param.ExpireDate
+	data.ImportDate = param.ImportDate
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
@@ -1147,12 +1147,12 @@ func (entity *productEntity) RemoveProductStockById(id string) (*entities.Produc
 	return &data, nil
 }
 
-func (entity *productEntity) UpdateProductStockSequence(form request.UpdateProductStockSequence) ([]entities.ProductStock, error) {
+func (entity *productEntity) UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error) {
 	logrus.Info("UpdateProductStockSequence")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objIds := make([]primitive.ObjectID, 0, len(form.Stocks))
-	for _, value := range form.Stocks {
+	objIds := make([]primitive.ObjectID, 0, len(param.Stocks))
+	for _, value := range param.Stocks {
 		id, err := primitive.ObjectIDFromHex(value.StockId)
 		if err != nil {
 			return nil, err
@@ -1163,7 +1163,7 @@ func (entity *productEntity) UpdateProductStockSequence(form request.UpdateProdu
 	if err != nil {
 		return nil, err
 	}
-	stocks := make([]entities.ProductStock, 0, len(form.Stocks))
+	stocks := make([]entities.ProductStock, 0, len(param.Stocks))
 	for cursor.Next(ctx) {
 		item := entities.ProductStock{}
 		err = cursor.Decode(&item)
@@ -1178,7 +1178,7 @@ func (entity *productEntity) UpdateProductStockSequence(form request.UpdateProdu
 		stocks = []entities.ProductStock{}
 	}
 	for i, value := range stocks {
-		value.Sequence = form.Stocks[i].Sequence
+		value.Sequence = param.Stocks[i].Sequence
 		_, err = entity.productStockRepo.ReplaceOne(ctx, bson.M{"_id": value.Id}, value)
 		if err != nil {
 			logrus.Error(err)
@@ -1187,23 +1187,23 @@ func (entity *productEntity) UpdateProductStockSequence(form request.UpdateProdu
 	return stocks, nil
 }
 
-func (entity *productEntity) CreateProductHistory(form request.ProductHistory) (*entities.ProductHistory, error) {
+func (entity *productEntity) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
 	logrus.Info("CreateProductHistory")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.ProductHistory{}
 	data.Id = primitive.NewObjectID()
-	data.ProductId, _ = primitive.ObjectIDFromHex(form.ProductId)
-	data.Description = form.Description
-	data.Type = form.Type
-	data.Unit = form.Unit
-	data.CostPrice = form.CostPrice
-	data.Price = form.Price
-	data.Quantity = form.Quantity
-	data.Import = form.Import
-	data.CreatedBy = form.CreatedBy
+	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
+	data.Description = param.Description
+	data.Type = param.Type
+	data.Unit = param.Unit
+	data.CostPrice = param.CostPrice
+	data.Price = param.Price
+	data.Quantity = param.Quantity
+	data.Import = param.Import
+	data.CreatedBy = param.CreatedBy
 	data.CreatedDate = time.Now()
-	data.Balance = form.Balance
+	data.Balance = param.Balance
 
 	_, err := entity.productHistoryRepo.InsertOne(ctx, data)
 	if err != nil {

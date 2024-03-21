@@ -4,11 +4,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func CreateSupplier(supplierEntity repository.ISupplier) gin.HandlerFunc {
+func CreateSupplier(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Supplier{}
 		if err := ctx.ShouldBind(&req); err != nil {

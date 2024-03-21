@@ -4,11 +4,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
-	repository2 "pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func DeleteOrderItemByOrderProductId(orderEntity repository2.IOrder, productEntity repository2.IProduct) gin.HandlerFunc {
+func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		orderId := ctx.Param("orderId")
 		productId := ctx.Param("productId")

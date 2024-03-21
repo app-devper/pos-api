@@ -3,11 +3,11 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func UpdateCustomerCodeOrderById(orderEntity repository.IOrder) gin.HandlerFunc {
+func UpdateCustomerCodeOrderById(orderEntity repositories.IOrder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateCustomerCode{}
 		if err := ctx.ShouldBind(&req); err != nil {

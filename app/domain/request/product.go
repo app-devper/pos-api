@@ -21,8 +21,8 @@ type Product struct {
 	LotNumber    string    `json:"lotNumber" binding:"required"`
 	ExpireDate   time.Time `json:"expireDate" binding:"required"`
 	ReceiveId    string    `json:"receiveId"`
-	CreatedBy    string
 	ReceiveCode  string
+	CreatedBy    string
 }
 
 type UpdateProduct struct {

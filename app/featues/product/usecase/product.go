@@ -3,14 +3,26 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	repository2 "pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
+	"sort"
 	"strings"
 	"time"
 )
 
-func CreateProduct(productEntity repository2.IProduct, receiveEntity repository2.IReceive) gin.HandlerFunc {
+func GenerateSerialNumber(sequenceEntity repositories.ISequence) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		result, err := sequenceEntity.NextSequence(constant.PRODUCT)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"serialNumber": result.GenerateCode()})
+	}
+}
+
+func CreateProduct(productEntity repositories.IProduct, receiveEntity repositories.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Product{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -88,8 +100,8 @@ func CreateProduct(productEntity repository2.IProduct, receiveEntity repository2
 				UnitId:      unit.Id.Hex(),
 				ReceiveCode: req.ReceiveCode,
 				Quantity:    req.Quantity,
-				Price:       req.Price,
-				CostPrice:   req.CostPrice,
+				Price:       0,
+				CostPrice:   0,
 				ExpireDate:  req.ExpireDate,
 				LotNumber:   req.LotNumber,
 				ImportDate:  time.Now(),
@@ -108,7 +120,7 @@ func CreateProduct(productEntity repository2.IProduct, receiveEntity repository2
 	}
 }
 
-func GetProducts(productEntity repository2.IProduct) gin.HandlerFunc {
+func GetProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.GetProduct{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -116,6 +128,67 @@ func GetProducts(productEntity repository2.IProduct) gin.HandlerFunc {
 			return
 		}
 		results, err := productEntity.GetProductAll(req)
+		userId := ctx.GetString("UserId")
+
+		for _, product := range results {
+			if len(product.ProductUnits) == 0 {
+				productUnit := request.ProductUnit{
+					ProductId: product.Id.Hex(),
+					Unit:      product.Unit,
+					Size:      1,
+					CostPrice: product.CostPrice,
+					Barcode:   product.SerialNumber,
+					UpdatedBy: userId,
+				}
+				unit, _ := productEntity.CreateProductUnit(productUnit)
+				productPrice := request.ProductPrice{
+					ProductId:    product.Id.Hex(),
+					UnitId:       unit.Id.Hex(),
+					Price:        product.Price,
+					CustomerType: constant.CustomerTypeGeneral,
+					UpdatedBy:    userId,
+				}
+				_, _ = productEntity.CreateProductPrice(productPrice)
+
+				if product.Quantity > 0 {
+					lots, _ := productEntity.GetProductLotsByProductId(product.Id.Hex())
+					if len(lots) > 0 {
+						sort.Slice(lots, func(i, j int) bool {
+							return lots[i].ExpireDate.After(lots[j].ExpireDate)
+						})
+						lot := lots[0]
+						productStock := request.ProductStock{
+							ProductId:   product.Id.Hex(),
+							UnitId:      unit.Id.Hex(),
+							ReceiveCode: "",
+							Quantity:    product.Quantity,
+							Price:       0,
+							CostPrice:   0,
+							ExpireDate:  lot.ExpireDate,
+							LotNumber:   lot.LotNumber,
+							ImportDate:  lot.CreatedDate,
+							UpdatedBy:   userId,
+						}
+						_, _ = productEntity.CreateProductStock(productStock)
+					}
+					if len(lots) == 0 {
+						productStock := request.ProductStock{
+							ProductId:   product.Id.Hex(),
+							UnitId:      unit.Id.Hex(),
+							ReceiveCode: "",
+							Quantity:    product.Quantity,
+							Price:       0,
+							CostPrice:   0,
+							ExpireDate:  time.Now(),
+							LotNumber:   "",
+							ImportDate:  time.Now(),
+							UpdatedBy:   userId,
+						}
+						_, _ = productEntity.CreateProductStock(productStock)
+					}
+				}
+			}
+		}
 
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -125,7 +198,7 @@ func GetProducts(productEntity repository2.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductBySerialNumber(productEntity repository2.IProduct) gin.HandlerFunc {
+func GetProductBySerialNumber(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		serialNumber := ctx.Param("serialNumber")
 		result, err := productEntity.GetProductBySerialNumber(serialNumber)
@@ -137,31 +210,35 @@ func GetProductBySerialNumber(productEntity repository2.IProduct) gin.HandlerFun
 	}
 }
 
-func DeleteProductById(productEntity repository2.IProduct) gin.HandlerFunc {
+func DeleteProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
-		result, err := productEntity.RemoveProductById(id)
+		product, err := productEntity.RemoveProductById(id)
+
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusOK, result)
+
+		ctx.JSON(http.StatusOK, product)
 	}
 }
 
-func GetProductById(productEntity repository2.IProduct) gin.HandlerFunc {
+func GetProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
-		result, err := productEntity.GetProductById(id)
+		product, err := productEntity.GetProductById(id)
+
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		ctx.JSON(http.StatusOK, result)
+
+		ctx.JSON(http.StatusOK, product)
 	}
 }
 
-func UpdateProductById(productEntity repository2.IProduct) gin.HandlerFunc {
+func UpdateProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
 		req := request.UpdateProduct{}

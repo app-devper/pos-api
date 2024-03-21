@@ -4,11 +4,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 	"pos/app/domain/request"
 )
 
-func UpdateCustomerById(customerEntity repository.ICustomer) gin.HandlerFunc {
+func UpdateCustomerById(customerEntity repositories.ICustomer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("customerId")
 		req := request.UpdateCustomer{}

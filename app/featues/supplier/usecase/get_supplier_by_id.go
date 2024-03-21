@@ -3,10 +3,10 @@ package usecase
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/data/repository"
+	"pos/app/data/repositories"
 )
 
-func GetSupplierById(supplierEntity repository.ISupplier) gin.HandlerFunc {
+func GetSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("supplierId")
 		result, err := supplierEntity.GetSupplierById(id)
