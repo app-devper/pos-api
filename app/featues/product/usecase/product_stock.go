@@ -17,16 +17,16 @@ func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 		stock, err := productEntity.CreateProductStock(req)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(req.UnitId)
 		balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex())
 		_, _ = productEntity.CreateProductHistory(request.AddProductStockHistory(req.ProductId, unit.Unit, req, balance))
 
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		ctx.JSON(http.StatusOK, stock)
 	}
 }
@@ -47,7 +47,7 @@ func GetProductStocksByProductId(productEntity repositories.IProduct) gin.Handle
 func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStock{}
-		id := ctx.Param("id")
+		id := ctx.Param("stockId")
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -56,16 +56,15 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 		req.UpdatedBy = userId
 
 		stock, err := productEntity.UpdateProductStockById(id, req)
-
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(req.UnitId)
 		balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex())
 		_, _ = productEntity.CreateProductHistory(request.UpdateProductStockHistory(req.ProductId, unit.Unit, req, balance))
 
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		ctx.JSON(http.StatusOK, stock)
 	}
 }
@@ -73,7 +72,7 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockQuantity{}
-		id := ctx.Param("id")
+		id := ctx.Param("stockId")
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -82,36 +81,35 @@ func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.Han
 		req.UpdatedBy = userId
 
 		stock, err := productEntity.UpdateProductStockQuantityById(id, req.Quantity)
-
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
 		balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex())
 		_, _ = productEntity.CreateProductHistory(request.UpdateProductStockQuantityHistory(stock.ProductId.Hex(), unit.Unit, req, balance))
 
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		ctx.JSON(http.StatusOK, stock)
 	}
 }
 
 func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		id := ctx.Param("id")
+		id := ctx.Param("stockId")
 		userId := ctx.GetString("UserId")
 
 		result, err := productEntity.RemoveProductStockById(id)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
 		balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
 		_, _ = productEntity.CreateProductHistory(request.RemoveProductStockHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
 
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		ctx.JSON(http.StatusOK, result)
 	}
 }

@@ -74,19 +74,19 @@ func ApplyProductAPI(
 		usecase.CreateProductStock(repository.Product),
 	)
 
-	productRoute.PUT("/stocks/:id",
+	productRoute.PUT("/stocks/:stockId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.UpdateProductStockById(repository.Product),
 	)
 
-	productRoute.DELETE("/stocks/:id",
+	productRoute.DELETE("/stocks/:stockId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.RemoveProductStockById(repository.Product),
 	)
 
-	productRoute.PATCH("/stocks/:id/quantity",
+	productRoute.PATCH("/stocks/:stockId/quantity",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		usecase.UpdateProductStockQuantityById(repository.Product),

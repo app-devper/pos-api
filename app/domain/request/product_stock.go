@@ -10,8 +10,8 @@ type ProductStock struct {
 	LotNumber   string    `json:"lotNumber"`
 	CostPrice   float64   `json:"costPrice"`
 	Price       float64   `json:"price"`
-	ExpireDate  time.Time `json:"expireDate"`
-	ImportDate  time.Time `json:"importDate"`
+	ExpireDate  time.Time `json:"expireDate" binding:"required"`
+	ImportDate  time.Time `json:"importDate" binding:"required"`
 	UpdatedBy   string
 }
 
@@ -21,8 +21,8 @@ type UpdateProductStock struct {
 	LotNumber  string    `json:"lotNumber"`
 	CostPrice  float64   `json:"costPrice"`
 	Price      float64   `json:"price"`
-	ExpireDate time.Time `json:"expireDate"`
-	ImportDate time.Time `json:"importDate"`
+	ExpireDate time.Time `json:"expireDate" binding:"required"`
+	ImportDate time.Time `json:"importDate" binding:"required"`
 	UpdatedBy  string
 }
 
