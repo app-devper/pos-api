@@ -27,7 +27,11 @@ func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 			Volume:     req.Volume,
 			VolumeUnit: req.VolumeUnit,
 		}
-		unit, _ := productEntity.CreateProductUnit(productUnit)
+		unit, err := productEntity.CreateProductUnit(productUnit)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		productPrice := request.ProductPrice{
 			ProductId:    req.ProductId,
@@ -35,7 +39,6 @@ func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 			Price:        req.Price,
 			CustomerType: constant.CustomerTypeGeneral,
 		}
-
 		_, _ = productEntity.CreateProductPrice(productPrice)
 
 		// Add product history
@@ -60,7 +63,7 @@ func GetProductUnitsByProductId(productEntity repositories.IProduct) gin.Handler
 func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductUnit{}
-		id := ctx.Param("id")
+		id := ctx.Param("unitId")
 		if err := ctx.ShouldBind(&req); err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -69,32 +72,31 @@ func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 		req.UpdatedBy = userId
 
 		unit, err := productEntity.UpdateProductUnitById(id, req)
-
-		// Add product history
-		_, _ = productEntity.CreateProductHistory(request.UpdateProductUnitHistory(req.ProductId, req))
-
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		// Add product history
+		_, _ = productEntity.CreateProductHistory(request.UpdateProductUnitHistory(req.ProductId, req))
+
 		ctx.JSON(http.StatusOK, unit)
 	}
 }
 
 func RemoveProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		id := ctx.Param("id")
+		id := ctx.Param("unitId")
 		userId := ctx.GetString("UserId")
 
 		result, err := productEntity.RemoveProductUnitById(id)
-
-		// Add product history
-		_, _ = productEntity.CreateProductHistory(request.RemoveProductUnitHistory(result.ProductId.Hex(), result, userId))
-
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		// Add product history
+		_, _ = productEntity.CreateProductHistory(request.RemoveProductUnitHistory(result.ProductId.Hex(), result, userId))
 		_ = productEntity.RemoveProductPricesByUnitId(id)
 		ctx.JSON(http.StatusOK, result)
 	}
