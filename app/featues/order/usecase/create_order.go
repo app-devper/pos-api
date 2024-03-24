@@ -48,10 +48,11 @@ func CreateOrder(
 				_, _ = productEntity.RemoveProductStockQuantityById(item.StockId, item.Quantity)
 
 				// Add product history
-				stock, _ := productEntity.GetProductStockById(item.StockId)
-				unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
+				unit, _ := productEntity.GetProductUnitById(item.UnitId)
 				balance := productEntity.GetProductStockBalance(item.ProductId, unit.Id.Hex())
 				_, _ = productEntity.CreateProductHistory(request.AddOrderItemProductHistory(item.ProductId, unit.Unit, item, balance, req.CreatedBy))
+			} else {
+				//
 			}
 		}
 

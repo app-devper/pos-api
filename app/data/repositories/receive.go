@@ -194,15 +194,11 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 	return &data, nil
 }
 
-func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*entities.ReceiveItem, error) {
+func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, productId string, form request.Product) (*entities.ReceiveItem, error) {
 	logrus.Info("CreateReceiveItem")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	receive, err := primitive.ObjectIDFromHex(receiveId)
-	if err != nil {
-		return nil, err
-	}
-	lot, err := primitive.ObjectIDFromHex(lotId)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +209,6 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, lotId string, p
 	data := entities.ReceiveItem{
 		Id:          primitive.NewObjectID(),
 		ReceiveId:   receive,
-		LotId:       lot,
 		ProductId:   product,
 		Quantity:    form.Quantity,
 		CostPrice:   form.CostPrice,

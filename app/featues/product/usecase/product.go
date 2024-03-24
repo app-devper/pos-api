@@ -84,12 +84,10 @@ func CreateProduct(productEntity repositories.IProduct, receiveEntity repositori
 			_, _ = productEntity.CreateProductPrice(productPrice)
 		}
 
-		lot, _ := productEntity.CreateProductLotByProductId(product.Id.Hex(), req)
-
 		if req.ReceiveId != "" {
 			receive, _ := receiveEntity.GetReceiveById(req.ReceiveId)
 			req.ReceiveCode = receive.Code
-			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, lot.Id.Hex(), product.Id.Hex(), req)
+			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, "", product.Id.Hex(), req)
 		}
 
 		// Create product stock

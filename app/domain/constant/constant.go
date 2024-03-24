@@ -2,13 +2,12 @@ package constant
 
 const (
 	CustomerTypeGeneral    = "General"
-	CustomerTypeMember     = "Member"
 	CustomerTypeWholesaler = "Wholesaler"
 	CustomerTypeRegular    = "Regular"
 )
 
 func CustomerTypes() []string {
-	return []string{CustomerTypeGeneral, CustomerTypeMember, CustomerTypeWholesaler, CustomerTypeRegular}
+	return []string{CustomerTypeGeneral, CustomerTypeWholesaler, CustomerTypeRegular}
 }
 
 const (

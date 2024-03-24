@@ -20,7 +20,6 @@ type Receive struct {
 type ReceiveItem struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
 	ReceiveId   primitive.ObjectID `bson:"receiveId" json:"receiveId"`
-	LotId       primitive.ObjectID `bson:"lotId" json:"lotId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
