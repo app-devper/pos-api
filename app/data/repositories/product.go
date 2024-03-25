@@ -1179,7 +1179,11 @@ func (entity *productEntity) UpdateProductStockSequence(param request.UpdateProd
 	}
 	for i, value := range stocks {
 		value.Sequence = param.Stocks[i].Sequence
-		_, err = entity.productStockRepo.ReplaceOne(ctx, bson.M{"_id": value.Id}, value)
+		isReturnNewDoc := options.After
+		opts := &options.FindOneAndUpdateOptions{
+			ReturnDocument: &isReturnNewDoc,
+		}
+		err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": value.Id}, bson.M{"$set": value}, opts).Decode(&value)
 		if err != nil {
 			logrus.Error(err)
 		}
