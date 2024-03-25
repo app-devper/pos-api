@@ -1177,7 +1177,7 @@ func (entity *productEntity) UpdateProductStockSequence(param request.UpdateProd
 	if stocks == nil {
 		stocks = []entities.ProductStock{}
 	}
-	for _, value := range stocks {
+	for index, value := range stocks {
 		for i := range param.Stocks {
 			if param.Stocks[i].StockId == value.Id.Hex() {
 				value.Sequence = param.Stocks[i].Sequence
@@ -1192,6 +1192,7 @@ func (entity *productEntity) UpdateProductStockSequence(param request.UpdateProd
 		if err != nil {
 			logrus.Error(err)
 		}
+		stocks[index] = value
 	}
 	return stocks, nil
 }
