@@ -1177,8 +1177,13 @@ func (entity *productEntity) UpdateProductStockSequence(param request.UpdateProd
 	if stocks == nil {
 		stocks = []entities.ProductStock{}
 	}
-	for i, value := range stocks {
-		value.Sequence = param.Stocks[i].Sequence
+	for _, value := range stocks {
+		for i := range param.Stocks {
+			if param.Stocks[i].StockId == value.Id.Hex() {
+				value.Sequence = param.Stocks[i].Sequence
+				break
+			}
+		}
 		isReturnNewDoc := options.After
 		opts := &options.FindOneAndUpdateOptions{
 			ReturnDocument: &isReturnNewDoc,
