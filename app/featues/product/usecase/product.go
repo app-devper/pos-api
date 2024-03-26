@@ -22,7 +22,84 @@ func GenerateSerialNumber(sequenceEntity repositories.ISequence) gin.HandlerFunc
 	}
 }
 
-func CreateProduct(productEntity repositories.IProduct, receiveEntity repositories.IReceive) gin.HandlerFunc {
+func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		req := request.CreateProduct{}
+		if err := ctx.ShouldBind(&req); err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		userId := ctx.GetString("UserId")
+		req.CreatedBy = userId
+
+		serialNumber := strings.TrimSpace(req.SerialNumber)
+		product, err := productEntity.GetProductBySerialNumber(serialNumber)
+
+		if product != nil {
+			updateProduct := request.UpdateProduct{
+				Description: req.Description,
+				Category:    req.Category,
+				Name:        req.Name,
+				NameEn:      req.NameEn,
+				UpdatedBy:   userId,
+			}
+			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
+
+			// Add product history
+			_, _ = productEntity.CreateProductHistory(request.UpdateProductHistory(product.Id.Hex(), updateProduct))
+		} else {
+			createProduct := request.Product{
+				SerialNumber: req.SerialNumber,
+				CostPrice:    req.CostPrice,
+				Price:        req.Price,
+				Description:  req.Description,
+				Quantity:     0,
+				Category:     req.Category,
+				Name:         req.Name,
+				NameEn:       req.NameEn,
+				Unit:         req.Unit,
+				CreatedBy:    userId,
+			}
+			product, err = productEntity.CreateProduct(createProduct)
+			if product != nil {
+
+				// Add product history
+				_, _ = productEntity.CreateProductHistory(request.AddProductHistory(product.Id.Hex(), createProduct))
+			}
+		}
+
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Create product unit default
+		unit, _ := productEntity.GetProductUnitByDefault(product.Id.Hex(), req.Unit)
+		if unit == nil {
+			productUnit := request.ProductUnit{
+				ProductId: product.Id.Hex(),
+				Unit:      req.Unit,
+				Size:      1,
+				CostPrice: req.CostPrice,
+				Barcode:   req.SerialNumber,
+				UpdatedBy: userId,
+			}
+			unit, _ = productEntity.CreateProductUnit(productUnit)
+			productPrice := request.ProductPrice{
+				ProductId:    product.Id.Hex(),
+				UnitId:       unit.Id.Hex(),
+				Price:        req.Price,
+				CustomerType: constant.CustomerTypeGeneral,
+				UpdatedBy:    userId,
+			}
+			_, _ = productEntity.CreateProductPrice(productPrice)
+		}
+
+		ctx.JSON(http.StatusOK, product)
+	}
+}
+
+func CreateProductReceive(productEntity repositories.IProduct, receiveEntity repositories.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Product{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -37,16 +114,11 @@ func CreateProduct(productEntity repositories.IProduct, receiveEntity repositori
 
 		if product != nil {
 			updateProduct := request.UpdateProduct{
-				SerialNumber: req.SerialNumber,
-				CostPrice:    req.CostPrice,
-				Price:        req.Price,
-				Description:  req.Description,
-				Quantity:     req.Quantity + product.Quantity,
-				Category:     req.Category,
-				Name:         req.Name,
-				NameEn:       req.NameEn,
-				Unit:         req.Unit,
-				UpdatedBy:    userId,
+				Description: req.Description,
+				Category:    req.Category,
+				Name:        req.Name,
+				NameEn:      req.NameEn,
+				UpdatedBy:   userId,
 			}
 			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
 		} else {

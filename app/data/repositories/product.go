@@ -237,14 +237,9 @@ func (entity *productEntity) UpdateProductById(id string, param request.UpdatePr
 	if err != nil {
 		return nil, err
 	}
-	data.SerialNumber = param.SerialNumber
 	data.Name = param.Name
 	data.NameEn = param.NameEn
 	data.Description = param.Description
-	data.Price = param.Price
-	data.CostPrice = param.CostPrice
-	data.Unit = param.Unit
-	data.Quantity = param.Quantity
 	data.Category = param.Category
 	data.UpdatedBy = param.UpdatedBy
 	data.UpdatedDate = time.Now()
