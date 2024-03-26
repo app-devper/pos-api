@@ -34,7 +34,6 @@ func UpdateProductHistory(productId string, product UpdateProduct) ProductHistor
 		ProductId:   productId,
 		Type:        constant.HistoryTypeUpdateProduct,
 		Description: "แก้ไขสินค้า " + product.Name,
-		Unit:        product.Unit,
 		CreatedBy:   product.UpdatedBy,
 	}
 }

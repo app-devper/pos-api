@@ -31,7 +31,7 @@ type CreateProduct struct {
 	Description  string  `json:"description"`
 	Price        float64 `json:"price" binding:"required"`
 	CostPrice    float64 `json:"costPrice" binding:"required"`
-	Unit         string  `json:"unit"`
+	Unit         string  `json:"unit" binding:"required"`
 	SerialNumber string  `json:"serialNumber" binding:"required"`
 	Category     string  `json:"category"`
 	CreatedBy    string
