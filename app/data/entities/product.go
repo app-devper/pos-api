@@ -14,6 +14,7 @@ type Product struct {
 	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
 	Unit         string             `bson:"unit" json:"unit"`
 	Quantity     int                `bson:"quantity" json:"quantity"`
+	SoldFirst    int                `bson:"soldFirst" json:"soldFirst"`
 	SerialNumber string             `bson:"serialNumber" json:"serialNumber"`
 	Category     string             `bson:"category"  json:"category"`
 	CreatedBy    string             `bson:"createdBy" json:"-"`
@@ -31,6 +32,7 @@ type ProductDetail struct {
 	CostPrice     float64            `bson:"costPrice" json:"costPrice"`
 	Unit          string             `bson:"unit" json:"unit"`
 	Quantity      int                `bson:"quantity" json:"quantity"`
+	SoldFirst     int                `bson:"soldFirst" json:"soldFirst"`
 	SerialNumber  string             `bson:"serialNumber" json:"serialNumber"`
 	Category      string             `bson:"category"  json:"category"`
 	CreatedBy     string             `bson:"createdBy" json:"-"`

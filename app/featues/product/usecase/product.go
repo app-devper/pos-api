@@ -329,3 +329,15 @@ func UpdateProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, result)
 	}
 }
+
+func ClearQuantitySoldFirstById(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		productId := ctx.Param("productId")
+		result, err := productEntity.ClearQuantitySoldFirstById(productId)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusOK, result)
+	}
+}

@@ -46,13 +46,6 @@ func ApplyOrderAPI(
 		usecase.DeleteOrderItemByOrderProductId(repository.Order, repository.Product),
 	)
 
-	orderRoute.GET("/:orderId/total-cost",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN),
-		usecase.UpdateTotalCostById(repository.Order, repository.Product),
-	)
-
 	orderRoute.PATCH("/:orderId/customer-code",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),

@@ -22,10 +22,15 @@ func DeleteOrderById(orderEntity repositories.IOrder, productEntity repositories
 		var message = ""
 		var no = 1
 		for _, item := range result.Items {
-			_, _ = productEntity.AddQuantityById(item.ProductId.Hex(), item.Quantity)
+
 			if len(item.Stocks) > 0 {
+				// Update stock quantity
 				for _, itemStock := range item.Stocks {
-					_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+					if itemStock.StockId != "" {
+						_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+					} else {
+						_, _ = productEntity.AddQuantitySoldFirstById(item.ProductId.Hex(), itemStock.Quantity)
+					}
 				}
 			}
 

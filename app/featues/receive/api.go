@@ -49,16 +49,4 @@ func ApplyReceiveAPI(
 		usecase.UpdateReceiveTotalCostById(repository.Receive),
 	)
 
-	receiveRoute.GET("/:receiveId/lots",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.GetReceiveItemByReceiveId(repository.Receive),
-	)
-
-	receiveRoute.DELETE("lots/:lotId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.DeleteReceiveItemByLotId(repository.Receive, repository.Product),
-	)
-
 }

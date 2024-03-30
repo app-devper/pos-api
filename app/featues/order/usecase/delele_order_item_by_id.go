@@ -23,11 +23,14 @@ func DeleteOrderItemById(orderEntity repositories.IOrder, productEntity reposito
 			return
 		}
 
-		_, _ = productEntity.AddQuantityById(result.ProductId.Hex(), result.Quantity)
-
 		if len(result.Stocks) > 0 {
+			// Update stock quantity
 			for _, itemStock := range result.Stocks {
-				_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+				if itemStock.StockId != "" {
+					_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+				} else {
+					_, _ = productEntity.AddQuantitySoldFirstById(result.ProductId.Hex(), itemStock.Quantity)
+				}
 			}
 
 			// Add product history

@@ -35,23 +35,25 @@ func CreateOrder(
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+
+		// Update product stock
 		var stocks []entities.ProductStock
 		for _, item := range req.Items {
 			if len(item.Stocks) > 0 {
+				// Update stock quantity
 				for _, itemStock := range item.Stocks {
 					if itemStock.StockId != "" {
 						stock, _ := productEntity.RemoveProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
 						stocks = append(stocks, *stock)
+					} else {
+						_, _ = productEntity.RemoveQuantitySoldFirstById(item.ProductId, itemStock.Quantity)
 					}
-					_, _ = productEntity.RemoveQuantityById(item.ProductId, item.Quantity)
 				}
 
 				// Add product history
 				unit, _ := productEntity.GetProductUnitById(item.UnitId)
 				balance := productEntity.GetProductStockBalance(item.ProductId, unit.Id.Hex())
 				_, _ = productEntity.CreateProductHistory(request.AddOrderItemProductHistory(item.ProductId, unit.Unit, item, balance, req.CreatedBy))
-			} else {
-				//
 			}
 		}
 

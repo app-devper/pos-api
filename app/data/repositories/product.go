@@ -34,23 +34,13 @@ type IProduct interface {
 	CreateProduct(param request.Product) (*entities.Product, error)
 	RemoveProductById(id string) (*entities.Product, error)
 	UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error)
-	RemoveQuantityById(id string, quantity int) (*entities.Product, error)
-	AddQuantityById(id string, quantity int) (*entities.Product, error)
-	GetTotalCostPrice(id string, quantity int) float64
+	RemoveQuantitySoldFirstById(id string, quantity int) (*entities.Product, error)
+	AddQuantitySoldFirstById(id string, quantity int) (*entities.Product, error)
+	ClearQuantitySoldFirstById(id string) (*entities.Product, error)
 
 	// ProductLot
-	CreateProductLotByProductId(productId string, param request.Product) (*entities.ProductLot, error)
-	CreateProductLot(param request.ProductLot) (*entities.ProductLot, error)
-	GetProductLots(param request.GetProductLotsExpireRange) ([]entities.ProductLot, error)
 	GetProductLotsByProductId(productId string) ([]entities.ProductLot, error)
-	GetProductLotsByIds(ids []string) ([]entities.ProductLot, error)
-	GetProductLotsExpired() ([]entities.ProductLot, error)
 	GetProductLotsExpireNotify(param request.GetProductLotsExpireRange) ([]entities.ProductLotDetail, error)
-	GetProductLotById(id string) (*entities.ProductLot, error)
-	RemoveProductLotById(id string) (*entities.ProductLot, error)
-	UpdateProductLotById(id string, param request.UpdateProductLot) (*entities.ProductLot, error)
-	UpdateProductLotNotifyById(id string, param request.UpdateProductLotNotify) (*entities.ProductLot, error)
-	UpdateProductLotQuantityById(id string, param request.UpdateProductLotQuantity) (*entities.ProductLot, error)
 
 	// ProductUnit
 	CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error)
@@ -308,6 +298,72 @@ func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 
 		return 0
 	}
 	return data.CostPrice * float64(quantity)
+}
+
+func (entity *productEntity) RemoveQuantitySoldFirstById(id string, quantity int) (*entities.Product, error) {
+	logrus.Info("RemoveQuantitySoldFirstById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, _ := primitive.ObjectIDFromHex(id)
+	data, err := entity.GetProductById(id)
+	if err != nil {
+		return nil, err
+	}
+	data.SoldFirst = data.SoldFirst - quantity
+	data.UpdatedDate = time.Now()
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (entity *productEntity) AddQuantitySoldFirstById(id string, quantity int) (*entities.Product, error) {
+	logrus.Info("AddQuantitySoldFirstById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, _ := primitive.ObjectIDFromHex(id)
+	data, err := entity.GetProductById(id)
+	if err != nil {
+		return nil, err
+	}
+	data.SoldFirst = data.SoldFirst + quantity
+	data.UpdatedDate = time.Now()
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (entity *productEntity) ClearQuantitySoldFirstById(id string) (*entities.Product, error) {
+	logrus.Info("ClearQuantitySoldFirstById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, _ := primitive.ObjectIDFromHex(id)
+	data, err := entity.GetProductById(id)
+	if err != nil {
+		return nil, err
+	}
+	data.SoldFirst = 0
+	data.UpdatedDate = time.Now()
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (entity *productEntity) CreateProductLotByProductId(productId string, param request.Product) (*entities.ProductLot, error) {

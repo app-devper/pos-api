@@ -56,6 +56,13 @@ func ApplyProductAPI(
 		usecase.DeleteProductById(repository.Product),
 	)
 
+	productRoute.DELETE("/:productId/sold-first",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN),
+		usecase.ClearQuantitySoldFirstById(repository.Product),
+	)
+
 	productRoute.GET("/serial-number/:serialNumber",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
@@ -156,54 +163,6 @@ func ApplyProductAPI(
 	)
 
 	// Product Lot
-	productRoute.GET("/:productId/lots",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.GetProductLotsByProductId(repository.Product),
-	)
-
-	productRoute.POST("/lots",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.CreateProductLot(repository.Product),
-	)
-
-	productRoute.GET("/lots",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.GetProductLots(repository.Product),
-	)
-
-	productRoute.GET("/lots/expired",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.GetProductLotsExpired(repository.Product),
-	)
-
-	productRoute.GET("/lots/:lotId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.GetProductLotByLotId(repository.Product),
-	)
-
-	productRoute.PUT("/lots/:lotId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.UpdateProductLotByLotId(repository.Product),
-	)
-
-	productRoute.PATCH("/lots/:lotId/notify",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.UpdateProductLotNotifyByLotId(repository.Product),
-	)
-
-	productRoute.PATCH("/lots/:lotId/quantity",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		usecase.UpdateProductLotQuantityByLotId(repository.Product),
-	)
-
 	productRoute.GET("/lots/expire-notify",
 		usecase.GetProductLotsExpireNotify(repository.Product),
 	)
