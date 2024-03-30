@@ -25,12 +25,13 @@ func DeleteOrderItemById(orderEntity repositories.IOrder, productEntity reposito
 
 		_, _ = productEntity.AddQuantityById(result.ProductId.Hex(), result.Quantity)
 
-		if !result.StockId.IsZero() {
-			_, _ = productEntity.AddProductStockQuantityById(result.StockId.Hex(), result.Quantity)
+		if len(result.Stocks) > 0 {
+			for _, itemStock := range result.Stocks {
+				_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+			}
 
 			// Add product history
-			stock, _ := productEntity.GetProductStockById(result.StockId.Hex())
-			unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
+			unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
 			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
 			_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
 		}

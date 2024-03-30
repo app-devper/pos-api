@@ -87,12 +87,23 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, err
 	for i := 0; i < count; i++ {
 		formItem := form.Items[i]
 		productId, _ := primitive.ObjectIDFromHex(formItem.ProductId)
-		stockId, _ := primitive.ObjectIDFromHex(formItem.StockId)
+		unitId, _ := primitive.ObjectIDFromHex(formItem.UnitId)
+		countStock := len(formItem.Stocks)
+		stocks := make([]entities.OrderItemStock, countStock)
+		for j := 0; j < countStock; j++ {
+			formStock := formItem.Stocks[j]
+			stock := entities.OrderItemStock{
+				Quantity: formStock.Quantity,
+				StockId:  formStock.StockId,
+			}
+			stocks[j] = stock
+		}
 		item := entities.OrderItem{
 			Id:          primitive.NewObjectID(),
 			OrderId:     orderId,
 			ProductId:   productId,
-			StockId:     stockId,
+			UnitId:      unitId,
+			Stocks:      stocks,
 			Quantity:    formItem.Quantity,
 			Price:       formItem.Price,
 			CostPrice:   formItem.CostPrice,

@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
@@ -21,13 +22,6 @@ func CreateOrder(
 			return
 		}
 
-		totalCost := 0.0
-		for index, item := range req.Items {
-			req.Items[index].CostPrice = productEntity.GetTotalCostPrice(item.ProductId, item.Quantity)
-			totalCost += req.Items[index].CostPrice
-		}
-		req.TotalCost = totalCost
-
 		userId := utils.GetUserId(ctx)
 		req.CreatedBy = userId
 
@@ -41,11 +35,16 @@ func CreateOrder(
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
+		var stocks []entities.ProductStock
 		for _, item := range req.Items {
-			_, _ = productEntity.RemoveQuantityById(item.ProductId, item.Quantity)
-			if item.StockId != "" {
-				_, _ = productEntity.RemoveProductStockQuantityById(item.StockId, item.Quantity)
+			if len(item.Stocks) > 0 {
+				for _, itemStock := range item.Stocks {
+					if itemStock.StockId != "" {
+						stock, _ := productEntity.RemoveProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+						stocks = append(stocks, *stock)
+					}
+					_, _ = productEntity.RemoveQuantityById(item.ProductId, item.Quantity)
+				}
 
 				// Add product history
 				unit, _ := productEntity.GetProductUnitById(item.UnitId)
@@ -61,6 +60,6 @@ func CreateOrder(
 			_, _ = utils.NotifyMassage("รายการวันที่ " + date + "\n\n" + req.Message)
 		}
 
-		ctx.JSON(http.StatusOK, result)
+		ctx.JSON(http.StatusOK, gin.H{"data": result, "stocks": stocks})
 	}
 }

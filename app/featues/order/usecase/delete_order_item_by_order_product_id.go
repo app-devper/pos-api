@@ -28,15 +28,15 @@ func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, productEnt
 
 		_, _ = productEntity.AddQuantityById(productId, result.Quantity)
 
-		if !result.StockId.IsZero() {
-			_, _ = productEntity.AddProductStockQuantityById(result.StockId.Hex(), result.Quantity)
-
-			// Add product history
-			stock, _ := productEntity.GetProductStockById(result.StockId.Hex())
-			unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
-			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
-			_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
+		if len(result.Stocks) > 0 {
+			for _, itemStock := range result.Stocks {
+				_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+			}
 		}
+		// Add product history
+		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
+		balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
+		_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
 
 		date := utils.ToFormat(result.CreatedDate)
 		_, _ = utils.NotifyMassage("ยกเลิกสินค้ารายการวันที่ " + date + "\n\n1. " + result.GetMessage())

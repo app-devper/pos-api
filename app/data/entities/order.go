@@ -38,11 +38,17 @@ type OrderDetail struct {
 	Payment      Payment                  `json:"payment"`
 }
 
+type OrderItemStock struct {
+	Quantity int    `json:"quantity" binding:"required"`
+	StockId  string `json:"stockId"`
+}
+
 type OrderItem struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	StockId     primitive.ObjectID `bson:"stockId" json:"stockId"`
+	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Stocks      []OrderItemStock   `bson:"stocks" json:"stocks"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
@@ -57,7 +63,8 @@ type OrderItemProductDetail struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	StockId     primitive.ObjectID `bson:"stockId" json:"stockId"`
+	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Stocks      []OrderItemStock   `bson:"stocks" json:"stocks"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
@@ -73,7 +80,8 @@ type OrderItemOrderDetail struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	StockId     primitive.ObjectID `bson:"stockId" json:"stockId"`
+	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Stocks      []OrderItemStock   `bson:"stocks" json:"stocks"`
 	Quantity    int                `bson:"quantity" json:"quantity"`
 	Price       float64            `bson:"price" json:"price"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`

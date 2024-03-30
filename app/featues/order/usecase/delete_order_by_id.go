@@ -23,15 +23,17 @@ func DeleteOrderById(orderEntity repositories.IOrder, productEntity repositories
 		var no = 1
 		for _, item := range result.Items {
 			_, _ = productEntity.AddQuantityById(item.ProductId.Hex(), item.Quantity)
-			if !item.StockId.IsZero() {
-				_, _ = productEntity.AddProductStockQuantityById(item.StockId.Hex(), item.Quantity)
-
-				// Add product history
-				stock, _ := productEntity.GetProductStockById(item.StockId.Hex())
-				unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
-				balance := productEntity.GetProductStockBalance(item.ProductId.Hex(), unit.Id.Hex())
-				_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(item.ProductId.Hex(), unit.Unit, &item, balance, userId))
+			if len(item.Stocks) > 0 {
+				for _, itemStock := range item.Stocks {
+					_, _ = productEntity.AddProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+				}
 			}
+
+			// Add product history
+			unit, _ := productEntity.GetProductUnitById(item.UnitId.Hex())
+			balance := productEntity.GetProductStockBalance(item.ProductId.Hex(), unit.Id.Hex())
+			_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(item.ProductId.Hex(), unit.Unit, &item, balance, userId))
+
 			message += fmt.Sprintf("%d. %s\n", no, item.GetMessage())
 			no += 1
 		}
