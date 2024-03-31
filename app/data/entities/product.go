@@ -17,6 +17,7 @@ type Product struct {
 	SoldFirst    int                `bson:"soldFirst" json:"soldFirst"`
 	SerialNumber string             `bson:"serialNumber" json:"serialNumber"`
 	Category     string             `bson:"category"  json:"category"`
+	Status       string             `bson:"status"  json:"status"`
 	CreatedBy    string             `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy    string             `bson:"updatedBy" json:"-"`
@@ -35,6 +36,7 @@ type ProductDetail struct {
 	SoldFirst     int                `bson:"soldFirst" json:"soldFirst"`
 	SerialNumber  string             `bson:"serialNumber" json:"serialNumber"`
 	Category      string             `bson:"category"  json:"category"`
+	Status        string             `bson:"status"  json:"status"`
 	CreatedBy     string             `bson:"createdBy" json:"-"`
 	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy     string             `bson:"updatedBy" json:"-"`

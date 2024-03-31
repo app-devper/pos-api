@@ -41,6 +41,7 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 				Category:    req.Category,
 				Name:        req.Name,
 				NameEn:      req.NameEn,
+				Status:      req.Status,
 				UpdatedBy:   userId,
 			}
 			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
@@ -53,6 +54,7 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 				CostPrice:    req.CostPrice,
 				Price:        req.Price,
 				Description:  req.Description,
+				Status:       req.Status,
 				Quantity:     0,
 				Category:     req.Category,
 				Name:         req.Name,

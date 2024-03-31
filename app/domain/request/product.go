@@ -21,6 +21,7 @@ type Product struct {
 	LotNumber    string    `json:"lotNumber" binding:"required"`
 	ExpireDate   time.Time `json:"expireDate" binding:"required"`
 	ReceiveId    string    `json:"receiveId"`
+	Status       string    `json:"status"`
 	ReceiveCode  string
 	CreatedBy    string
 }
@@ -34,6 +35,7 @@ type CreateProduct struct {
 	Unit         string  `json:"unit" binding:"required"`
 	SerialNumber string  `json:"serialNumber" binding:"required"`
 	Category     string  `json:"category"`
+	Status       string  `json:"status"`
 	CreatedBy    string
 }
 
@@ -42,5 +44,6 @@ type UpdateProduct struct {
 	NameEn      string `json:"nameEn"`
 	Description string `json:"description"`
 	Category    string `json:"category"`
+	Status      string `json:"status"`
 	UpdatedBy   string
 }

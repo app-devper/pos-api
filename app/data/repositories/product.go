@@ -180,6 +180,7 @@ func (entity *productEntity) CreateProduct(param request.Product) (*entities.Pro
 	data.CostPrice = param.CostPrice
 	data.Quantity = param.Quantity
 	data.Category = param.Category
+	data.Status = param.Status
 	data.CreatedBy = param.CreatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedBy = param.CreatedBy
@@ -231,6 +232,7 @@ func (entity *productEntity) UpdateProductById(id string, param request.UpdatePr
 	data.NameEn = param.NameEn
 	data.Description = param.Description
 	data.Category = param.Category
+	data.Status = param.Status
 	data.UpdatedBy = param.UpdatedBy
 	data.UpdatedDate = time.Now()
 
