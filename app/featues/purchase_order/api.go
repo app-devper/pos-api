@@ -17,7 +17,7 @@ func ApplyPurchaseOrderAPI(
 	poRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreatePurchaseOrder(repository.PurchaseOrder, repository.Sequence),
 	)
@@ -25,21 +25,21 @@ func ApplyPurchaseOrderAPI(
 	poRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetPurchaseOrders(repository.PurchaseOrder),
 	)
 
 	poRoute.GET("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetPurchaseOrderById(repository.PurchaseOrder),
 	)
 
 	poRoute.PUT("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.UpdatePurchaseOrderById(repository.PurchaseOrder),
 	)
@@ -47,7 +47,7 @@ func ApplyPurchaseOrderAPI(
 	poRoute.DELETE("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeletePurchaseOrderById(repository.PurchaseOrder),
 	)

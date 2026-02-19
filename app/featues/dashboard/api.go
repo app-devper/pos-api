@@ -17,28 +17,28 @@ func ApplyDashboardAPI(
 	dashboardRoute.GET("/summary",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetSummary(repository.Order),
 	)
 
 	dashboardRoute.GET("/daily-chart",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetDailyChart(repository.Order),
 	)
 
 	dashboardRoute.GET("/low-stock",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetLowStockProducts(repository.Product),
 	)
 
 	dashboardRoute.GET("/stock-report",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetStockReport(repository.Product),
 	)
 }

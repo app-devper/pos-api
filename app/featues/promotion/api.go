@@ -17,7 +17,7 @@ func ApplyPromotionAPI(
 	promoRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreatePromotion(repository.Promotion),
 	)
@@ -25,21 +25,21 @@ func ApplyPromotionAPI(
 	promoRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetPromotions(repository.Promotion),
 	)
 
 	promoRoute.GET("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetPromotionById(repository.Promotion),
 	)
 
 	promoRoute.PUT("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.UpdatePromotionById(repository.Promotion),
 	)
@@ -47,7 +47,7 @@ func ApplyPromotionAPI(
 	promoRoute.DELETE("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeletePromotionById(repository.Promotion),
 	)
@@ -55,7 +55,7 @@ func ApplyPromotionAPI(
 	promoRoute.POST("/apply",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.ApplyPromotion(repository.Promotion),
 	)
 }

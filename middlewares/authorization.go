@@ -11,7 +11,7 @@ func RequireAuthorization(auths ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var roles []string
 		roles = append(roles, ctx.GetString("Role"))
-		if len(roles) <= 0 {
+		if roles[0] == "" {
 			invalidRequest(ctx)
 			return
 		}

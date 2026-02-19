@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"pos/app/domain"
+	"pos/app/domain/request"
 	"pos/app/featues/billing"
 	"pos/app/featues/branch"
 	"pos/app/featues/catagory"
@@ -55,6 +56,7 @@ func (app Routes) StartGin() {
 	publicRoute := r.Group("/api/pos/v1")
 
 	repository := domain.InitRepository(resource)
+	initDefaultBranch(repository)
 
 	product.ApplyProductAPI(publicRoute, repository)
 	order.ApplyOrderAPI(publicRoute, repository)
@@ -84,4 +86,21 @@ func (app Routes) StartGin() {
 	if err != nil {
 		logrus.Error(err)
 	}
+}
+
+func initDefaultBranch(repository *domain.Repository) {
+	_, err := repository.Branch.GetBranchByCode("HQ")
+	if err == nil {
+		return
+	}
+	_, err = repository.Branch.CreateBranch(request.Branch{
+		Name:      "สำนักงานใหญ่",
+		Code:      "HQ",
+		CreatedBy: "system",
+	})
+	if err != nil {
+		logrus.Error("initDefaultBranch: failed to create default branch: ", err)
+		return
+	}
+	logrus.Info("initDefaultBranch: created default branch 'สำนักงานใหญ่'")
 }

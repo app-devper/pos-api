@@ -17,7 +17,7 @@ func ApplyQuotationAPI(
 	qRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreateQuotation(repository.Quotation, repository.Sequence),
 	)
@@ -25,21 +25,21 @@ func ApplyQuotationAPI(
 	qRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetQuotations(repository.Quotation),
 	)
 
 	qRoute.GET("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetQuotationById(repository.Quotation),
 	)
 
 	qRoute.PUT("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.UpdateQuotationById(repository.Quotation),
 	)
@@ -47,7 +47,7 @@ func ApplyQuotationAPI(
 	qRoute.DELETE("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeleteQuotationById(repository.Quotation),
 	)

@@ -17,7 +17,7 @@ func ApplyBillingAPI(
 	billingRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreateBilling(repository.Billing, repository.Sequence),
 	)
@@ -25,21 +25,21 @@ func ApplyBillingAPI(
 	billingRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetBillings(repository.Billing),
 	)
 
 	billingRoute.GET("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetBillingById(repository.Billing),
 	)
 
 	billingRoute.PUT("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.UpdateBillingById(repository.Billing),
 	)
@@ -47,7 +47,7 @@ func ApplyBillingAPI(
 	billingRoute.DELETE("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeleteBillingById(repository.Billing),
 	)

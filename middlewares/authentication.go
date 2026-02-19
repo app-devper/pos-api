@@ -12,18 +12,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func RequireBranch(employeeEntity repositories.IEmployee) gin.HandlerFunc {
+func RequireBranch(employeeEntity repositories.IEmployee, branchEntity repositories.IBranch) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("UserId")
 		employee, err := employeeEntity.GetEmployeeByUserId(userId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.AU_FORBIDDEN_001, "employee not found")
-			return
+			defaultBranch, bErr := branchEntity.GetBranchByCode("HQ")
+			if bErr != nil {
+				errcode.Abort(ctx, http.StatusForbidden, errcode.AU_FORBIDDEN_001, "no branch available")
+				return
+			}
+			ctx.Set("BranchId", defaultBranch.Id.Hex())
+			ctx.Set("EmployeeRole", "STAFF")
+			logrus.Info("BranchId: " + defaultBranch.Id.Hex())
+			logrus.Info("EmployeeRole: STAFF")
+		} else {
+			ctx.Set("BranchId", employee.BranchId.Hex())
+			ctx.Set("EmployeeRole", employee.Role)
+			logrus.Info("BranchId: " + employee.BranchId.Hex())
+			logrus.Info("EmployeeRole: " + employee.Role)
 		}
-		ctx.Set("BranchId", employee.BranchId.Hex())
-		ctx.Set("EmployeeRole", employee.Role)
-		logrus.Info("BranchId: " + employee.BranchId.Hex())
-		logrus.Info("EmployeeRole: " + employee.Role)
 		ctx.Next()
 	}
 }

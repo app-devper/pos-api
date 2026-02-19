@@ -26,14 +26,14 @@ info:
     |--------|--------------------|
     | AU     | Authentication     |
     | BR     | Branch             |
-    | CT     | Category           |
+    | CA     | Category           |
     | CU     | Customer           |
     | EM     | Employee           |
-    | SP     | Supplier           |
+    | SU     | Supplier           |
     | RC     | Receive            |
     | OR     | Order              |
     | PD     | Product            |
-    | ST     | Setting            |
+    | SE     | Setting            |
     | PO     | Purchase Order     |
     | DO     | Delivery Order     |
     | CN     | Credit Note        |

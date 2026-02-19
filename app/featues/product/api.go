@@ -26,7 +26,7 @@ func ApplyProductAPI(
 	productRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreateProduct(repository.Product),
 	)
@@ -34,7 +34,7 @@ func ApplyProductAPI(
 	productRoute.POST("/receive",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreateProductReceive(repository.Product, repository.Receive),
 	)
@@ -48,7 +48,7 @@ func ApplyProductAPI(
 	productRoute.PUT("/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.UpdateProductById(repository.Product),
 	)
@@ -89,28 +89,28 @@ func ApplyProductAPI(
 	productRoute.POST("/stocks",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.CreateProductStock(repository.Product),
 	)
 
 	productRoute.PUT("/stocks/:stockId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.UpdateProductStockById(repository.Product),
 	)
 
 	productRoute.DELETE("/stocks/:stockId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.RemoveProductStockById(repository.Product),
 	)
 
 	productRoute.PATCH("/stocks/:stockId/quantity",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.UpdateProductStockQuantityById(repository.Product),
 	)
 
@@ -124,21 +124,21 @@ func ApplyProductAPI(
 	productRoute.POST("/units",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.CreateProductUnit(repository.Product),
 	)
 
 	productRoute.PUT("/units/:unitId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.UpdateProductUnitById(repository.Product),
 	)
 
 	productRoute.DELETE("/units/:unitId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.RemoveProductUnitById(repository.Product),
 	)
 
@@ -158,21 +158,21 @@ func ApplyProductAPI(
 	productRoute.POST("/prices",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.CreateProductPrice(repository.Product),
 	)
 
 	productRoute.PUT("/prices/:priceId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.UpdateProductPriceById(repository.Product),
 	)
 
 	productRoute.DELETE("/prices/:priceId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.RemoveProductPriceById(repository.Product),
 	)
 

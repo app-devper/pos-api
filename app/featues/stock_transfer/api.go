@@ -17,7 +17,7 @@ func ApplyStockTransferAPI(
 	stRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreateStockTransfer(repository.StockTransfer, repository.Product, repository.Sequence),
 	)
@@ -25,21 +25,21 @@ func ApplyStockTransferAPI(
 	stRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetStockTransfers(repository.StockTransfer),
 	)
 
 	stRoute.GET("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetStockTransferById(repository.StockTransfer),
 	)
 
 	stRoute.PATCH("/:id/approve",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.ApproveStockTransfer(repository.StockTransfer, repository.Product),
 	)
@@ -47,7 +47,7 @@ func ApplyStockTransferAPI(
 	stRoute.PATCH("/:id/reject",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.RejectStockTransfer(repository.StockTransfer, repository.Product),
 	)

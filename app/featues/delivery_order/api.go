@@ -17,7 +17,7 @@ func ApplyDeliveryOrderAPI(
 	doRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.CreateDeliveryOrder(repository.DeliveryOrder, repository.Sequence),
 	)
@@ -25,21 +25,21 @@ func ApplyDeliveryOrderAPI(
 	doRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetDeliveryOrders(repository.DeliveryOrder),
 	)
 
 	doRoute.GET("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetDeliveryOrderById(repository.DeliveryOrder),
 	)
 
 	doRoute.PUT("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.UpdateDeliveryOrderById(repository.DeliveryOrder),
 	)
@@ -47,7 +47,7 @@ func ApplyDeliveryOrderAPI(
 	doRoute.DELETE("/:id",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeleteDeliveryOrderById(repository.DeliveryOrder),
 	)

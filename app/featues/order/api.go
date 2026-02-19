@@ -18,28 +18,28 @@ func ApplyOrderAPI(
 	orderRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.CreateOrder(repository.Order, repository.Product, repository.Sequence),
 	)
 
 	orderRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetOrdersRange(repository.Order),
 	)
 
 	orderRoute.GET("/:orderId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetOrderById(repository.Order),
 	)
 
 	orderRoute.DELETE("/:orderId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeleteOrderById(repository.Order, repository.Product),
 	)
@@ -47,7 +47,7 @@ func ApplyOrderAPI(
 	orderRoute.DELETE("/:orderId/products/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeleteOrderItemByOrderProductId(repository.Order, repository.Product),
 	)
@@ -55,35 +55,35 @@ func ApplyOrderAPI(
 	orderRoute.PATCH("/:orderId/customer-code",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.UpdateCustomerCodeOrderById(repository.Order),
 	)
 
 	orderRoute.GET("/customers/:customerCode",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetOrdersByCustomerCode(repository.Order),
 	)
 
 	orderRoute.GET("/items",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetOrderItemRange(repository.Order),
 	)
 
 	orderRoute.GET("/items/:itemId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetOrderItemById(repository.Order),
 	)
 
 	orderRoute.DELETE("/items/:itemId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.DeleteOrderItemById(repository.Order, repository.Product),
 	)
@@ -91,7 +91,7 @@ func ApplyOrderAPI(
 	orderRoute.GET("/items/products/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.GetOrderItemByProductId(repository.Order),
 	)
@@ -99,7 +99,7 @@ func ApplyOrderAPI(
 	orderRoute.GET("/item-details/products/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN),
 		usecase.GetOrderItemDetailsByProductId(repository.Order),
 	)
