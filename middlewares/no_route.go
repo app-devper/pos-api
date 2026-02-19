@@ -1,12 +1,14 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
+
+	"github.com/gin-gonic/gin"
 )
 
 func NoRoute() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Service Missing / Not found."})
+		errcode.Abort(ctx, http.StatusNotFound, errcode.SY_NOT_FOUND_001, "Service Missing / Not found.")
 	}
 }

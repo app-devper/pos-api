@@ -1,13 +1,14 @@
 package usecase
 
 import (
-	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.HandlerFunc {
@@ -22,28 +23,14 @@ func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.Handler
 		}
 		result, err := productEntity.GetProductLotsExpireNotify(req)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"status":  http.StatusBadRequest,
-				"message": err.Error(),
-			})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		if len(result) > 0 {
-			var message = ""
-			var no = 1
-			for _, item := range result {
-				message += fmt.Sprintf("%d. %s Lot: %s\n", no, item.Product.Name, item.LotNumber)
-				no += 1
-			}
-
-			date := utils.ToFormatDate(today)
-			_, _ = utils.NotifyMassage("สินค้าหมดอายุวันที่ " + date + "\n\n" + message)
 		}
 
 		ctx.JSON(http.StatusOK, gin.H{
 			"status":  http.StatusOK,
 			"message": "success",
+			"data":    result,
 		})
 
 	}

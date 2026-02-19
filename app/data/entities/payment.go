@@ -1,12 +1,14 @@
 package entities
 
 import (
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Payment struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	Status      string             `bson:"status" json:"status"`
 	Amount      float64            `bson:"amount" json:"amount"`

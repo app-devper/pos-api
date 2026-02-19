@@ -1,17 +1,18 @@
 package repositories
 
 import (
-	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/request"
 	"pos/db"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type categoryEntity struct {
@@ -47,20 +48,20 @@ func (entity *categoryEntity) UpdateDefaultCategoryById(id string) (*entities.Ca
 		return nil, err
 	}
 
-	objId, _ := primitive.ObjectIDFromHex(id)
-	var data entities.Category
-	err = entity.categoryRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Default = true
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.categoryRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Category
+	err = entity.categoryRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"default":     true,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -76,17 +77,9 @@ func (entity *categoryEntity) GetCategoryAll() ([]entities.Category, error) {
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		var category entities.Category
-		err = cursor.Decode(&category)
-		if err != nil {
-			logrus.Error(err)
-		} else {
-			items = append(items, category)
-		}
-	}
-	if items == nil {
-		items = []entities.Category{}
+	items = []entities.Category{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -115,9 +108,12 @@ func (entity *categoryEntity) GetCategoryById(id string) (*entities.Category, er
 	logrus.Info("GetCategoryById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
 	var data entities.Category
-	err := entity.categoryRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.categoryRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +125,11 @@ func (entity *categoryEntity) RemoveCategoryById(id string) (*entities.Category,
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	var data entities.Category
-	objId, _ := primitive.ObjectIDFromHex(id)
-	err := entity.categoryRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	_, err = entity.categoryRepo.DeleteOne(ctx, bson.M{"_id": objId})
+	err = entity.categoryRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -145,23 +140,23 @@ func (entity *categoryEntity) UpdateCategoryById(id string, form request.Categor
 	logrus.Info("UpdateCategoryById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	var data entities.Category
-	err := entity.categoryRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Name = form.Name
-	data.Value = strings.ToUpper(form.Value)
-	data.RequireCustomerOrder = form.RequireCustomerOrder
-	data.Description = form.Description
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.categoryRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Category
+	err = entity.categoryRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"name":                 form.Name,
+		"value":                strings.ToUpper(form.Value),
+		"requireCustomerOrder": form.RequireCustomerOrder,
+		"description":          form.Description,
+		"updatedDate":          time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -172,9 +167,7 @@ func (entity *categoryEntity) CreateIndex() (string, error) {
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	mod := mongo.IndexModel{
-		Keys: bson.M{
-			"value": 1,
-		},
+		Keys:    bson.D{{Key: "value", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	}
 	ind, err := entity.categoryRepo.Indexes().CreateOne(ctx, mod)

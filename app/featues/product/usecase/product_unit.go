@@ -1,18 +1,20 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
 func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.CreateProductUnit{}
 		if err := ctx.ShouldBind(&req); err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
 		userId := ctx.GetString("UserId")
@@ -29,7 +31,7 @@ func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 		}
 		unit, err := productEntity.CreateProductUnit(productUnit)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
 
@@ -42,7 +44,9 @@ func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 		_, _ = productEntity.CreateProductPrice(productPrice)
 
 		// Add product history
-		_, _ = productEntity.CreateProductHistory(request.AddProductUnitHistory(req.ProductId, productUnit))
+		addUnitHistory := request.AddProductUnitHistory(req.ProductId, productUnit)
+		addUnitHistory.BranchId = ctx.GetString("BranchId")
+		_, _ = productEntity.CreateProductHistory(addUnitHistory)
 
 		ctx.JSON(http.StatusOK, unit)
 	}
@@ -53,7 +57,7 @@ func GetProductUnitsByProductId(productEntity repositories.IProduct) gin.Handler
 		productId := ctx.Param("productId")
 		result, err := productEntity.GetProductUnitsByProductId(productId)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -65,7 +69,7 @@ func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 		req := request.ProductUnit{}
 		id := ctx.Param("unitId")
 		if err := ctx.ShouldBind(&req); err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
 		userId := ctx.GetString("UserId")
@@ -73,12 +77,14 @@ func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 
 		unit, err := productEntity.UpdateProductUnitById(id, req)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
 
 		// Add product history
-		_, _ = productEntity.CreateProductHistory(request.UpdateProductUnitHistory(req.ProductId, req))
+		updUnitHistory := request.UpdateProductUnitHistory(req.ProductId, req)
+		updUnitHistory.BranchId = ctx.GetString("BranchId")
+		_, _ = productEntity.CreateProductHistory(updUnitHistory)
 
 		ctx.JSON(http.StatusOK, unit)
 	}
@@ -91,12 +97,14 @@ func RemoveProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 
 		result, err := productEntity.RemoveProductUnitById(id)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
 
 		// Add product history
-		_, _ = productEntity.CreateProductHistory(request.RemoveProductUnitHistory(result.ProductId.Hex(), result, userId))
+		remUnitHistory := request.RemoveProductUnitHistory(result.ProductId.Hex(), result, userId)
+		remUnitHistory.BranchId = ctx.GetString("BranchId")
+		_, _ = productEntity.CreateProductHistory(remUnitHistory)
 		_ = productEntity.RemoveProductPricesByUnitId(id)
 		ctx.JSON(http.StatusOK, result)
 	}

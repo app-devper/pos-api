@@ -3,17 +3,25 @@ package request
 import "time"
 
 type Order struct {
-	Items        []OrderItem `json:"items" binding:"required"`
-	Amount       float64     `json:"amount" binding:"required"`
-	Type         string      `json:"type" binding:"required"`
-	CustomerCode string      `json:"customerCode"`
-	CustomerName string      `json:"customerName"`
-	Total        float64     `json:"total" binding:"required"`
-	TotalCost    float64     `json:"totalCost"`
-	Change       float64     `json:"change"`
-	Message      string      `json:"message"`
+	Items        []OrderItem    `json:"items" binding:"required"`
+	Payments     []OrderPayment `json:"payments"`
+	Amount       float64        `json:"amount" binding:"required"`
+	Type         string         `json:"type" binding:"required"`
+	CustomerCode string         `json:"customerCode"`
+	CustomerName string         `json:"customerName"`
+	Total        float64        `json:"total" binding:"required"`
+	TotalCost    float64        `json:"totalCost"`
+	Discount     float64        `json:"discount"`
+	Change       float64        `json:"change"`
+	Message      string         `json:"message"`
 	CreatedBy    string
 	Code         string
+	BranchId     string
+}
+
+type OrderPayment struct {
+	Amount float64 `json:"amount" binding:"required"`
+	Type   string  `json:"type" binding:"required"`
 }
 
 type OrderItem struct {
@@ -34,6 +42,7 @@ type OrderItemStock struct {
 type GetOrderRange struct {
 	StartDate time.Time `form:"startDate" binding:"required"`
 	EndDate   time.Time `form:"endDate" binding:"required"`
+	BranchId  string
 }
 
 type UpdateCustomerCode struct {

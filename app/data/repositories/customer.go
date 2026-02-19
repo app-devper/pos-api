@@ -1,17 +1,18 @@
 package repositories
 
 import (
-	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type customerEntity struct {
@@ -45,17 +46,9 @@ func (entity *customerEntity) GetCustomerAll() ([]entities.Customer, error) {
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		var item entities.Customer
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.Customer{}
+	items = []entities.Customer{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -89,9 +82,12 @@ func (entity *customerEntity) GetCustomerById(id string) (*entities.Customer, er
 	logrus.Info("GetCustomerById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
 	var data entities.Customer
-	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +111,11 @@ func (entity *customerEntity) RemoveCustomerById(id string) (*entities.Customer,
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	var data entities.Customer
-	objId, _ := primitive.ObjectIDFromHex(id)
-	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	_, err = entity.customerRepo.DeleteOne(ctx, bson.M{"_id": objId})
+	err = entity.customerRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -131,26 +126,25 @@ func (entity *customerEntity) UpdateCustomerById(id string, form request.UpdateC
 	logrus.Info("UpdateCustomerById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	var data entities.Customer
-	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-
-	data.CustomerType = form.CustomerType
-	data.Name = form.Name
-	data.Address = form.Address
-	data.Phone = form.Phone
-	data.Email = form.Email
-	data.UpdatedBy = form.UpdatedBy
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Customer
+	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"customerType": form.CustomerType,
+		"name":         form.Name,
+		"address":      form.Address,
+		"phone":        form.Phone,
+		"email":        form.Email,
+		"updatedBy":    form.UpdatedBy,
+		"updatedDate":  time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -161,21 +155,21 @@ func (entity *customerEntity) UpdateCustomerStatusById(id string, form request.U
 	logrus.Info("UpdateCustomerStatusById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	cid, _ := primitive.ObjectIDFromHex(id)
-	var data entities.Customer
-	err := entity.customerRepo.FindOne(ctx, bson.M{"_id": cid}).Decode(&data)
+	cid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Status = form.Status
-	data.UpdatedBy = form.UpdatedBy
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": cid}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Customer
+	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": cid}, bson.M{"$set": bson.M{
+		"status":      form.Status,
+		"updatedBy":   form.UpdatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -186,9 +180,7 @@ func (entity *customerEntity) CreateIndex() (string, error) {
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	mod := mongo.IndexModel{
-		Keys: bson.M{
-			"code": 1,
-		},
+		Keys:    bson.D{{Key: "code", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	}
 	ind, err := entity.customerRepo.Indexes().CreateOne(ctx, mod)

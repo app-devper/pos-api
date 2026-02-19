@@ -1,11 +1,13 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func GetOrderItemDetailsByProductId(orderEntity repositories.IOrder) gin.HandlerFunc {
@@ -17,7 +19,7 @@ func GetOrderItemDetailsByProductId(orderEntity repositories.IOrder) gin.Handler
 		productId := ctx.Param("productId")
 		result, err := orderEntity.GetOrderItemOrderDetailsByProductId(productId, req)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

@@ -13,6 +13,7 @@ type ProductStock struct {
 	ExpireDate  time.Time `json:"expireDate" binding:"required"`
 	ImportDate  time.Time `json:"importDate" binding:"required"`
 	UpdatedBy   string
+	BranchId    string
 }
 
 type UpdateProductStock struct {

@@ -1,19 +1,21 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	repositories "pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
 func CreateCustomer(customerEntity repositories.ICustomer, sequenceEntity repositories.ISequence) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Customer{}
 		if err := ctx.ShouldBind(&req); err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_001, err.Error())
 			return
 		}
 
@@ -31,7 +33,7 @@ func CreateCustomer(customerEntity repositories.ICustomer, sequenceEntity reposi
 
 		result, err := customerEntity.CreateCustomer(req)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
 			return
 		}
 

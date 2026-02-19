@@ -1,11 +1,12 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/core/utils"
+	"pos/app/core/errcode"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
 func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
@@ -16,13 +17,13 @@ func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, productEnt
 
 		result, err := orderEntity.RemoveOrderItemByOrderProductId(orderId, productId)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return
 		}
 
 		_, err = orderEntity.UpdateTotalOrderById(orderId)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return
 		}
 
@@ -39,11 +40,10 @@ func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, productEnt
 
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
-		balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
-		_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
-
-		date := utils.ToFormat(result.CreatedDate)
-		_, _ = utils.NotifyMassage("ยกเลิกสินค้ารายการวันที่ " + date + "\n\n1. " + result.GetMessage())
+		if unit != nil {
+			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
+			_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
+		}
 
 		ctx.JSON(http.StatusOK, result)
 	}

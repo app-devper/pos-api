@@ -2,12 +2,14 @@ package entities
 
 import (
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Order struct {
 	Id           primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId     primitive.ObjectID `bson:"branchId" json:"branchId"`
 	Code         string             `bson:"code" json:"code"`
 	CustomerCode string             `bson:"customerCode" json:"customerCode"`
 	CustomerName string             `bson:"customerName" json:"customerName"`
@@ -18,11 +20,13 @@ type Order struct {
 	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
 	Total        float64            `bson:"total" json:"total"`
 	TotalCost    float64            `bson:"totalCost" json:"totalCost"`
+	Discount     float64            `bson:"discount" json:"discount"`
 	Type         string             `bson:"type" json:"type"`
 }
 
 type OrderDetail struct {
 	Id           primitive.ObjectID       `bson:"_id" json:"id"`
+	BranchId     primitive.ObjectID       `bson:"branchId" json:"branchId"`
 	Code         string                   `bson:"code" json:"code"`
 	CustomerCode string                   `bson:"customerCode" json:"customerCode"`
 	CustomerName string                   `bson:"customerName" json:"customerName"`
@@ -33,6 +37,7 @@ type OrderDetail struct {
 	UpdatedDate  time.Time                `bson:"updatedDate" json:"-"`
 	Total        float64                  `bson:"total" json:"total"`
 	TotalCost    float64                  `bson:"totalCost" json:"totalCost"`
+	Discount     float64                  `bson:"discount" json:"discount"`
 	Type         string                   `bson:"type" json:"type"`
 	Items        []OrderItemProductDetail `json:"items"`
 	Payment      Payment                  `json:"payment"`
@@ -45,6 +50,7 @@ type OrderItemStock struct {
 
 type OrderItem struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
 	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
@@ -61,6 +67,7 @@ type OrderItem struct {
 
 type OrderItemProductDetail struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
 	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
@@ -78,6 +85,7 @@ type OrderItemProductDetail struct {
 
 type OrderItemOrderDetail struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
 	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
 	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
@@ -91,6 +99,21 @@ type OrderItemOrderDetail struct {
 	UpdatedBy   string             `bson:"updatedBy" json:"-"`
 	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
 	Order       Order              `bson:"order" json:"order"`
+}
+
+type OrderSummary struct {
+	TotalOrders  int     `bson:"totalOrders" json:"totalOrders"`
+	TotalRevenue float64 `bson:"totalRevenue" json:"totalRevenue"`
+	TotalCost    float64 `bson:"totalCost" json:"totalCost"`
+	TotalProfit  float64 `bson:"totalProfit" json:"totalProfit"`
+}
+
+type OrderDailyChart struct {
+	Date         string  `bson:"_id" json:"date"`
+	TotalOrders  int     `bson:"totalOrders" json:"totalOrders"`
+	TotalRevenue float64 `bson:"totalRevenue" json:"totalRevenue"`
+	TotalCost    float64 `bson:"totalCost" json:"totalCost"`
+	TotalProfit  float64 `bson:"totalProfit" json:"totalProfit"`
 }
 
 func (item OrderItemProductDetail) GetMessage() string {

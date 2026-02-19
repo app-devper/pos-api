@@ -1,8 +1,10 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
+
+	"github.com/gin-gonic/gin"
 )
 
 func RequireAuthorization(auths ...string) gin.HandlerFunc {
@@ -43,9 +45,9 @@ func RequireAuthorization(auths ...string) gin.HandlerFunc {
 }
 
 func invalidRequest(ctx *gin.Context) {
-	ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid request, restricted endpoint"})
+	errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_001, "Invalid request, restricted endpoint")
 }
 
 func notPermission(ctx *gin.Context) {
-	ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Don't have permission"})
+	errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "Don't have permission")
 }

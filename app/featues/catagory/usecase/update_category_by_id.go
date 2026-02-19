@@ -1,10 +1,12 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
 func UpdateCategoryById(entity repositories.ICategory) gin.HandlerFunc {
@@ -12,12 +14,12 @@ func UpdateCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 		categoryId := ctx.Param("categoryId")
 		req := request.Category{}
 		if err := ctx.ShouldBind(&req); err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_001, err.Error())
 			return
 		}
 		result, err := entity.UpdateCategoryById(categoryId, req)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

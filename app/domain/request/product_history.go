@@ -17,6 +17,7 @@ type ProductHistory struct {
 	Price       float64 `json:"price"`
 	Balance     int     `json:"balance"`
 	CreatedBy   string  `json:"createdBy"`
+	BranchId    string
 }
 
 func AddProductHistory(productId string, product Product) ProductHistory {

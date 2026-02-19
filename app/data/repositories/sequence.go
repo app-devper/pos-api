@@ -1,16 +1,17 @@
 package repositories
 
 import (
-	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
 	"pos/db"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type sequenceEntity struct {
@@ -114,7 +115,10 @@ func (entity *sequenceEntity) NextSequence(field string) (*entities.Sequence, er
 		opts := &options.FindOneAndUpdateOptions{
 			ReturnDocument: &isReturnNewDoc,
 		}
-		err := entity.sequenceRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, opts).Decode(&data)
+		err := entity.sequenceRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": bson.M{
+			"value": data.Value,
+			"date":  data.Date,
+		}}, opts).Decode(&data)
 		if err != nil {
 			return nil, err
 		}

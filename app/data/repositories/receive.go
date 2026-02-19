@@ -1,16 +1,18 @@
 package repositories
 
 import (
+	"pos/app/core/utils"
+	"pos/app/data/entities"
+	"pos/app/domain/constant"
+	"pos/app/domain/request"
+	"pos/db"
+	"time"
+
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"pos/app/core/utils"
-	"pos/app/data/entities"
-	"pos/app/domain/request"
-	"pos/db"
-	"time"
 )
 
 type receiveEntity struct {
@@ -25,6 +27,7 @@ type IReceive interface {
 	RemoveReceiveById(id string) (*entities.Receive, error)
 	UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error)
 	UpdateReceiveTotalCostById(id string, totalCost float64) (*entities.Receive, error)
+	UpdateReceiveItemsById(id string, form request.UpdateReceiveItems) (*entities.Receive, error)
 	CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*entities.ReceiveItem, error)
 	GetReceiveItemsByReceiveId(receiveId string) ([]entities.ReceiveItem, error)
 	GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
@@ -38,7 +41,41 @@ func NewReceiveEntity(resource *db.Resource) IReceive {
 		receiveRepo:      receiveRepo,
 		receiveItemsRepo: receiveItemsRepo,
 	}
+	ensureReceiveIndexes(receiveRepo, receiveItemsRepo)
 	return entity
+}
+
+func ensureReceiveIndexes(receiveRepo *mongo.Collection, receiveItemsRepo *mongo.Collection) {
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	_, err := receiveRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "createdDate", Value: -1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create createdDate index: ", err)
+	}
+
+	_, err = receiveItemsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "receiveId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create receiveId index: ", err)
+	}
+
+	_, err = receiveItemsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "lotId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create lotId index: ", err)
+	}
+
+	_, err = receiveRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create receives branchId+createdDate index: ", err)
+	}
 }
 
 func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []entities.Receive, err error) {
@@ -46,26 +83,23 @@ func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	cursor, err := entity.receiveRepo.Find(ctx, bson.M{
+	filter := bson.M{
 		"createdDate": bson.M{
 			"$gt": form.StartDate,
 			"$lt": form.EndDate,
 		},
-	})
+	}
+	if form.BranchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
+		filter["branchId"] = branchObjId
+	}
+	cursor, err := entity.receiveRepo.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.Receive{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.Receive{}
+	items = []entities.Receive{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -78,11 +112,15 @@ func (entity *receiveEntity) CreateReceive(form request.Receive) (*entities.Rece
 	if err != nil {
 		return nil, err
 	}
+	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
 	data := entities.Receive{
 		Id:          primitive.NewObjectID(),
+		BranchId:    branchId,
 		Code:        form.Code,
 		Reference:   form.Reference,
 		SupplierId:  supplier,
+		Items:       []entities.ReceiveItem{},
+		Status:      constant.ACTIVE,
 		CreatedBy:   form.UpdatedBy,
 		UpdatedBy:   form.UpdatedBy,
 		CreatedDate: time.Now(),
@@ -99,9 +137,12 @@ func (entity *receiveEntity) GetReceiveById(id string) (*entities.Receive, error
 	logrus.Info("GetReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.Receive{}
-	err := entity.receiveRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -117,17 +158,13 @@ func (entity *receiveEntity) RemoveReceiveById(id string) (*entities.Receive, er
 	if err != nil {
 		return nil, err
 	}
-	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": obId}).Decode(&data)
+	err = entity.receiveRepo.FindOneAndDelete(ctx, bson.M{"_id": obId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	_, err = entity.receiveRepo.DeleteOne(ctx, bson.M{"_id": obId})
-	if err != nil {
-		logrus.Error(err)
-	}
 	_, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId})
 	if err != nil {
-		logrus.Error(err)
+		return nil, err
 	}
 	return &data, nil
 }
@@ -140,20 +177,16 @@ func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost flo
 	if err != nil {
 		return nil, err
 	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": obId}).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	data.TotalCost = totalCost
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": data}, opts).Decode(&data)
+	data := entities.Receive{}
+	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+		"totalCost":   totalCost,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -168,26 +201,73 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 	if err != nil {
 		return nil, err
 	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": obId}).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
 	supplier, err := primitive.ObjectIDFromHex(form.SupplierId)
 	if err != nil {
 		return nil, err
 	}
-	data.SupplierId = supplier
-	data.Reference = form.Reference
-	data.TotalCost = form.TotalCost
-	data.UpdatedBy = form.UpdatedBy
-	data.UpdatedDate = time.Now()
+	items := make([]entities.ReceiveItem, 0, len(form.ReceiveItems))
+	for _, item := range form.ReceiveItems {
+		productId, err := primitive.ObjectIDFromHex(item.ProductId)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, entities.ReceiveItem{
+			ProductId: productId,
+			CostPrice: item.CostPrice,
+			Quantity:  item.Quantity,
+		})
+	}
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": data}, opts).Decode(&data)
+	data := entities.Receive{}
+	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+		"supplierId":  supplier,
+		"reference":   form.Reference,
+		"totalCost":   form.TotalCost,
+		"items":       items,
+		"updatedBy":   form.UpdatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
+	logrus.Info("UpdateReceiveItems")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	obId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]entities.ReceiveItem, 0, len(form.ReceiveItems))
+	for _, item := range form.ReceiveItems {
+		productId, err := primitive.ObjectIDFromHex(item.ProductId)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, entities.ReceiveItem{
+			ProductId: productId,
+			CostPrice: item.CostPrice,
+			Quantity:  item.Quantity,
+		})
+	}
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	data := entities.Receive{}
+	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+		"items":       items,
+		"updatedBy":   form.UpdatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -198,24 +278,14 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, produ
 	logrus.Info("CreateReceiveItem")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	receive, err := primitive.ObjectIDFromHex(receiveId)
-	if err != nil {
-		return nil, err
-	}
 	product, err := primitive.ObjectIDFromHex(productId)
 	if err != nil {
 		return nil, err
 	}
 	data := entities.ReceiveItem{
-		Id:          primitive.NewObjectID(),
-		ReceiveId:   receive,
-		ProductId:   product,
-		Quantity:    form.Quantity,
-		CostPrice:   form.CostPrice,
-		CreatedBy:   form.CreatedBy,
-		CreatedDate: time.Now(),
-		UpdatedBy:   form.CreatedBy,
-		UpdatedDate: time.Now(),
+		ProductId: product,
+		Quantity:  form.Quantity,
+		CostPrice: form.CostPrice,
 	}
 	_, err = entity.receiveItemsRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -236,17 +306,9 @@ func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ReceiveItem{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ReceiveItem{}
+	items = []entities.ReceiveItem{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -255,9 +317,12 @@ func (entity *receiveEntity) GetReceiveItemByLotId(lotId string) (*entities.Rece
 	logrus.Info("GetReceiveItemByLotId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	lot, _ := primitive.ObjectIDFromHex(lotId)
+	lot, err := primitive.ObjectIDFromHex(lotId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.ReceiveItem{}
-	err := entity.receiveItemsRepo.FindOne(ctx, bson.M{"lotId": lot}).Decode(&data)
+	err = entity.receiveItemsRepo.FindOne(ctx, bson.M{"lotId": lot}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -273,13 +338,9 @@ func (entity *receiveEntity) RemoveReceiveItemByLotId(lotId string) (*entities.R
 	if err != nil {
 		return nil, err
 	}
-	err = entity.receiveItemsRepo.FindOne(ctx, bson.M{"lotId": lot}).Decode(&data)
+	err = entity.receiveItemsRepo.FindOneAndDelete(ctx, bson.M{"lotId": lot}).Decode(&data)
 	if err != nil {
 		return nil, err
-	}
-	_, err = entity.receiveItemsRepo.DeleteOne(ctx, bson.M{"lotId": lot})
-	if err != nil {
-		logrus.Error(err)
 	}
 	return &data, nil
 }

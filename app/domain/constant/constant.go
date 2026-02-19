@@ -6,6 +6,13 @@ const (
 	CustomerTypeRegular    = "Regular"
 )
 
+const (
+	PaymentTypeCash      = "CASH"
+	PaymentTypeCredit    = "CREDIT"
+	PaymentTypePromptPay = "PROMPTPAY"
+	PaymentTypeTransfer  = "TRANSFER"
+)
+
 func CustomerTypes() []string {
 	return []string{CustomerTypeGeneral, CustomerTypeWholesaler, CustomerTypeRegular}
 }

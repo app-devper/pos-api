@@ -1,8 +1,11 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
+	"fmt"
 	"net/http"
+	"pos/app/core/errcode"
+
+	"github.com/gin-gonic/gin"
 )
 
 func NewRecovery() gin.HandlerFunc {
@@ -10,7 +13,5 @@ func NewRecovery() gin.HandlerFunc {
 }
 
 func recoveryHandler(ctx *gin.Context, err interface{}) {
-	ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-		"error": err,
-	})
+	errcode.Abort(ctx, http.StatusInternalServerError, errcode.SY_INTERNAL_001, fmt.Sprintf("%v", err))
 }

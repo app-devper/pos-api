@@ -2,11 +2,6 @@ package repositories
 
 import (
 	"errors"
-	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -14,6 +9,12 @@ import (
 	"pos/db"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type productEntity struct {
@@ -31,6 +32,7 @@ type IProduct interface {
 	GetProductAll(param request.GetProduct) ([]entities.ProductDetail, error)
 	GetProductBySerialNumber(serialNumber string) (*entities.Product, error)
 	GetProductById(id string) (*entities.Product, error)
+	GetProductsByIds(ids []string) ([]entities.Product, error)
 	CreateProduct(param request.Product) (*entities.Product, error)
 	RemoveProductById(id string) (*entities.Product, error)
 	UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error)
@@ -73,6 +75,12 @@ type IProduct interface {
 
 	// ProductHistory
 	CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error)
+	GetProductHistoryByProductId(productId string, branchId string) ([]entities.ProductHistory, error)
+	GetProductHistoryByDateRange(branchId string, startDate time.Time, endDate time.Time) ([]entities.ProductHistory, error)
+
+	// Reports
+	GetLowStockProducts(threshold int, branchId string) ([]entities.LowStockProduct, error)
+	GetStockReport(branchId string) ([]entities.StockReport, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
@@ -90,7 +98,95 @@ func NewProductEntity(resource *db.Resource) IProduct {
 		productStockRepo:   productStockRepo,
 		productHistoryRepo: productHistoryRepo,
 	}
+	ensureProductIndexes(productStockRepo, productHistoryRepo)
+	ensureProductCollectionIndexes(productsRepo, productUnitsRepo, productPricesRepo, productLotsRepo)
 	return entity
+}
+
+func ensureProductIndexes(productStockRepo *mongo.Collection, productHistoryRepo *mongo.Collection) {
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	_, err := productStockRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "productId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_stocks branchId+productId index: ", err)
+	}
+
+	_, err = productHistoryRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_histories branchId+createdDate index: ", err)
+	}
+
+	_, err = productHistoryRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "productId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_histories productId index: ", err)
+	}
+}
+
+func ensureProductCollectionIndexes(productsRepo, productUnitsRepo, productPricesRepo, productLotsRepo *mongo.Collection) {
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	_, err := productsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "serialNumber", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create products serialNumber index: ", err)
+	}
+
+	_, err = productUnitsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "productId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_units productId index: ", err)
+	}
+
+	_, err = productPricesRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "productId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_prices productId index: ", err)
+	}
+
+	_, err = productLotsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "productId", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_lots productId index: ", err)
+	}
+
+	_, err = productLotsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "expireDate", Value: 1}},
+	})
+	if err != nil {
+		logrus.Error("failed to create product_lots expireDate index: ", err)
+	}
+}
+
+func toEntityDrugInfo(req *request.RequestDrugInfo) *entities.DrugInfo {
+	if req == nil {
+		return nil
+	}
+	return &entities.DrugInfo{
+		GenericName:       req.GenericName,
+		DrugType:          req.DrugType,
+		DosageForm:        req.DosageForm,
+		Strength:          req.Strength,
+		Indication:        req.Indication,
+		Dosage:            req.Dosage,
+		SideEffects:       req.SideEffects,
+		Contraindications: req.Contraindications,
+		StorageCondition:  req.StorageCondition,
+		Manufacturer:      req.Manufacturer,
+		RegistrationNo:    req.RegistrationNo,
+		IsControlled:      req.IsControlled,
+	}
 }
 
 func (entity *productEntity) GetProductAll(param request.GetProduct) (items []entities.ProductDetail, err error) {
@@ -136,18 +232,9 @@ func (entity *productEntity) GetProductAll(param request.GetProduct) (items []en
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductDetail{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductDetail{}
+	items = []entities.ProductDetail{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -181,6 +268,7 @@ func (entity *productEntity) CreateProduct(param request.Product) (*entities.Pro
 	data.Quantity = param.Quantity
 	data.Category = param.Category
 	data.Status = param.Status
+	data.DrugInfo = toEntityDrugInfo(param.DrugInfo)
 	data.CreatedBy = param.CreatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedBy = param.CreatedBy
@@ -196,26 +284,54 @@ func (entity *productEntity) GetProductById(id string) (*entities.Product, error
 	logrus.Info("GetProductById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
 	var data entities.Product
-	objId, _ := primitive.ObjectIDFromHex(id)
-	err := entity.productsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.productsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
 	return &data, nil
 }
 
+func (entity *productEntity) GetProductsByIds(ids []string) ([]entities.Product, error) {
+	logrus.Info("GetProductsByIds")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objIds := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		objId, err := primitive.ObjectIDFromHex(id)
+		if err == nil {
+			objIds = append(objIds, objId)
+		}
+	}
+	var items []entities.Product
+	cursor, err := entity.productsRepo.Find(ctx, bson.M{"_id": bson.M{"$in": objIds}})
+	if err != nil {
+		return nil, err
+	}
+	items = []entities.Product{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func (entity *productEntity) RemoveProductById(id string) (*entities.Product, error) {
 	logrus.Info("RemoveProductById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var data entities.Product
-	objId, _ := primitive.ObjectIDFromHex(id)
-	err := entity.productsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	_, err = entity.productsRepo.DeleteOne(ctx, bson.M{"_id": objId})
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
 	return &data, nil
 }
 
@@ -223,74 +339,78 @@ func (entity *productEntity) UpdateProductById(id string, param request.UpdatePr
 	logrus.Info("UpdateProductById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Name = param.Name
-	data.NameEn = param.NameEn
-	data.Description = param.Description
-	data.Category = param.Category
-	data.Status = param.Status
-	data.UpdatedBy = param.UpdatedBy
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"name":        param.Name,
+		"nameEn":      param.NameEn,
+		"description": param.Description,
+		"category":    param.Category,
+		"status":      param.Status,
+		"drugInfo":    toEntityDrugInfo(param.DrugInfo),
+		"updatedBy":   param.UpdatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) RemoveQuantityById(id string, quantity int) (*entities.Product, error) {
 	logrus.Info("RemoveQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-
-	data, err := entity.GetProductById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Quantity = data.Quantity - quantity
-	data.UpdatedDate = time.Now()
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"quantity": -quantity},
+		"$set": bson.M{"updatedDate": time.Now()},
+	}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) AddQuantityById(id string, quantity int) (*entities.Product, error) {
 	logrus.Info("AddQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Quantity = data.Quantity + quantity
-	data.UpdatedDate = time.Now()
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"quantity": quantity},
+		"$set": bson.M{"updatedDate": time.Now()},
+	}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 {
@@ -306,66 +426,72 @@ func (entity *productEntity) RemoveQuantitySoldFirstById(id string, quantity int
 	logrus.Info("RemoveQuantitySoldFirstById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.SoldFirst = data.SoldFirst - quantity
-	data.UpdatedDate = time.Now()
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"soldFirst": -quantity},
+		"$set": bson.M{"updatedDate": time.Now()},
+	}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) AddQuantitySoldFirstById(id string, quantity int) (*entities.Product, error) {
 	logrus.Info("AddQuantitySoldFirstById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.SoldFirst = data.SoldFirst + quantity
-	data.UpdatedDate = time.Now()
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"soldFirst": quantity},
+		"$set": bson.M{"updatedDate": time.Now()},
+	}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) ClearQuantitySoldFirstById(id string) (*entities.Product, error) {
 	logrus.Info("ClearQuantitySoldFirstById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.SoldFirst = 0
-	data.UpdatedDate = time.Now()
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.Product
+	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"soldFirst":   0,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) CreateProductLotByProductId(productId string, param request.Product) (*entities.ProductLot, error) {
@@ -420,7 +546,7 @@ func (entity *productEntity) GetProductLots(param request.GetProductLotsExpireRa
 	logrus.Info("GetProductLots")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	opts := options.Find().SetSort(bson.D{{"expireDate", -1}})
+	opts := options.Find().SetSort(bson.D{{Key: "expireDate", Value: -1}})
 	cursor, err := entity.productLotsRepo.Find(ctx,
 		bson.M{"expireDate": bson.M{
 			"$gt": param.StartDate,
@@ -432,18 +558,9 @@ func (entity *productEntity) GetProductLots(param request.GetProductLotsExpireRa
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		data := entities.ProductLot{}
-		err = cursor.Decode(&data)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, data)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductLot{}
+	items = []entities.ProductLot{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -457,18 +574,9 @@ func (entity *productEntity) GetProductLotsByProductId(productId string) (items 
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		var productLot entities.ProductLot
-		err = cursor.Decode(&productLot)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, productLot)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductLot{}
+	items = []entities.ProductLot{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -482,11 +590,10 @@ func (entity *productEntity) RemoveProductLotById(id string) (*entities.ProductL
 	if err != nil {
 		return nil, err
 	}
-	err = entity.productLotsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.productLotsRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	_, err = entity.productLotsRepo.DeleteOne(ctx, bson.M{"_id": objId})
 	return &data, nil
 }
 
@@ -508,18 +615,9 @@ func (entity *productEntity) GetProductLotsByIds(ids []string) (items []entities
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductLot{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductLot{}
+	items = []entities.ProductLot{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -529,7 +627,7 @@ func (entity *productEntity) GetProductLotsExpired() (items []entities.ProductLo
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	opts := options.Find().SetSort(bson.D{{"expireDate", -1}})
+	opts := options.Find().SetSort(bson.D{{Key: "expireDate", Value: -1}})
 	cursor, err := entity.productLotsRepo.Find(ctx,
 		bson.M{"expireDate": bson.M{"$lte": time.Now()}},
 		opts,
@@ -537,18 +635,9 @@ func (entity *productEntity) GetProductLotsExpired() (items []entities.ProductLo
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductLot{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductLot{}
+	items = []entities.ProductLot{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -581,18 +670,9 @@ func (entity *productEntity) GetProductLotsExpireNotify(param request.GetProduct
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		data := entities.ProductLotDetail{}
-		err = cursor.Decode(&data)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, data)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductLotDetail{}
+	items = []entities.ProductLotDetail{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -614,78 +694,78 @@ func (entity *productEntity) UpdateProductLotById(id string, param request.Updat
 	logrus.Info("UpdateProductLotById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductLotById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-
-	data.LotNumber = param.LotNumber
-	data.ExpireDate = param.ExpireDate
-	data.Quantity = param.Quantity
-	data.CostPrice = param.CostPrice
-	data.UpdatedDate = time.Now()
-	data.UpdatedBy = param.UpdatedBy
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductLot
+	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"lotNumber":   param.LotNumber,
+		"expireDate":  param.ExpireDate,
+		"quantity":    param.Quantity,
+		"costPrice":   param.CostPrice,
+		"updatedDate": time.Now(),
+		"updatedBy":   param.UpdatedBy,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) UpdateProductLotNotifyById(id string, param request.UpdateProductLotNotify) (*entities.ProductLot, error) {
 	logrus.Info("UpdateProductLotNotifyById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductLotById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-
-	data.Notify = param.Notify
-	data.UpdatedDate = time.Now()
-	data.UpdatedBy = param.UpdatedBy
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductLot
+	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"notify":      param.Notify,
+		"updatedDate": time.Now(),
+		"updatedBy":   param.UpdatedBy,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) UpdateProductLotQuantityById(id string, param request.UpdateProductLotQuantity) (*entities.ProductLot, error) {
 	logrus.Info("UpdateProductLotQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data, err := entity.GetProductLotById(id)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-
-	data.Quantity = param.Quantity
-	data.UpdatedDate = time.Now()
-	data.UpdatedBy = param.UpdatedBy
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductLot
+	err = entity.productLotsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"quantity":    param.Quantity,
+		"updatedDate": time.Now(),
+		"updatedBy":   param.UpdatedBy,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return &data, nil
 }
 
 func (entity *productEntity) CreateProductUnitByProductId(productId string, param request.Product) (*entities.ProductUnit, error) {
@@ -735,6 +815,7 @@ func (entity *productEntity) CreateProductStockByProductAndUnitId(productId stri
 	unit, _ := primitive.ObjectIDFromHex(unitId)
 
 	data.Id = primitive.NewObjectID()
+	data.BranchId, _ = primitive.ObjectIDFromHex(param.BranchId)
 	data.ProductId = product
 	data.UnitId = unit
 	data.Sequence = entity.GetProductStockMaxSequence(productId, unitId) + 1
@@ -760,23 +841,14 @@ func (entity *productEntity) GetProductStocksByProductAndUnitId(productId string
 	defer cancel()
 	product, _ := primitive.ObjectIDFromHex(productId)
 	unit, _ := primitive.ObjectIDFromHex(unitId)
-	opts := options.Find().SetSort(bson.D{{"sequence", 1}})
+	opts := options.Find().SetSort(bson.D{{Key: "sequence", Value: 1}})
 	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"productId": product, "unitId": unit}, opts)
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductStock{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductStock{}
+	items = []entities.ProductStock{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -787,7 +859,7 @@ func (entity *productEntity) GetProductStockMaxSequence(productId string, unitId
 	defer cancel()
 	product, _ := primitive.ObjectIDFromHex(productId)
 	unit, _ := primitive.ObjectIDFromHex(unitId)
-	opts := options.FindOne().SetSort(bson.D{{"sequence", -1}})
+	opts := options.FindOne().SetSort(bson.D{{Key: "sequence", Value: -1}})
 	data := entities.ProductStock{}
 	err := entity.productStockRepo.FindOne(ctx, bson.M{"productId": product, "unitId": unit}, opts).Decode(&data)
 	if err != nil {
@@ -800,19 +872,19 @@ func (entity *productEntity) AddProductStockQuantityById(stockId string, quantit
 	logrus.Info("AddProductStockQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(stockId)
-	data := entities.ProductStock{}
-	err := entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(stockId)
 	if err != nil {
 		return nil, err
 	}
-	data.Quantity = data.Quantity + quantity
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductStock
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"quantity": quantity},
+	}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -823,19 +895,19 @@ func (entity *productEntity) RemoveProductStockQuantityById(stockId string, quan
 	logrus.Info("RemoveProductStockQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(stockId)
-	data := entities.ProductStock{}
-	err := entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(stockId)
 	if err != nil {
 		return nil, err
 	}
-	data.Quantity = data.Quantity - quantity
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductStock
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"quantity": -quantity},
+	}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -851,18 +923,9 @@ func (entity *productEntity) GetProductUnitsByProductId(productId string) (items
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductUnit{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductUnit{}
+	items = []entities.ProductUnit{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -876,18 +939,9 @@ func (entity *productEntity) GetProductPricesByProductId(productId string) (item
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductPrice{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductPrice{}
+	items = []entities.ProductPrice{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
@@ -913,19 +967,20 @@ func (entity *productEntity) UpdateProductPriceById(id string, param request.Pro
 	logrus.Info("UpdateProductPriceById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data := entities.ProductPrice{}
-	err := entity.productPricesRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.CustomerType = param.CustomerType
-	data.Price = param.Price
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productPricesRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductPrice
+	err = entity.productPricesRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"customerType": param.CustomerType,
+		"price":        param.Price,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -936,11 +991,11 @@ func (entity *productEntity) RemoveProductPriceById(id string) (*entities.Produc
 	logrus.Info("RemoveProductPriceById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := entities.ProductPrice{}
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
+	var data entities.ProductPrice
 	err = entity.productPricesRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -948,7 +1003,10 @@ func (entity *productEntity) RemoveProductPriceById(id string) (*entities.Produc
 	if data.CustomerType == constant.CustomerTypeGeneral {
 		return nil, errors.New("can not remove default price")
 	}
-	_, err = entity.productPricesRepo.DeleteOne(ctx, bson.M{"_id": objId})
+	err = entity.productPricesRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
 	return &data, nil
 }
 
@@ -1028,23 +1086,24 @@ func (entity *productEntity) UpdateProductUnitById(id string, param request.Prod
 	logrus.Info("UpdateProductUnitById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data := entities.ProductUnit{}
-	err := entity.productUnitsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Unit = param.Unit
-	data.Size = param.Size
-	data.CostPrice = param.CostPrice
-	data.Volume = param.Volume
-	data.VolumeUnit = param.VolumeUnit
-	data.Barcode = param.Barcode
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productUnitsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductUnit
+	err = entity.productUnitsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"unit":       param.Unit,
+		"size":       param.Size,
+		"costPrice":  param.CostPrice,
+		"volume":     param.Volume,
+		"volumeUnit": param.VolumeUnit,
+		"barcode":    param.Barcode,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -1067,7 +1126,10 @@ func (entity *productEntity) RemoveProductUnitById(id string) (*entities.Product
 	if data.Size == 1 {
 		return nil, errors.New("can not remove default unit")
 	}
-	_, err = entity.productUnitsRepo.DeleteOne(ctx, bson.M{"_id": objId})
+	err = entity.productUnitsRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
 	return &data, nil
 }
 
@@ -1077,6 +1139,7 @@ func (entity *productEntity) CreateProductStock(param request.ProductStock) (*en
 	defer cancel()
 	data := entities.ProductStock{}
 	data.Id = primitive.NewObjectID()
+	data.BranchId, _ = primitive.ObjectIDFromHex(param.BranchId)
 	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
 	data.UnitId, _ = primitive.ObjectIDFromHex(param.UnitId)
 	data.Sequence = entity.GetProductStockMaxSequence(param.ProductId, param.UnitId) + 1
@@ -1113,48 +1176,39 @@ func (entity *productEntity) GetProductStocksByProductId(productId string) (item
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	product, _ := primitive.ObjectIDFromHex(productId)
-	opts := options.Find().SetSort(bson.D{{"sequence", 1}})
+	opts := options.Find().SetSort(bson.D{{Key: "sequence", Value: 1}})
 	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"productId": product}, opts)
 	if err != nil {
 		return nil, err
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductStock{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			items = append(items, item)
-		}
-	}
-	if items == nil {
-		items = []entities.ProductStock{}
+	items = []entities.ProductStock{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
-
 }
 
 func (entity *productEntity) UpdateProductStockById(id string, param request.UpdateProductStock) (*entities.ProductStock, error) {
 	logrus.Info("UpdateProductStockById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data := entities.ProductStock{}
-	err := entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.LotNumber = param.LotNumber
-	data.CostPrice = param.CostPrice
-	data.Price = param.Price
-	data.ExpireDate = param.ExpireDate
-	data.ImportDate = param.ImportDate
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductStock
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"lotNumber":  param.LotNumber,
+		"costPrice":  param.CostPrice,
+		"price":      param.Price,
+		"expireDate": param.ExpireDate,
+		"importDate": param.ImportDate,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -1165,18 +1219,19 @@ func (entity *productEntity) UpdateProductStockQuantityById(id string, quantity 
 	logrus.Info("UpdateProductStockQuantityById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(id)
-	data := entities.ProductStock{}
-	err := entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Quantity = quantity
+
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{
 		ReturnDocument: &isReturnNewDoc,
 	}
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": data}, opts).Decode(&data)
+	var data entities.ProductStock
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"quantity": quantity,
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -1187,16 +1242,15 @@ func (entity *productEntity) RemoveProductStockById(id string) (*entities.Produc
 	logrus.Info("RemoveProductStockById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := entities.ProductStock{}
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	err = entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	var data entities.ProductStock
+	err = entity.productStockRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
-	_, err = entity.productStockRepo.DeleteOne(ctx, bson.M{"_id": objId})
 	return &data, nil
 }
 
@@ -1204,48 +1258,36 @@ func (entity *productEntity) UpdateProductStockSequence(param request.UpdateProd
 	logrus.Info("UpdateProductStockSequence")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+
+	sequenceMap := make(map[string]int, len(param.Stocks))
 	objIds := make([]primitive.ObjectID, 0, len(param.Stocks))
-	for _, value := range param.Stocks {
-		id, err := primitive.ObjectIDFromHex(value.StockId)
+	for _, s := range param.Stocks {
+		id, err := primitive.ObjectIDFromHex(s.StockId)
 		if err != nil {
 			return nil, err
 		}
 		objIds = append(objIds, id)
+		sequenceMap[s.StockId] = s.Sequence
 	}
-	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"_id": bson.M{"$in": objIds}})
+
+	writes := make([]mongo.WriteModel, 0, len(objIds))
+	for _, id := range objIds {
+		writes = append(writes, mongo.NewUpdateOneModel().
+			SetFilter(bson.M{"_id": id}).
+			SetUpdate(bson.M{"$set": bson.M{"sequence": sequenceMap[id.Hex()]}}))
+	}
+	if _, err := entity.productStockRepo.BulkWrite(ctx, writes); err != nil {
+		return nil, err
+	}
+
+	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"_id": bson.M{"$in": objIds}},
+		options.Find().SetSort(bson.D{{Key: "sequence", Value: 1}}))
 	if err != nil {
 		return nil, err
 	}
-	stocks := make([]entities.ProductStock, 0, len(param.Stocks))
-	for cursor.Next(ctx) {
-		item := entities.ProductStock{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			stocks = append(stocks, item)
-		}
-	}
-	if stocks == nil {
-		stocks = []entities.ProductStock{}
-	}
-	for index, value := range stocks {
-		for i := range param.Stocks {
-			if param.Stocks[i].StockId == value.Id.Hex() {
-				value.Sequence = param.Stocks[i].Sequence
-				break
-			}
-		}
-		isReturnNewDoc := options.After
-		opts := &options.FindOneAndUpdateOptions{
-			ReturnDocument: &isReturnNewDoc,
-		}
-		err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": value.Id}, bson.M{"$set": value}, opts).Decode(&value)
-		if err != nil {
-			logrus.Error(err)
-		}
-		stocks[index] = value
+	stocks := []entities.ProductStock{}
+	if err = cursor.All(ctx, &stocks); err != nil {
+		return nil, err
 	}
 	return stocks, nil
 }
@@ -1256,6 +1298,7 @@ func (entity *productEntity) CreateProductHistory(param request.ProductHistory) 
 	defer cancel()
 	data := entities.ProductHistory{}
 	data.Id = primitive.NewObjectID()
+	data.BranchId, _ = primitive.ObjectIDFromHex(param.BranchId)
 	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
 	data.Description = param.Description
 	data.Type = param.Type
@@ -1281,20 +1324,173 @@ func (entity *productEntity) GetProductStockBalance(productId string, unitId str
 	defer cancel()
 	product, _ := primitive.ObjectIDFromHex(productId)
 	unit, _ := primitive.ObjectIDFromHex(unitId)
-	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"productId": product, "unitId": unit})
-	balance := 0
+	pipeline := []bson.M{
+		{"$match": bson.M{"productId": product, "unitId": unit}},
+		{"$group": bson.M{"_id": nil, "balance": bson.M{"$sum": "$quantity"}}},
+	}
+	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
 	if err != nil {
-		return balance
+		return 0
 	}
-	for cursor.Next(ctx) {
-		item := entities.ProductStock{}
-		err = cursor.Decode(&item)
-		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
-		} else {
-			balance += item.Quantity
-		}
+	var results []bson.M
+	if err = cursor.All(ctx, &results); err != nil || len(results) == 0 {
+		return 0
 	}
-	return balance
+	if v, ok := results[0]["balance"].(int32); ok {
+		return int(v)
+	}
+	if v, ok := results[0]["balance"].(int64); ok {
+		return int(v)
+	}
+	return 0
+}
+
+func (entity *productEntity) GetProductHistoryByProductId(productId string, branchId string) ([]entities.ProductHistory, error) {
+	logrus.Info("GetProductHistoryByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	prodObjId, _ := primitive.ObjectIDFromHex(productId)
+	filter := bson.M{"productId": prodObjId}
+	if branchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
+		filter["branchId"] = branchObjId
+	}
+	opts := options.Find().SetSort(bson.M{"createdDate": -1})
+	cursor, err := entity.productHistoryRepo.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	var results []entities.ProductHistory
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []entities.ProductHistory{}
+	}
+	return results, nil
+}
+
+func (entity *productEntity) GetProductHistoryByDateRange(branchId string, startDate time.Time, endDate time.Time) ([]entities.ProductHistory, error) {
+	logrus.Info("GetProductHistoryByDateRange")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	filter := bson.M{
+		"createdDate": bson.M{"$gte": startDate, "$lte": endDate},
+	}
+	if branchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
+		filter["branchId"] = branchObjId
+	}
+	opts := options.Find().SetSort(bson.M{"createdDate": -1})
+	cursor, err := entity.productHistoryRepo.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	var results []entities.ProductHistory
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []entities.ProductHistory{}
+	}
+	return results, nil
+}
+
+func (entity *productEntity) GetLowStockProducts(threshold int, branchId string) ([]entities.LowStockProduct, error) {
+	logrus.Info("GetLowStockProducts")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	matchStage := bson.M{}
+	if branchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
+		matchStage["branchId"] = branchObjId
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchStage},
+		{"$group": bson.M{
+			"_id":        "$productId",
+			"totalStock": bson.M{"$sum": "$quantity"},
+		}},
+		{"$match": bson.M{"totalStock": bson.M{"$lte": threshold}}},
+		{"$lookup": bson.M{
+			"from":         "products",
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "product",
+		}},
+		{"$unwind": "$product"},
+		{"$project": bson.M{
+			"_id":          1,
+			"totalStock":   1,
+			"name":         "$product.name",
+			"serialNumber": "$product.serialNumber",
+			"unit":         "$product.unit",
+		}},
+		{"$sort": bson.M{"totalStock": 1}},
+	}
+
+	var results []entities.LowStockProduct
+	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []entities.LowStockProduct{}
+	}
+	return results, nil
+}
+
+func (entity *productEntity) GetStockReport(branchId string) ([]entities.StockReport, error) {
+	logrus.Info("GetStockReport")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	matchStage := bson.M{}
+	if branchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
+		matchStage["branchId"] = branchObjId
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchStage},
+		{"$group": bson.M{
+			"_id":        "$productId",
+			"totalStock": bson.M{"$sum": "$quantity"},
+			"totalCost":  bson.M{"$sum": bson.M{"$multiply": []string{"$quantity", "$costPrice"}}},
+		}},
+		{"$lookup": bson.M{
+			"from":         "products",
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "product",
+		}},
+		{"$unwind": "$product"},
+		{"$project": bson.M{
+			"_id":          1,
+			"totalStock":   1,
+			"totalCost":    1,
+			"name":         "$product.name",
+			"serialNumber": "$product.serialNumber",
+			"unit":         "$product.unit",
+		}},
+		{"$sort": bson.M{"name": 1}},
+	}
+
+	var results []entities.StockReport
+	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []entities.StockReport{}
+	}
+	return results, nil
 }

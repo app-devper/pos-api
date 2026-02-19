@@ -1,9 +1,11 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"pos/app/core/errcode"
 	"pos/app/data/repositories"
+
+	"github.com/gin-gonic/gin"
 )
 
 func DeleteCategoryById(entity repositories.ICategory) gin.HandlerFunc {
@@ -11,7 +13,7 @@ func DeleteCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 		categoryId := ctx.Param("categoryId")
 		result, err := entity.RemoveCategoryById(categoryId)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
 			return
 		}
 
