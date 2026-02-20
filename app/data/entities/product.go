@@ -22,46 +22,48 @@ type DrugInfo struct {
 }
 
 type Product struct {
-	Id           primitive.ObjectID `bson:"_id" json:"id"`
-	Name         string             `bson:"name" json:"name"`
-	NameEn       string             `bson:"nameEn" json:"nameEn"`
-	Description  string             `bson:"description" json:"description"`
-	Price        float64            `bson:"price" json:"price"`
-	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
-	Unit         string             `bson:"unit" json:"unit"`
-	Quantity     int                `bson:"quantity" json:"quantity"`
-	SoldFirst    int                `bson:"soldFirst" json:"soldFirst"`
-	SerialNumber string             `bson:"serialNumber" json:"serialNumber"`
-	Category     string             `bson:"category"  json:"category"`
-	Status       string             `bson:"status"  json:"status"`
-	DrugInfo     *DrugInfo          `bson:"drugInfo,omitempty" json:"drugInfo,omitempty"`
-	CreatedBy    string             `bson:"createdBy" json:"-"`
-	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy    string             `bson:"updatedBy" json:"-"`
-	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
+	Id                primitive.ObjectID `bson:"_id" json:"id"`
+	Name              string             `bson:"name" json:"name"`
+	NameEn            string             `bson:"nameEn" json:"nameEn"`
+	Description       string             `bson:"description" json:"description"`
+	Price             float64            `bson:"price" json:"price"`
+	CostPrice         float64            `bson:"costPrice" json:"costPrice"`
+	Unit              string             `bson:"unit" json:"unit"`
+	Quantity          int                `bson:"quantity" json:"quantity"`
+	SoldFirst         int                `bson:"soldFirst" json:"soldFirst"`
+	SerialNumber      string             `bson:"serialNumber" json:"serialNumber"`
+	Category          string             `bson:"category"  json:"category"`
+	Status            string             `bson:"status"  json:"status"`
+	DrugInfo          *DrugInfo          `bson:"drugInfo,omitempty" json:"drugInfo,omitempty"`
+	DrugRegistrations []string           `bson:"drugRegistrations,omitempty" json:"drugRegistrations,omitempty"`
+	CreatedBy         string             `bson:"createdBy" json:"-"`
+	CreatedDate       time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy         string             `bson:"updatedBy" json:"-"`
+	UpdatedDate       time.Time          `bson:"updatedDate" json:"-"`
 }
 
 type ProductDetail struct {
-	Id            primitive.ObjectID `bson:"_id" json:"id"`
-	Name          string             `bson:"name" json:"name"`
-	NameEn        string             `bson:"nameEn" json:"nameEn"`
-	Description   string             `bson:"description" json:"description"`
-	Price         float64            `bson:"price" json:"price"`
-	CostPrice     float64            `bson:"costPrice" json:"costPrice"`
-	Unit          string             `bson:"unit" json:"unit"`
-	Quantity      int                `bson:"quantity" json:"quantity"`
-	SoldFirst     int                `bson:"soldFirst" json:"soldFirst"`
-	SerialNumber  string             `bson:"serialNumber" json:"serialNumber"`
-	Category      string             `bson:"category"  json:"category"`
-	Status        string             `bson:"status"  json:"status"`
-	DrugInfo      *DrugInfo          `bson:"drugInfo,omitempty" json:"drugInfo,omitempty"`
-	CreatedBy     string             `bson:"createdBy" json:"-"`
-	CreatedDate   time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy     string             `bson:"updatedBy" json:"-"`
-	UpdatedDate   time.Time          `bson:"updatedDate" json:"-"`
-	ProductUnits  []ProductUnit      `bson:"units" json:"units"`
-	ProductPrices []ProductPrice     `bson:"prices"  json:"prices"`
-	ProductStocks []ProductStock     `bson:"stocks"  json:"stocks"`
+	Id                primitive.ObjectID `bson:"_id" json:"id"`
+	Name              string             `bson:"name" json:"name"`
+	NameEn            string             `bson:"nameEn" json:"nameEn"`
+	Description       string             `bson:"description" json:"description"`
+	Price             float64            `bson:"price" json:"price"`
+	CostPrice         float64            `bson:"costPrice" json:"costPrice"`
+	Unit              string             `bson:"unit" json:"unit"`
+	Quantity          int                `bson:"quantity" json:"quantity"`
+	SoldFirst         int                `bson:"soldFirst" json:"soldFirst"`
+	SerialNumber      string             `bson:"serialNumber" json:"serialNumber"`
+	Category          string             `bson:"category"  json:"category"`
+	Status            string             `bson:"status"  json:"status"`
+	DrugInfo          *DrugInfo          `bson:"drugInfo,omitempty" json:"drugInfo,omitempty"`
+	DrugRegistrations []string           `bson:"drugRegistrations,omitempty" json:"drugRegistrations,omitempty"`
+	CreatedBy         string             `bson:"createdBy" json:"-"`
+	CreatedDate       time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy         string             `bson:"updatedBy" json:"-"`
+	UpdatedDate       time.Time          `bson:"updatedDate" json:"-"`
+	ProductUnits      []ProductUnit      `bson:"units" json:"units"`
+	ProductPrices     []ProductPrice     `bson:"prices"  json:"prices"`
+	ProductStocks     []ProductStock     `bson:"stocks"  json:"stocks"`
 }
 
 type ProductLot struct {

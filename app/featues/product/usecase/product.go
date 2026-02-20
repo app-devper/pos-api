@@ -38,12 +38,13 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 
 		if product != nil {
 			updateProduct := request.UpdateProduct{
-				Description: req.Description,
-				Category:    req.Category,
-				Name:        req.Name,
-				NameEn:      req.NameEn,
-				Status:      req.Status,
-				UpdatedBy:   userId,
+				Description:       req.Description,
+				Category:          req.Category,
+				Name:              req.Name,
+				NameEn:            req.NameEn,
+				Status:            req.Status,
+				DrugRegistrations: req.DrugRegistrations,
+				UpdatedBy:         userId,
 			}
 			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
 
@@ -53,17 +54,18 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 			_, _ = productEntity.CreateProductHistory(updHistory)
 		} else {
 			createProduct := request.Product{
-				SerialNumber: req.SerialNumber,
-				CostPrice:    req.CostPrice,
-				Price:        req.Price,
-				Description:  req.Description,
-				Status:       req.Status,
-				Quantity:     0,
-				Category:     req.Category,
-				Name:         req.Name,
-				NameEn:       req.NameEn,
-				Unit:         req.Unit,
-				CreatedBy:    userId,
+				SerialNumber:      req.SerialNumber,
+				CostPrice:         req.CostPrice,
+				Price:             req.Price,
+				Description:       req.Description,
+				Status:            req.Status,
+				Quantity:          0,
+				Category:          req.Category,
+				Name:              req.Name,
+				NameEn:            req.NameEn,
+				Unit:              req.Unit,
+				DrugRegistrations: req.DrugRegistrations,
+				CreatedBy:         userId,
 			}
 			product, err = productEntity.CreateProduct(createProduct)
 			if product != nil {

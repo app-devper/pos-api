@@ -269,6 +269,7 @@ func (entity *productEntity) CreateProduct(param request.Product) (*entities.Pro
 	data.Category = param.Category
 	data.Status = param.Status
 	data.DrugInfo = toEntityDrugInfo(param.DrugInfo)
+	data.DrugRegistrations = param.DrugRegistrations
 	data.CreatedBy = param.CreatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedBy = param.CreatedBy
@@ -350,14 +351,15 @@ func (entity *productEntity) UpdateProductById(id string, param request.UpdatePr
 	}
 	var data entities.Product
 	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"name":        param.Name,
-		"nameEn":      param.NameEn,
-		"description": param.Description,
-		"category":    param.Category,
-		"status":      param.Status,
-		"drugInfo":    toEntityDrugInfo(param.DrugInfo),
-		"updatedBy":   param.UpdatedBy,
-		"updatedDate": time.Now(),
+		"name":              param.Name,
+		"nameEn":            param.NameEn,
+		"description":       param.Description,
+		"category":          param.Category,
+		"status":            param.Status,
+		"drugInfo":          toEntityDrugInfo(param.DrugInfo),
+		"drugRegistrations": param.DrugRegistrations,
+		"updatedBy":         param.UpdatedBy,
+		"updatedDate":       time.Now(),
 	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
