@@ -83,6 +83,7 @@ func ApplyProductAPI(
 	productRoute.GET("/:productId/stocks",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetProductStocksByProductId(repository.Product),
 	)
 
@@ -174,6 +175,21 @@ func ApplyProductAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.RemoveProductPriceById(repository.Product),
+	)
+
+	// Product History
+	productRoute.GET("/:productId/histories",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetProductHistoryByProductId(repository.Product),
+	)
+
+	productRoute.GET("/histories",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetProductHistoryByDateRange(repository.Product),
 	)
 
 	// Product Lot

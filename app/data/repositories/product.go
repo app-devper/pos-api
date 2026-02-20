@@ -67,7 +67,7 @@ type IProduct interface {
 	UpdateProductStockQuantityById(id string, quantity int) (*entities.ProductStock, error)
 	UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error)
 	RemoveProductStockById(id string) (*entities.ProductStock, error)
-	GetProductStocksByProductId(productId string) ([]entities.ProductStock, error)
+	GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string) int
 	GetProductStockBalance(productId string, unitId string) int
 	RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
@@ -1171,13 +1171,19 @@ func (entity *productEntity) GetProductStockById(id string) (*entities.ProductSt
 	return &data, nil
 }
 
-func (entity *productEntity) GetProductStocksByProductId(productId string) (items []entities.ProductStock, err error) {
+func (entity *productEntity) GetProductStocksByProductId(productId string, branchId string) (items []entities.ProductStock, err error) {
 	logrus.Info("GetProductStocksByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	product, _ := primitive.ObjectIDFromHex(productId)
+	filter := bson.M{"productId": product}
+	if branchId != "" {
+		if branch, branchErr := primitive.ObjectIDFromHex(branchId); branchErr == nil {
+			filter["branchId"] = branch
+		}
+	}
 	opts := options.Find().SetSort(bson.D{{Key: "sequence", Value: 1}})
-	cursor, err := entity.productStockRepo.Find(ctx, bson.M{"productId": product}, opts)
+	cursor, err := entity.productStockRepo.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -1349,7 +1355,10 @@ func (entity *productEntity) GetProductHistoryByProductId(productId string, bran
 	logrus.Info("GetProductHistoryByProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	prodObjId, _ := primitive.ObjectIDFromHex(productId)
+	prodObjId, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
 	filter := bson.M{"productId": prodObjId}
 	if branchId != "" {
 		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
@@ -1374,8 +1383,9 @@ func (entity *productEntity) GetProductHistoryByDateRange(branchId string, start
 	logrus.Info("GetProductHistoryByDateRange")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	endOfDay := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 999999999, endDate.Location())
 	filter := bson.M{
-		"createdDate": bson.M{"$gte": startDate, "$lte": endDate},
+		"createdDate": bson.M{"$gte": startDate, "$lte": endOfDay},
 	}
 	if branchId != "" {
 		branchObjId, _ := primitive.ObjectIDFromHex(branchId)

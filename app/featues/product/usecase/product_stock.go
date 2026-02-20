@@ -41,7 +41,8 @@ func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
 func GetProductStocksByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
-		result, err := productEntity.GetProductStocksByProductId(productId)
+		branchId := ctx.GetString("BranchId")
+		result, err := productEntity.GetProductStocksByProductId(productId, branchId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return

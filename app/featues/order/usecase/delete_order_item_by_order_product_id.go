@@ -42,7 +42,9 @@ func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, productEnt
 		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
 		if unit != nil {
 			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
-			_, _ = productEntity.CreateProductHistory(request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId))
+			h := request.RemoveOrderItemProductHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId)
+			h.BranchId = ctx.GetString("BranchId")
+			_, _ = productEntity.CreateProductHistory(h)
 		}
 
 		ctx.JSON(http.StatusOK, result)

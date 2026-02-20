@@ -581,6 +581,59 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /products/{productId}/histories:
+    get:
+      tags: [Products]
+      summary: Get product history by product ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductHistory'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /products/histories:
+    get:
+      tags: [Products]
+      summary: Get product history by date range
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductHistory'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   # ─── Orders ─────────────────────────────────────────────────
   /orders:
     post:
@@ -3212,6 +3265,35 @@ components:
           type: integer
         costPrice:
           type: number
+
+    ProductHistory:
+      type: object
+      properties:
+        id:
+          type: string
+        branchId:
+          type: string
+        productId:
+          type: string
+        type:
+          type: string
+        description:
+          type: string
+        unit:
+          type: string
+        import:
+          type: integer
+        quantity:
+          type: integer
+        costPrice:
+          type: number
+        price:
+          type: number
+        balance:
+          type: integer
+        createdDate:
+          type: string
+          format: date-time
 
     CreateProductRequest:
       type: object
