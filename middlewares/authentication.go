@@ -7,8 +7,8 @@ import (
 	"pos/app/data/repositories"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,7 +40,7 @@ type AccessClaims struct {
 	Role     string `json:"role"`
 	System   string `json:"system"`
 	ClientId string `json:"clientId"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 func RequireAuthenticated() gin.HandlerFunc {
@@ -66,7 +66,7 @@ func RequireAuthenticated() gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_002, err.Error())
 			return
 		}
-		if tkn == nil || !tkn.Valid || claims.Id == "" {
+		if tkn == nil || !tkn.Valid || claims.ID == "" {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_002, "token invalid")
 			return
 		}
@@ -79,12 +79,12 @@ func RequireAuthenticated() gin.HandlerFunc {
 			return
 		}
 
-		ctx.Set("SessionId", claims.Id)
+		ctx.Set("SessionId", claims.ID)
 		ctx.Set("Role", claims.Role)
 		ctx.Set("System", claims.System)
 		ctx.Set("ClientId", claims.ClientId)
 
-		logrus.Info("SessionId: " + claims.Id)
+		logrus.Info("SessionId: " + claims.ID)
 		logrus.Info("Role: " + claims.Role)
 		logrus.Info("System: " + claims.System)
 		logrus.Info("ClientId: " + claims.ClientId)
