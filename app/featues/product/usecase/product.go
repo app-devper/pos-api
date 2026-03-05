@@ -43,6 +43,7 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 				Name:              req.Name,
 				NameEn:            req.NameEn,
 				Status:            req.Status,
+				MinStock:          req.MinStock,
 				DrugRegistrations: req.DrugRegistrations,
 				UpdatedBy:         userId,
 			}

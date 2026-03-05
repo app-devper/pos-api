@@ -211,11 +211,20 @@ func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateRec
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, entities.ReceiveItem{
-			ProductId: productId,
-			CostPrice: item.CostPrice,
-			Quantity:  item.Quantity,
-		})
+		ri := entities.ReceiveItem{
+			ProductId:    productId,
+			CostPrice:    item.CostPrice,
+			Quantity:     item.Quantity,
+			LotNumber:    item.LotNumber,
+			UnitId:       item.UnitId,
+			BaseQuantity: item.BaseQuantity,
+		}
+		if item.ExpireDate != "" {
+			if t, e := time.Parse(time.RFC3339, item.ExpireDate); e == nil {
+				ri.ExpireDate = t
+			}
+		}
+		items = append(items, ri)
 	}
 
 	isReturnNewDoc := options.After
@@ -251,11 +260,20 @@ func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.Upda
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, entities.ReceiveItem{
-			ProductId: productId,
-			CostPrice: item.CostPrice,
-			Quantity:  item.Quantity,
-		})
+		ri := entities.ReceiveItem{
+			ProductId:    productId,
+			CostPrice:    item.CostPrice,
+			Quantity:     item.Quantity,
+			LotNumber:    item.LotNumber,
+			UnitId:       item.UnitId,
+			BaseQuantity: item.BaseQuantity,
+		}
+		if item.ExpireDate != "" {
+			if t, e := time.Parse(time.RFC3339, item.ExpireDate); e == nil {
+				ri.ExpireDate = t
+			}
+		}
+		items = append(items, ri)
 	}
 
 	isReturnNewDoc := options.After
@@ -282,10 +300,14 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, produ
 	if err != nil {
 		return nil, err
 	}
+	recvId, _ := primitive.ObjectIDFromHex(receiveId)
 	data := entities.ReceiveItem{
-		ProductId: product,
-		Quantity:  form.Quantity,
-		CostPrice: form.CostPrice,
+		ReceiveId:  recvId,
+		ProductId:  product,
+		Quantity:   form.Quantity,
+		CostPrice:  form.CostPrice,
+		LotNumber:  form.LotNumber,
+		ExpireDate: form.ExpireDate,
 	}
 	_, err = entity.receiveItemsRepo.InsertOne(ctx, data)
 	if err != nil {

@@ -22,7 +22,12 @@ type Receive struct {
 }
 
 type ReceiveItem struct {
-	ProductId primitive.ObjectID `bson:"productId" json:"productId"`
-	CostPrice float64            `bson:"costPrice" json:"costPrice"`
-	Quantity  int                `bson:"quantity" json:"quantity"`
+	ReceiveId    primitive.ObjectID `bson:"receiveId,omitempty" json:"receiveId,omitempty"`
+	ProductId    primitive.ObjectID `bson:"productId" json:"productId"`
+	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
+	Quantity     int                `bson:"quantity" json:"quantity"`
+	LotNumber    string             `bson:"lotNumber,omitempty" json:"lotNumber,omitempty"`
+	ExpireDate   time.Time          `bson:"expireDate,omitempty" json:"expireDate,omitempty"`
+	UnitId       string             `bson:"unitId,omitempty" json:"unitId,omitempty"`
+	BaseQuantity int                `bson:"baseQuantity,omitempty" json:"baseQuantity,omitempty"`
 }

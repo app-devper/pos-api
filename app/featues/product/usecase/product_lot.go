@@ -11,6 +11,79 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func GetAllLots(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		req := request.GetProductLotsExpireRange{}
+		// Date range is optional for listing all lots
+		_ = ctx.ShouldBindQuery(&req)
+		result, err := productEntity.GetProductLots(req)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func GetLotById(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		lotId := ctx.Param("lotId")
+		result, err := productEntity.GetProductLotById(lotId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func CreateLot(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		req := request.ProductLot{}
+		if err := ctx.ShouldBind(&req); err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
+			return
+		}
+		req.UpdatedBy = utils.GetUserId(ctx)
+		result, err := productEntity.CreateProductLot(req)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func UpdateLotById(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		lotId := ctx.Param("lotId")
+		req := request.UpdateProductLot{}
+		if err := ctx.ShouldBind(&req); err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
+			return
+		}
+		req.UpdatedBy = utils.GetUserId(ctx)
+		result, err := productEntity.UpdateProductLotById(lotId, req)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func DeleteLotById(productEntity repositories.IProduct) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		lotId := ctx.Param("lotId")
+		result, err := productEntity.RemoveProductLotById(lotId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, result)
+	}
+}
+
 func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		location := utils.GetLocation()

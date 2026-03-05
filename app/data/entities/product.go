@@ -7,18 +7,19 @@ import (
 )
 
 type DrugInfo struct {
-	GenericName       string `bson:"genericName" json:"genericName"`
-	DrugType          string `bson:"drugType" json:"drugType"`
-	DosageForm        string `bson:"dosageForm" json:"dosageForm"`
-	Strength          string `bson:"strength" json:"strength"`
-	Indication        string `bson:"indication" json:"indication"`
-	Dosage            string `bson:"dosage" json:"dosage"`
-	SideEffects       string `bson:"sideEffects" json:"sideEffects"`
-	Contraindications string `bson:"contraindications" json:"contraindications"`
-	StorageCondition  string `bson:"storageCondition" json:"storageCondition"`
-	Manufacturer      string `bson:"manufacturer" json:"manufacturer"`
-	RegistrationNo    string `bson:"registrationNo" json:"registrationNo"`
-	IsControlled      bool   `bson:"isControlled" json:"isControlled"`
+	GenericName       string   `bson:"genericName" json:"genericName"`
+	DrugType          string   `bson:"drugType" json:"drugType"`
+	DosageForm        string   `bson:"dosageForm" json:"dosageForm"`
+	Strength          string   `bson:"strength" json:"strength"`
+	Indication        string   `bson:"indication" json:"indication"`
+	Dosage            string   `bson:"dosage" json:"dosage"`
+	SideEffects       string   `bson:"sideEffects" json:"sideEffects"`
+	Contraindications string   `bson:"contraindications" json:"contraindications"`
+	StorageCondition  string   `bson:"storageCondition" json:"storageCondition"`
+	Manufacturer      string   `bson:"manufacturer" json:"manufacturer"`
+	RegistrationNo    string   `bson:"registrationNo" json:"registrationNo"`
+	IsControlled      bool     `bson:"isControlled" json:"isControlled"`
+	DrugInteractions  []string `bson:"drugInteractions,omitempty" json:"drugInteractions,omitempty"`
 }
 
 type Product struct {
@@ -34,8 +35,10 @@ type Product struct {
 	SerialNumber      string             `bson:"serialNumber" json:"serialNumber"`
 	Category          string             `bson:"category"  json:"category"`
 	Status            string             `bson:"status"  json:"status"`
+	MinStock          int                `bson:"minStock" json:"minStock"`
 	DrugInfo          *DrugInfo          `bson:"drugInfo,omitempty" json:"drugInfo,omitempty"`
 	DrugRegistrations []string           `bson:"drugRegistrations,omitempty" json:"drugRegistrations,omitempty"`
+	DeletedDate       *time.Time         `bson:"deletedDate,omitempty" json:"deletedDate,omitempty"`
 	CreatedBy         string             `bson:"createdBy" json:"-"`
 	CreatedDate       time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy         string             `bson:"updatedBy" json:"-"`
@@ -55,8 +58,10 @@ type ProductDetail struct {
 	SerialNumber      string             `bson:"serialNumber" json:"serialNumber"`
 	Category          string             `bson:"category"  json:"category"`
 	Status            string             `bson:"status"  json:"status"`
+	MinStock          int                `bson:"minStock" json:"minStock"`
 	DrugInfo          *DrugInfo          `bson:"drugInfo,omitempty" json:"drugInfo,omitempty"`
 	DrugRegistrations []string           `bson:"drugRegistrations,omitempty" json:"drugRegistrations,omitempty"`
+	DeletedDate       *time.Time         `bson:"deletedDate,omitempty" json:"deletedDate,omitempty"`
 	CreatedBy         string             `bson:"createdBy" json:"-"`
 	CreatedDate       time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy         string             `bson:"updatedBy" json:"-"`

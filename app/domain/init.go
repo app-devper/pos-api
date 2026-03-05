@@ -17,11 +17,6 @@ type Repository struct {
 	Branch          repositories.IBranch
 	Employee        repositories.IEmployee
 	Setting         repositories.ISetting
-	PurchaseOrder   repositories.IPurchaseOrder
-	DeliveryOrder   repositories.IDeliveryOrder
-	CreditNote      repositories.ICreditNote
-	Billing         repositories.IBilling
-	Quotation       repositories.IQuotation
 	Promotion       repositories.IPromotion
 	CustomerHistory repositories.ICustomerHistory
 	Patient         repositories.IPatient
@@ -42,11 +37,6 @@ func InitRepository(resource *db.Resource) *Repository {
 		Branch:          repositories.NewBranchEntity(resource),
 		Employee:        repositories.NewEmployeeEntity(resource),
 		Setting:         repositories.NewSettingEntity(resource),
-		PurchaseOrder:   repositories.NewPurchaseOrderEntity(resource),
-		DeliveryOrder:   repositories.NewDeliveryOrderEntity(resource),
-		CreditNote:      repositories.NewCreditNoteEntity(resource),
-		Billing:         repositories.NewBillingEntity(resource),
-		Quotation:       repositories.NewQuotationEntity(resource),
 		Promotion:       repositories.NewPromotionEntity(resource),
 		CustomerHistory: repositories.NewCustomerHistoryEntity(resource),
 		Patient:         repositories.NewPatientEntity(resource),

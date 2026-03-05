@@ -43,6 +43,11 @@ type IProduct interface {
 	// ProductLot
 	GetProductLotsByProductId(productId string) ([]entities.ProductLot, error)
 	GetProductLotsExpireNotify(param request.GetProductLotsExpireRange) ([]entities.ProductLotDetail, error)
+	GetProductLots(param request.GetProductLotsExpireRange) ([]entities.ProductLot, error)
+	GetProductLotById(id string) (*entities.ProductLot, error)
+	CreateProductLot(param request.ProductLot) (*entities.ProductLot, error)
+	UpdateProductLotById(id string, param request.UpdateProductLot) (*entities.ProductLot, error)
+	RemoveProductLotById(id string) (*entities.ProductLot, error)
 
 	// ProductUnit
 	CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error)
@@ -81,6 +86,7 @@ type IProduct interface {
 	// Reports
 	GetLowStockProducts(threshold int, branchId string) ([]entities.LowStockProduct, error)
 	GetStockReport(branchId string) ([]entities.StockReport, error)
+	GetDeadStockProducts(days int, branchId string) ([]entities.DeadStockProduct, error)
 }
 
 func NewProductEntity(resource *db.Resource) IProduct {
@@ -186,6 +192,7 @@ func toEntityDrugInfo(req *request.RequestDrugInfo) *entities.DrugInfo {
 		Manufacturer:      req.Manufacturer,
 		RegistrationNo:    req.RegistrationNo,
 		IsControlled:      req.IsControlled,
+		DrugInteractions:  req.DrugInteractions,
 	}
 }
 
@@ -193,7 +200,7 @@ func (entity *productEntity) GetProductAll(param request.GetProduct) (items []en
 	logrus.Info("GetProductAll")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	query := bson.M{}
+	query := bson.M{"deletedDate": bson.M{"$exists": false}}
 	if param.Category != "" {
 		query["category"] = param.Category
 	}
@@ -244,7 +251,7 @@ func (entity *productEntity) GetProductBySerialNumber(serialNumber string) (*ent
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	var data entities.Product
-	err := entity.productsRepo.FindOne(ctx, bson.M{"serialNumber": serialNumber}).Decode(&data)
+	err := entity.productsRepo.FindOne(ctx, bson.M{"serialNumber": serialNumber, "deletedDate": bson.M{"$exists": false}}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -268,6 +275,7 @@ func (entity *productEntity) CreateProduct(param request.Product) (*entities.Pro
 	data.Quantity = param.Quantity
 	data.Category = param.Category
 	data.Status = param.Status
+	data.MinStock = param.MinStock
 	data.DrugInfo = toEntityDrugInfo(param.DrugInfo)
 	data.DrugRegistrations = param.DrugRegistrations
 	data.CreatedBy = param.CreatedBy
@@ -290,7 +298,7 @@ func (entity *productEntity) GetProductById(id string) (*entities.Product, error
 		return nil, err
 	}
 	var data entities.Product
-	err = entity.productsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.productsRepo.FindOne(ctx, bson.M{"_id": objId, "deletedDate": bson.M{"$exists": false}}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -328,8 +336,17 @@ func (entity *productEntity) RemoveProductById(id string) (*entities.Product, er
 	if err != nil {
 		return nil, err
 	}
+	now := time.Now()
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
 	var data entities.Product
-	err = entity.productsRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.productsRepo.FindOneAndUpdate(ctx,
+		bson.M{"_id": objId, "deletedDate": bson.M{"$exists": false}},
+		bson.M{"$set": bson.M{"deletedDate": now}},
+		opts,
+	).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +373,7 @@ func (entity *productEntity) UpdateProductById(id string, param request.UpdatePr
 		"description":       param.Description,
 		"category":          param.Category,
 		"status":            param.Status,
+		"minStock":          param.MinStock,
 		"drugInfo":          toEntityDrugInfo(param.DrugInfo),
 		"drugRegistrations": param.DrugRegistrations,
 		"updatedBy":         param.UpdatedBy,
@@ -548,14 +566,15 @@ func (entity *productEntity) GetProductLots(param request.GetProductLotsExpireRa
 	logrus.Info("GetProductLots")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	opts := options.Find().SetSort(bson.D{{Key: "expireDate", Value: -1}})
-	cursor, err := entity.productLotsRepo.Find(ctx,
-		bson.M{"expireDate": bson.M{
+	filter := bson.M{}
+	if !param.StartDate.IsZero() && !param.EndDate.IsZero() {
+		filter["expireDate"] = bson.M{
 			"$gt": param.StartDate,
 			"$lt": param.EndDate,
-		}},
-		opts,
-	)
+		}
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "expireDate", Value: -1}})
+	cursor, err := entity.productLotsRepo.Find(ctx, filter, opts)
 
 	if err != nil {
 		return nil, err
@@ -1063,6 +1082,9 @@ func (entity *productEntity) GetProductUnitByDefault(productId string, unit stri
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	product, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.ProductUnit{}
 	err = entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit, "size": 1}).Decode(&data)
 	if err != nil {
@@ -1076,6 +1098,9 @@ func (entity *productEntity) GetProductUnitByUnit(productId string, unit string)
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	product, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.ProductUnit{}
 	err = entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit}).Decode(&data)
 	if err != nil {
@@ -1184,7 +1209,7 @@ func (entity *productEntity) GetProductStocksByProductId(productId string, branc
 			filter["branchId"] = branch
 		}
 	}
-	opts := options.Find().SetSort(bson.D{{Key: "sequence", Value: 1}})
+	opts := options.Find().SetSort(bson.D{{Key: "expireDate", Value: 1}, {Key: "sequence", Value: 1}})
 	cursor, err := entity.productStockRepo.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
@@ -1473,7 +1498,7 @@ func (entity *productEntity) GetStockReport(branchId string) ([]entities.StockRe
 		{"$group": bson.M{
 			"_id":        "$productId",
 			"totalStock": bson.M{"$sum": "$quantity"},
-			"totalCost":  bson.M{"$sum": bson.M{"$multiply": []string{"$quantity", "$costPrice"}}},
+			"totalCost":  bson.M{"$sum": bson.M{"$multiply": bson.A{"$quantity", "$costPrice"}}},
 		}},
 		{"$lookup": bson.M{
 			"from":         "products",
@@ -1503,6 +1528,70 @@ func (entity *productEntity) GetStockReport(branchId string) ([]entities.StockRe
 	}
 	if results == nil {
 		results = []entities.StockReport{}
+	}
+	return results, nil
+}
+
+func (entity *productEntity) GetDeadStockProducts(days int, branchId string) ([]entities.DeadStockProduct, error) {
+	logrus.Info("GetDeadStockProducts")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	matchFilter := bson.M{
+		"deletedDate": bson.M{"$exists": false},
+		"quantity":    bson.M{"$gt": 0},
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchFilter},
+		{"$lookup": bson.M{
+			"from": "order_items",
+			"let":  bson.M{"pid": "$_id"},
+			"pipeline": bson.A{
+				bson.M{"$match": bson.M{"$expr": bson.M{"$eq": bson.A{"$productId", "$$pid"}}}},
+				bson.M{"$sort": bson.M{"createdDate": -1}},
+				bson.M{"$limit": 1},
+				bson.M{"$project": bson.M{"createdDate": 1}},
+			},
+			"as": "lastOrder",
+		}},
+		{"$addFields": bson.M{
+			"lastSold": bson.M{"$ifNull": bson.A{
+				bson.M{"$arrayElemAt": bson.A{"$lastOrder.createdDate", 0}},
+				nil,
+			}},
+		}},
+		{"$match": bson.M{
+			"$or": bson.A{
+				bson.M{"lastSold": nil},
+				bson.M{"lastSold": bson.M{"$lt": cutoff}},
+			},
+		}},
+		{"$project": bson.M{
+			"name":      1,
+			"quantity":  1,
+			"costPrice": 1,
+			"lastSold": bson.M{"$cond": bson.M{
+				"if":   bson.M{"$eq": bson.A{"$lastSold", nil}},
+				"then": "",
+				"else": bson.M{"$dateToString": bson.M{"format": "%Y-%m-%d", "date": "$lastSold"}},
+			}},
+		}},
+		{"$sort": bson.M{"lastSold": 1}},
+	}
+
+	var results []entities.DeadStockProduct
+	cursor, err := entity.productsRepo.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []entities.DeadStockProduct{}
 	}
 	return results, nil
 }

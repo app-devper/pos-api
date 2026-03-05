@@ -1,11 +1,12 @@
 package stock_transfer
 
 import (
-	"github.com/gin-gonic/gin"
 	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/stock_transfer/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplyStockTransferAPI(
@@ -18,7 +19,7 @@ func ApplyStockTransferAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreateStockTransfer(repository.StockTransfer, repository.Product, repository.Sequence),
 	)
 
@@ -40,7 +41,7 @@ func ApplyStockTransferAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.ApproveStockTransfer(repository.StockTransfer, repository.Product),
 	)
 
@@ -48,7 +49,7 @@ func ApplyStockTransferAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.RejectStockTransfer(repository.StockTransfer, repository.Product),
 	)
 }

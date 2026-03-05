@@ -1,11 +1,12 @@
 package promotion
 
 import (
-	"github.com/gin-gonic/gin"
 	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/promotion/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplyPromotionAPI(
@@ -18,7 +19,7 @@ func ApplyPromotionAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreatePromotion(repository.Promotion),
 	)
 
@@ -40,7 +41,7 @@ func ApplyPromotionAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdatePromotionById(repository.Promotion),
 	)
 
@@ -48,7 +49,7 @@ func ApplyPromotionAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeletePromotionById(repository.Promotion),
 	)
 

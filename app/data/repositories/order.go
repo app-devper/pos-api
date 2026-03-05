@@ -51,6 +51,8 @@ type IOrder interface {
 
 	GetOrderSummary(form request.GetOrderRange) (*entities.OrderSummary, error)
 	GetOrderDailyChart(form request.GetOrderRange) ([]entities.OrderDailyChart, error)
+	GetOrderMonthlyChart(branchId string) ([]entities.OrderDailyChart, error)
+	GetABCAnalysis(branchId string) ([]entities.ABCProduct, error)
 }
 
 func NewOrderEntity(resource *db.Resource) IOrder {
@@ -427,8 +429,10 @@ func (entity *orderEntity) RemoveOrderById(id string) (*entities.OrderDetail, er
 		return nil, err
 	}
 
-	payment, _ := entity.RemovePaymentByOrderId(id)
-	data.Payment = *payment
+	payment, pErr := entity.RemovePaymentByOrderId(id)
+	if pErr == nil && payment != nil {
+		data.Payment = *payment
+	}
 
 	items, _ := entity.RemoveOrderItemByOrderId(id)
 	data.Items = items
@@ -877,7 +881,7 @@ func (entity *orderEntity) GetOrderSummary(form request.GetOrderRange) (*entitie
 			"totalCost":    bson.M{"$sum": "$totalCost"},
 		}},
 		{"$addFields": bson.M{
-			"totalProfit": bson.M{"$subtract": []string{"$totalRevenue", "$totalCost"}},
+			"totalProfit": bson.M{"$subtract": bson.A{"$totalRevenue", "$totalCost"}},
 		}},
 	}
 
@@ -922,7 +926,7 @@ func (entity *orderEntity) GetOrderDailyChart(form request.GetOrderRange) ([]ent
 			"totalCost":    bson.M{"$sum": "$totalCost"},
 		}},
 		{"$addFields": bson.M{
-			"totalProfit": bson.M{"$subtract": []string{"$totalRevenue", "$totalCost"}},
+			"totalProfit": bson.M{"$subtract": bson.A{"$totalRevenue", "$totalCost"}},
 		}},
 		{"$sort": bson.M{"_id": 1}},
 	}
@@ -939,4 +943,117 @@ func (entity *orderEntity) GetOrderDailyChart(form request.GetOrderRange) ([]ent
 		results = []entities.OrderDailyChart{}
 	}
 	return results, nil
+}
+
+func (entity *orderEntity) GetOrderMonthlyChart(branchId string) ([]entities.OrderDailyChart, error) {
+	logrus.Info("GetOrderMonthlyChart")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	startDate := time.Now().AddDate(-1, 0, 0)
+	matchFilter := bson.M{
+		"createdDate": bson.M{"$gte": startDate},
+	}
+	if branchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
+		matchFilter["branchId"] = branchObjId
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchFilter},
+		{"$group": bson.M{
+			"_id": bson.M{
+				"$dateToString": bson.M{"format": "%Y-%m", "date": "$createdDate"},
+			},
+			"totalOrders":  bson.M{"$sum": 1},
+			"totalRevenue": bson.M{"$sum": "$total"},
+			"totalCost":    bson.M{"$sum": "$totalCost"},
+		}},
+		{"$addFields": bson.M{
+			"totalProfit": bson.M{"$subtract": bson.A{"$totalRevenue", "$totalCost"}},
+		}},
+		{"$sort": bson.M{"_id": 1}},
+	}
+
+	var results []entities.OrderDailyChart
+	cursor, err := entity.orderRepo.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []entities.OrderDailyChart{}
+	}
+	return results, nil
+}
+
+func (entity *orderEntity) GetABCAnalysis(branchId string) ([]entities.ABCProduct, error) {
+	logrus.Info("GetABCAnalysis")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	startDate := time.Now().AddDate(0, -3, 0)
+	matchFilter := bson.M{
+		"createdDate": bson.M{"$gte": startDate},
+	}
+	if branchId != "" {
+		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
+		matchFilter["branchId"] = branchObjId
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchFilter},
+		{"$group": bson.M{
+			"_id":          "$productId",
+			"totalRevenue": bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}},
+			"totalQty":     bson.M{"$sum": "$quantity"},
+		}},
+		{"$lookup": bson.M{
+			"from":         "products",
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "product",
+		}},
+		{"$unwind": bson.M{"path": "$product", "preserveNullAndEmptyArrays": true}},
+		{"$addFields": bson.M{
+			"productName": bson.M{"$ifNull": bson.A{"$product.name", ""}},
+		}},
+		{"$project": bson.M{"product": 0}},
+		{"$sort": bson.M{"totalRevenue": -1}},
+	}
+
+	var abcResults []entities.ABCProduct
+	cursor, err := entity.orderItemRepo.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(ctx, &abcResults); err != nil {
+		return nil, err
+	}
+	if abcResults == nil {
+		abcResults = []entities.ABCProduct{}
+	}
+
+	var totalRev float64
+	for _, r := range abcResults {
+		totalRev += r.TotalRevenue
+	}
+	if totalRev > 0 {
+		var cumRev float64
+		for i := range abcResults {
+			cumRev += abcResults[i].TotalRevenue
+			pct := cumRev / totalRev
+			if pct <= 0.80 {
+				abcResults[i].Class = "A"
+			} else if pct <= 0.95 {
+				abcResults[i].Class = "B"
+			} else {
+				abcResults[i].Class = "C"
+			}
+		}
+	}
+
+	return abcResults, nil
 }

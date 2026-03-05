@@ -18,7 +18,7 @@ func ApplyEmployeeAPI(
 	employeeRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreateEmployee(repository.Employee),
 	)
 
@@ -37,14 +37,14 @@ func ApplyEmployeeAPI(
 	employeeRoute.PUT("/:employeeId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateEmployeeById(repository.Employee),
 	)
 
 	employeeRoute.DELETE("/:employeeId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteEmployeeById(repository.Employee),
 	)
 

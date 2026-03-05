@@ -40,7 +40,7 @@ func ApplyOrderAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteOrderById(repository.Order, repository.Product),
 	)
 
@@ -48,7 +48,7 @@ func ApplyOrderAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteOrderItemByOrderProductId(repository.Order, repository.Product),
 	)
 
@@ -84,7 +84,7 @@ func ApplyOrderAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteOrderItemById(repository.Order, repository.Product),
 	)
 
@@ -92,7 +92,7 @@ func ApplyOrderAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetOrderItemByProductId(repository.Order),
 	)
 
@@ -100,7 +100,7 @@ func ApplyOrderAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetOrderItemDetailsByProductId(repository.Order),
 	)
 

@@ -4,22 +4,17 @@ import (
 	"os"
 	"pos/app/domain"
 	"pos/app/domain/request"
-	"pos/app/featues/billing"
 	"pos/app/featues/branch"
 	"pos/app/featues/catagory"
-	"pos/app/featues/credit_note"
 	"pos/app/featues/customer"
 	"pos/app/featues/customer_history"
 	"pos/app/featues/dashboard"
-	"pos/app/featues/delivery_order"
 	"pos/app/featues/dispensing"
 	"pos/app/featues/employee"
 	"pos/app/featues/order"
 	"pos/app/featues/patient"
 	"pos/app/featues/product"
 	"pos/app/featues/promotion"
-	"pos/app/featues/purchase_order"
-	"pos/app/featues/quotation"
 	"pos/app/featues/receive"
 	"pos/app/featues/report"
 	"pos/app/featues/setting"
@@ -69,11 +64,6 @@ func (app Routes) StartGin() {
 	dashboard.ApplyDashboardAPI(publicRoute, repository)
 	report.ApplyReportAPI(publicRoute, repository)
 	setting.ApplySettingAPI(publicRoute, repository)
-	purchase_order.ApplyPurchaseOrderAPI(publicRoute, repository)
-	delivery_order.ApplyDeliveryOrderAPI(publicRoute, repository)
-	credit_note.ApplyCreditNoteAPI(publicRoute, repository)
-	billing.ApplyBillingAPI(publicRoute, repository)
-	quotation.ApplyQuotationAPI(publicRoute, repository)
 	promotion.ApplyPromotionAPI(publicRoute, repository)
 	customer_history.ApplyCustomerHistoryAPI(publicRoute, repository)
 	patient.ApplyPatientAPI(publicRoute, repository)

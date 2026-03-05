@@ -17,6 +17,7 @@ type Setting struct {
 	LogoUrl        string             `bson:"logoUrl" json:"logoUrl"`
 	ShowCredit     bool               `bson:"showCredit" json:"showCredit"`
 	PromptPayId    string             `bson:"promptPayId" json:"promptPayId"`
+	Features       map[string]bool    `bson:"features,omitempty" json:"features,omitempty"`
 	UpdatedBy      string             `bson:"updatedBy" json:"-"`
 	UpdatedDate    time.Time          `bson:"updatedDate" json:"-"`
 }

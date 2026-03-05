@@ -22,6 +22,7 @@ type Product struct {
 	ExpireDate        time.Time        `json:"expireDate" binding:"required"`
 	ReceiveId         string           `json:"receiveId"`
 	Status            string           `json:"status"`
+	MinStock          int              `json:"minStock"`
 	DrugInfo          *RequestDrugInfo `json:"drugInfo"`
 	DrugRegistrations []string         `json:"drugRegistrations"`
 	ReceiveCode       string
@@ -39,6 +40,7 @@ type CreateProduct struct {
 	SerialNumber      string           `json:"serialNumber" binding:"required"`
 	Category          string           `json:"category"`
 	Status            string           `json:"status"`
+	MinStock          int              `json:"minStock"`
 	DrugInfo          *RequestDrugInfo `json:"drugInfo"`
 	DrugRegistrations []string         `json:"drugRegistrations"`
 	CreatedBy         string
@@ -50,22 +52,24 @@ type UpdateProduct struct {
 	Description       string           `json:"description"`
 	Category          string           `json:"category"`
 	Status            string           `json:"status"`
+	MinStock          int              `json:"minStock"`
 	DrugInfo          *RequestDrugInfo `json:"drugInfo"`
 	DrugRegistrations []string         `json:"drugRegistrations"`
 	UpdatedBy         string
 }
 
 type RequestDrugInfo struct {
-	GenericName       string `json:"genericName"`
-	DrugType          string `json:"drugType"`
-	DosageForm        string `json:"dosageForm"`
-	Strength          string `json:"strength"`
-	Indication        string `json:"indication"`
-	Dosage            string `json:"dosage"`
-	SideEffects       string `json:"sideEffects"`
-	Contraindications string `json:"contraindications"`
-	StorageCondition  string `json:"storageCondition"`
-	Manufacturer      string `json:"manufacturer"`
-	RegistrationNo    string `json:"registrationNo"`
-	IsControlled      bool   `json:"isControlled"`
+	GenericName       string   `json:"genericName"`
+	DrugType          string   `json:"drugType"`
+	DosageForm        string   `json:"dosageForm"`
+	Strength          string   `json:"strength"`
+	Indication        string   `json:"indication"`
+	Dosage            string   `json:"dosage"`
+	SideEffects       string   `json:"sideEffects"`
+	Contraindications string   `json:"contraindications"`
+	StorageCondition  string   `json:"storageCondition"`
+	Manufacturer      string   `json:"manufacturer"`
+	RegistrationNo    string   `json:"registrationNo"`
+	IsControlled      bool     `json:"isControlled"`
+	DrugInteractions  []string `json:"drugInteractions"`
 }

@@ -3,20 +3,25 @@ package request
 import "time"
 
 type Order struct {
-	Items        []OrderItem    `json:"items" binding:"required"`
-	Payments     []OrderPayment `json:"payments"`
-	Amount       float64        `json:"amount" binding:"required"`
-	Type         string         `json:"type" binding:"required"`
-	CustomerCode string         `json:"customerCode"`
-	CustomerName string         `json:"customerName"`
-	Total        float64        `json:"total" binding:"required"`
-	TotalCost    float64        `json:"totalCost"`
-	Discount     float64        `json:"discount"`
-	Change       float64        `json:"change"`
-	Message      string         `json:"message"`
-	CreatedBy    string
-	Code         string
-	BranchId     string
+	Items          []OrderItem    `json:"items" binding:"required"`
+	Payments       []OrderPayment `json:"payments"`
+	Amount         float64        `json:"amount" binding:"required"`
+	Type           string         `json:"type" binding:"required"`
+	CustomerCode   string         `json:"customerCode"`
+	CustomerName   string         `json:"customerName"`
+	PatientId      string         `json:"patientId"`
+	PharmacistName string         `json:"pharmacistName"`
+	PrescriberName string         `json:"prescriberName"`
+	BuyerName      string         `json:"buyerName"`
+	BuyerIdCard    string         `json:"buyerIdCard"`
+	Total          float64        `json:"total" binding:"required"`
+	TotalCost      float64        `json:"totalCost"`
+	Discount       float64        `json:"discount"`
+	Change         float64        `json:"change"`
+	Message        string         `json:"message"`
+	CreatedBy      string
+	Code           string
+	BranchId       string
 }
 
 type OrderPayment struct {

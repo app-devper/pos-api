@@ -9,8 +9,9 @@ type GetReceiveRange struct {
 }
 
 type Receive struct {
-	SupplierId string `json:"supplierId" binding:"required"`
-	Reference  string `json:"reference"`
+	SupplierId string        `json:"supplierId" binding:"required"`
+	Reference  string        `json:"reference"`
+	Items      []ReceiveItem `json:"items"`
 	Code       string
 	UpdatedBy  string
 	BranchId   string
@@ -29,9 +30,13 @@ type UpdateReceiveTotalCode struct {
 }
 
 type ReceiveItem struct {
-	ProductId string  `json:"productId" binding:"required"`
-	CostPrice float64 `json:"costPrice" binding:"required"`
-	Quantity  int     `json:"quantity" binding:"required"`
+	ProductId    string  `json:"productId" binding:"required"`
+	CostPrice    float64 `json:"costPrice" binding:"required"`
+	Quantity     int     `json:"quantity" binding:"required"`
+	LotNumber    string  `json:"lotNumber"`
+	ExpireDate   string  `json:"expireDate"`
+	UnitId       string  `json:"unitId"`
+	BaseQuantity int     `json:"baseQuantity"`
 }
 
 type UpdateReceiveItems struct {

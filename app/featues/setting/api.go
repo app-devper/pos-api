@@ -1,11 +1,12 @@
 package setting
 
 import (
-	"github.com/gin-gonic/gin"
 	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/setting/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplySettingAPI(
@@ -25,7 +26,7 @@ func ApplySettingAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpsertSetting(repository.Setting),
 	)
 }

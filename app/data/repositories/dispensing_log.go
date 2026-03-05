@@ -18,12 +18,19 @@ type dispensingLogEntity struct {
 	repo *mongo.Collection
 }
 
+type RefillReminder struct {
+	PatientId       primitive.ObjectID `bson:"_id" json:"patientId"`
+	LastDispensed   time.Time          `bson:"lastDispensed" json:"lastDispensed"`
+	EstimatedRefill time.Time          `bson:"estimatedRefill" json:"estimatedRefill"`
+}
+
 type IDispensingLog interface {
 	CreateDispensingLog(form request.DispensingLog) (*entities.DispensingLog, error)
 	GetDispensingLogs(branchId string) ([]entities.DispensingLog, error)
 	GetDispensingLogById(id string) (*entities.DispensingLog, error)
 	GetDispensingLogsByPatientId(patientId string) ([]entities.DispensingLog, error)
 	GetDispensingLogsByDateRange(branchId string, startDate time.Time, endDate time.Time) ([]entities.DispensingLog, error)
+	GetRefillReminders(branchId string, refillDays int) ([]RefillReminder, error)
 }
 
 func NewDispensingLogEntity(resource *db.Resource) IDispensingLog {
@@ -149,6 +156,58 @@ func (entity *dispensingLogEntity) GetDispensingLogsByPatientId(patientId string
 	}
 	if results == nil {
 		results = []entities.DispensingLog{}
+	}
+	return results, nil
+}
+
+func (entity *dispensingLogEntity) GetRefillReminders(branchId string, refillDays int) ([]RefillReminder, error) {
+	logrus.Info("GetRefillReminders")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if refillDays <= 0 {
+		refillDays = 30
+	}
+
+	matchFilter := bson.M{
+		"patientId": bson.M{"$ne": primitive.NilObjectID},
+	}
+	if branchId != "" {
+		objId, _ := primitive.ObjectIDFromHex(branchId)
+		matchFilter["branchId"] = objId
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchFilter},
+		{"$group": bson.M{
+			"_id":           "$patientId",
+			"lastDispensed": bson.M{"$max": "$createdDate"},
+		}},
+		{"$addFields": bson.M{
+			"estimatedRefill": bson.M{
+				"$dateAdd": bson.M{
+					"startDate": "$lastDispensed",
+					"unit":      "day",
+					"amount":    refillDays,
+				},
+			},
+		}},
+		{"$match": bson.M{
+			"estimatedRefill": bson.M{"$lte": time.Now().AddDate(0, 0, 7)},
+		}},
+		{"$sort": bson.M{"estimatedRefill": 1}},
+	}
+
+	var results []RefillReminder
+	cursor, err := entity.repo.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	if results == nil {
+		results = []RefillReminder{}
 	}
 	return results, nil
 }

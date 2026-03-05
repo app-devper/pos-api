@@ -1,6 +1,7 @@
 package report
 
 import (
+	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/report/usecase"
 	"pos/middlewares"
@@ -32,6 +33,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetSalesReportPDF(repository.Order, repository.Setting),
 	)
 
@@ -39,6 +41,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetSalesReportExcel(repository.Order),
 	)
 
@@ -46,6 +49,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetStockReportExcel(repository.Product),
 	)
 
@@ -60,6 +64,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetKHY9PDF(repository.Receive, repository.Product, repository.Setting),
 	)
 
@@ -67,6 +72,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetKHY10PDF(repository.DispensingLog, repository.Product, repository.Setting),
 	)
 
@@ -74,6 +80,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetKHY11PDF(repository.DispensingLog, repository.Product, repository.Setting),
 	)
 
@@ -81,14 +88,57 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetKHY12PDF(repository.Product, repository.Setting),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY12PDF(repository.DispensingLog, repository.Product, repository.Setting),
 	)
 
 	reportRoute.GET("/pharmacy/khy13",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetKHY13PDF(repository.Product, repository.Setting),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY13PDF(repository.DispensingLog, repository.Product, repository.Setting),
+	)
+
+	// KHY CSV exports
+	reportRoute.GET("/pharmacy/khy9/csv",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY9CSV(repository.Receive, repository.Product),
+	)
+
+	reportRoute.GET("/pharmacy/khy10/csv",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY10CSV(repository.DispensingLog, repository.Product),
+	)
+
+	reportRoute.GET("/pharmacy/khy11/csv",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY11CSV(repository.DispensingLog, repository.Product),
+	)
+
+	reportRoute.GET("/pharmacy/khy12/csv",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY12CSV(repository.DispensingLog, repository.Product),
+	)
+
+	reportRoute.GET("/pharmacy/khy13/csv",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.GetKHY13CSV(repository.DispensingLog, repository.Product),
 	)
 
 	reportRoute.GET("/product-history/:productId/pdf",
@@ -130,6 +180,7 @@ func ApplyReportAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetReceiveSummaryPDF(repository.Receive, repository.Setting),
 	)
 

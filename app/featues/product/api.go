@@ -27,7 +27,7 @@ func ApplyProductAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreateProduct(repository.Product),
 	)
 
@@ -35,7 +35,7 @@ func ApplyProductAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreateProductReceive(repository.Product, repository.Receive),
 	)
 
@@ -49,21 +49,21 @@ func ApplyProductAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateProductById(repository.Product),
 	)
 
 	productRoute.DELETE("/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteProductById(repository.Product),
 	)
 
 	productRoute.DELETE("/:productId/sold-first",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.ClearQuantitySoldFirstById(repository.Product),
 	)
 
@@ -193,8 +193,62 @@ func ApplyProductAPI(
 	)
 
 	// Product Lot
+	productRoute.GET("/lots",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetAllLots(repository.Product),
+	)
+
 	productRoute.GET("/lots/expire-notify",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
 		usecase.GetProductLotsExpireNotify(repository.Product),
+	)
+
+	productRoute.GET("/lots/:lotId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.GetLotById(repository.Product),
+	)
+
+	productRoute.POST("/lots",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.CreateLot(repository.Product),
+	)
+
+	productRoute.PUT("/lots/:lotId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.UpdateLotById(repository.Product),
+	)
+
+	productRoute.DELETE("/lots/:lotId",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.DeleteLotById(repository.Product),
+	)
+
+	// CSV Import
+	productRoute.POST("/import-csv",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.ImportCSV(repository.Product),
+	)
+
+	// Drug Interaction Check
+	productRoute.POST("/drug-interaction-check",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		usecase.CheckDrugInteractions(repository.Product),
 	)
 
 }

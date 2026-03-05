@@ -41,4 +41,39 @@ func ApplyDashboardAPI(
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetStockReport(repository.Product),
 	)
+
+	dashboardRoute.GET("/monthly-chart",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetMonthlyChart(repository.Order),
+	)
+
+	dashboardRoute.GET("/expiring",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetExpiringProducts(repository.Product),
+	)
+
+	dashboardRoute.GET("/refill-reminders",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetRefillReminders(repository.DispensingLog),
+	)
+
+	dashboardRoute.GET("/abc-analysis",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetABCAnalysis(repository.Order),
+	)
+
+	dashboardRoute.GET("/dead-stock",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		usecase.GetDeadStockProducts(repository.Product),
+	)
 }

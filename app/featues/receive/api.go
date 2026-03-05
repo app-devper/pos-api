@@ -1,6 +1,7 @@
 package receive
 
 import (
+	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/receive/usecase"
 	"pos/middlewares"
@@ -18,7 +19,8 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.CreateReceive(repository.Receive, repository.Sequence),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.CreateReceive(repository.Receive, repository.Sequence, repository.Product),
 	)
 
 	receiveRoute.GET("",
@@ -39,6 +41,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateReceiveById(repository.Receive),
 	)
 
@@ -46,6 +49,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteReceiveById(repository.Receive),
 	)
 
@@ -53,6 +57,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateReceiveTotalCostById(repository.Receive),
 	)
 
@@ -60,6 +65,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateReceiveItemsById(repository.Receive),
 	)
 

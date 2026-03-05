@@ -1,7 +1,7 @@
 package constant
 
 const (
-	ADMIN   = "ADMIN"
-	MANAGER = "MANAGER"
-	CASHIER = "CASHIER"
+	SUPER = "SUPER"
+	ADMIN = "ADMIN"
+	USER  = "USER"
 )
