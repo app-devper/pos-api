@@ -16,6 +16,10 @@ func GetReceiveById(receiveEntity repositories.IReceive) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
 			return
 		}
+		items, err := receiveEntity.GetReceiveItemsByReceiveId(id)
+		if err == nil && len(items) > 0 {
+			result.Items = items
+		}
 		ctx.JSON(http.StatusOK, result)
 	}
 }
