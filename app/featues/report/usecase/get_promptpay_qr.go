@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
+	"pos/app/core/pdf"
 	"pos/app/data/repositories"
 	"strconv"
 
@@ -37,25 +38,26 @@ func GetPromptPayQR(settingEntity repositories.ISetting) gin.HandlerFunc {
 		payload := generatePromptPayPayload(promptPayId, amount)
 
 		doc := fpdf.New("P", "mm", "A4", "")
+		pdf.InitFont(doc)
 		doc.AddPage()
-		doc.SetFont("Arial", "B", 14)
+		doc.SetFont(pdf.FontFamily, "B", 14)
 		doc.CellFormat(0, 10, companyName, "", 1, "C", false, 0, "")
 		doc.Ln(3)
-		doc.SetFont("Arial", "B", 12)
+		doc.SetFont(pdf.FontFamily, "B", 12)
 		doc.CellFormat(0, 8, "PromptPay QR Code", "", 1, "C", false, 0, "")
 		doc.Ln(2)
-		doc.SetFont("Arial", "", 10)
+		doc.SetFont(pdf.FontFamily, "", 10)
 		doc.CellFormat(0, 6, fmt.Sprintf("PromptPay ID: %s", promptPayId), "", 1, "C", false, 0, "")
 		if amount > 0 {
 			doc.CellFormat(0, 6, fmt.Sprintf("Amount: %.2f THB", amount), "", 1, "C", false, 0, "")
 		}
 		doc.Ln(5)
 
-		doc.SetFont("Courier", "", 8)
+		doc.SetFont(pdf.FontFamily, "", 8)
 		doc.CellFormat(0, 5, "EMVCo Payload:", "", 1, "C", false, 0, "")
 		doc.CellFormat(0, 5, payload, "", 1, "C", false, 0, "")
 		doc.Ln(5)
-		doc.SetFont("Arial", "I", 9)
+		doc.SetFont(pdf.FontFamily, "I", 9)
 		doc.CellFormat(0, 5, "Use this payload with a QR generator to create scannable QR code", "", 1, "C", false, 0, "")
 
 		ctx.Header("Content-Type", "application/pdf")

@@ -50,7 +50,7 @@ func GetSalesReportPDF(orderEntity repositories.IOrder, settingEntity repositori
 			req.StartDate.Format("02/01/2006"),
 			req.EndDate.Format("02/01/2006"))
 		pdf.AddHeader(doc, companyName, companyAddress, companyPhone, "Sales Report")
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		doc.CellFormat(0, 5, fmt.Sprintf("Period: %s", dateRange), "", 1, "C", false, 0, "")
 		doc.Ln(3)
 

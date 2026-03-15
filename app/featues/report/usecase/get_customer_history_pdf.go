@@ -36,7 +36,7 @@ func GetCustomerHistoryPDF(customerHistoryEntity repositories.ICustomerHistory, 
 		doc := pdf.NewPDF()
 		doc.AddPage()
 		pdf.AddHeader(doc, companyName, "", "", "Customer History Report")
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		doc.CellFormat(0, 5, fmt.Sprintf("Customer: %s (%s)", customer.Name, customer.Code), "", 1, "C", false, 0, "")
 		doc.Ln(3)
 

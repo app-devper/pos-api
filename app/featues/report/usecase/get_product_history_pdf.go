@@ -37,7 +37,7 @@ func GetProductHistoryPDF(productEntity repositories.IProduct, settingEntity rep
 		doc := pdf.NewPDF()
 		doc.AddPage()
 		pdf.AddHeader(doc, companyName, "", "", "Product History Report")
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		doc.CellFormat(0, 5, fmt.Sprintf("Product: %s (%s)", product.Name, product.SerialNumber), "", 1, "C", false, 0, "")
 		doc.Ln(3)
 
@@ -89,7 +89,7 @@ func GetProductHistoryRangePDF(productEntity repositories.IProduct, settingEntit
 		doc := pdf.NewPDF()
 		doc.AddPage()
 		pdf.AddHeader(doc, companyName, "", "", "Product History Report")
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		doc.CellFormat(0, 5, fmt.Sprintf("Period: %s - %s", req.StartDate.Format("02/01/2006"), req.EndDate.Format("02/01/2006")), "", 1, "C", false, 0, "")
 		doc.Ln(3)
 

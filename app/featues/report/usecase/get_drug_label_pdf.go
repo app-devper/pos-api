@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
+	"pos/app/core/pdf"
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,7 @@ func GetDrugLabelPDF(dispensingEntity repositories.IDispensingLog, settingEntity
 		gapY := 2.0
 
 		doc := fpdf.New("P", "mm", "A4", "")
+		pdf.InitFont(doc)
 		doc.SetAutoPageBreak(false, 0)
 		doc.AddPage()
 
@@ -50,19 +52,19 @@ func GetDrugLabelPDF(dispensingEntity repositories.IDispensingLog, settingEntity
 					x := marginX + float64(c)*(labelW+gapX)
 					y := marginY + float64(r)*(labelH+gapY)
 
-					doc.SetFont("Arial", "B", 7)
+					doc.SetFont(pdf.FontFamily, "B", 7)
 					doc.SetXY(x+1, y+1)
 					doc.CellFormat(labelW-2, 4, companyName, "", 1, "C", false, 0, "")
 
-					doc.SetFont("Arial", "", 6)
+					doc.SetFont(pdf.FontFamily, "", 6)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 3, fmt.Sprintf("Pharmacist: %s (Lic: %s)", dispLog.PharmacistName, dispLog.LicenseNo), "", 1, "L", false, 0, "")
 
-					doc.SetFont("Arial", "B", 7)
+					doc.SetFont(pdf.FontFamily, "B", 7)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 4, item.ProductName, "", 1, "L", false, 0, "")
 
-					doc.SetFont("Arial", "", 6)
+					doc.SetFont(pdf.FontFamily, "", 6)
 					if item.GenericName != "" {
 						doc.SetX(x + 1)
 						doc.CellFormat(labelW-2, 3, fmt.Sprintf("(%s)", item.GenericName), "", 1, "L", false, 0, "")
@@ -72,18 +74,18 @@ func GetDrugLabelPDF(dispensingEntity repositories.IDispensingLog, settingEntity
 					doc.CellFormat(labelW-2, 3, fmt.Sprintf("Qty: %d %s", item.Quantity, item.Unit), "", 1, "L", false, 0, "")
 
 					if item.Dosage != "" {
-						doc.SetFont("Arial", "B", 6)
+						doc.SetFont(pdf.FontFamily, "B", 6)
 						doc.SetX(x + 1)
 						doc.CellFormat(labelW-2, 3, item.Dosage, "", 1, "L", false, 0, "")
 					}
 
 					if item.LotNumber != "" {
-						doc.SetFont("Arial", "", 5)
+						doc.SetFont(pdf.FontFamily, "", 5)
 						doc.SetX(x + 1)
 						doc.CellFormat(labelW-2, 3, fmt.Sprintf("Lot: %s", item.LotNumber), "", 1, "L", false, 0, "")
 					}
 
-					doc.SetFont("Arial", "", 5)
+					doc.SetFont(pdf.FontFamily, "", 5)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 3, fmt.Sprintf("Date: %s", dispLog.CreatedDate.Format("02/01/2006")), "", 1, "L", false, 0, "")
 

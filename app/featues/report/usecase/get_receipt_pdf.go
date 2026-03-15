@@ -43,7 +43,7 @@ func GetReceiptPDF(orderEntity repositories.IOrder, settingEntity repositories.I
 		pdf.AddHeader(doc, companyName, companyAddress, companyPhone, "Receipt / Invoice")
 
 		// Order info
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		doc.CellFormat(95, 5, fmt.Sprintf("Order: %s", order.Code), "", 0, "L", false, 0, "")
 		doc.CellFormat(95, 5, fmt.Sprintf("Date: %s", order.CreatedDate.Format("02/01/2006 15:04")), "", 1, "R", false, 0, "")
 		if order.CustomerCode != "" {

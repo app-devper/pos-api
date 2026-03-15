@@ -47,7 +47,7 @@ func GetKHY9PDF(receiveEntity repositories.IReceive, productEntity repositories.
 		doc := pdf.NewPDF()
 		doc.AddPage()
 		pdf.AddHeader(doc, companyName, "", "", "KHY.9 - Drug Purchase Record")
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		doc.CellFormat(0, 5, fmt.Sprintf("Period: %s - %s", req.StartDate.Format("02/01/2006"), req.EndDate.Format("02/01/2006")), "", 1, "C", false, 0, "")
 		doc.Ln(3)
 
@@ -138,7 +138,7 @@ func generateDispensingReport(ctx *gin.Context, dispensingEntity repositories.ID
 	doc := pdf.NewPDF()
 	doc.AddPage()
 	pdf.AddHeader(doc, companyName, "", "", title)
-	doc.SetFont("Arial", "", 9)
+	doc.SetFont(pdf.FontFamily, "", 9)
 	doc.CellFormat(0, 5, fmt.Sprintf("Period: %s - %s", req.StartDate.Format("02/01/2006"), req.EndDate.Format("02/01/2006")), "", 1, "C", false, 0, "")
 	doc.Ln(3)
 

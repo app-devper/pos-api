@@ -42,7 +42,7 @@ func GetTaxInvoicePDF(orderEntity repositories.IOrder, settingEntity repositorie
 
 		pdf.AddHeader(doc, companyName, companyAddress, companyPhone, "Tax Invoice / Receipt")
 
-		doc.SetFont("Arial", "", 9)
+		doc.SetFont(pdf.FontFamily, "", 9)
 		if companyTaxId != "" {
 			doc.CellFormat(0, 5, fmt.Sprintf("Tax ID: %s", companyTaxId), "", 1, "C", false, 0, "")
 		}

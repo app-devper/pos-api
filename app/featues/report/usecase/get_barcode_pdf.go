@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
+	"pos/app/core/pdf"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 
@@ -60,6 +61,7 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 		gapY := 2.7
 
 		doc := fpdf.New("P", "mm", "A4", "")
+		pdf.InitFont(doc)
 		doc.SetAutoPageBreak(false, 0)
 
 		idx := 0
@@ -73,7 +75,7 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 
 					doc.Rect(x, y, labelW, labelH, "D")
 
-					doc.SetFont("Arial", "B", 7)
+					doc.SetFont(pdf.FontFamily, "B", 7)
 					doc.SetXY(x+1, y+1)
 					nameStr := label.Name
 					if len(nameStr) > 25 {
@@ -81,18 +83,18 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 					}
 					doc.CellFormat(labelW-2, 4, nameStr, "", 1, "C", false, 0, "")
 
-					doc.SetFont("Arial", "", 6)
+					doc.SetFont(pdf.FontFamily, "", 6)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 3, fmt.Sprintf("Unit: %s", label.Unit), "", 1, "C", false, 0, "")
 
-					doc.SetFont("Courier", "B", 10)
+					doc.SetFont(pdf.FontFamily, "B", 10)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 6, label.SerialNumber, "", 1, "C", false, 0, "")
 
 					barcodeY := doc.GetY()
 					drawCode128(doc, x+3, barcodeY, labelW-6, 5, label.SerialNumber)
 
-					doc.SetFont("Arial", "B", 9)
+					doc.SetFont(pdf.FontFamily, "B", 9)
 					doc.SetXY(x+1, y+labelH-5)
 					doc.CellFormat(labelW-2, 4, fmt.Sprintf("%.2f", label.Price), "", 1, "R", false, 0, "")
 
@@ -132,6 +134,7 @@ func GetPriceTagPDF(productEntity repositories.IProduct) gin.HandlerFunc {
 		gapY := 1.0
 
 		doc := fpdf.New("P", "mm", "A4", "")
+		pdf.InitFont(doc)
 		doc.SetAutoPageBreak(false, 0)
 
 		idx := 0
@@ -145,7 +148,7 @@ func GetPriceTagPDF(productEntity repositories.IProduct) gin.HandlerFunc {
 
 					doc.Rect(x, y, labelW, labelH, "D")
 
-					doc.SetFont("Arial", "B", 7)
+					doc.SetFont(pdf.FontFamily, "B", 7)
 					doc.SetXY(x+1, y+1)
 					nameStr := p.Name
 					if len(nameStr) > 30 {
@@ -153,18 +156,18 @@ func GetPriceTagPDF(productEntity repositories.IProduct) gin.HandlerFunc {
 					}
 					doc.CellFormat(labelW-2, 4, nameStr, "", 1, "C", false, 0, "")
 
-					doc.SetFont("Arial", "", 6)
+					doc.SetFont(pdf.FontFamily, "", 6)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 3, fmt.Sprintf("SN: %s | %s", p.SerialNumber, p.Unit), "", 1, "C", false, 0, "")
 
-					doc.SetFont("Courier", "B", 8)
+					doc.SetFont(pdf.FontFamily, "B", 8)
 					doc.SetX(x + 1)
 					doc.CellFormat(labelW-2, 5, p.SerialNumber, "", 1, "C", false, 0, "")
 
 					barcodeY := doc.GetY()
 					drawCode128(doc, x+3, barcodeY, labelW-6, 5, p.SerialNumber)
 
-					doc.SetFont("Arial", "B", 12)
+					doc.SetFont(pdf.FontFamily, "B", 12)
 					doc.SetXY(x+1, y+labelH-7)
 					doc.CellFormat(labelW-2, 6, fmt.Sprintf("%.2f", p.Price), "", 1, "C", false, 0, "")
 

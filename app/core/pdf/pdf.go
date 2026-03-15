@@ -1,18 +1,45 @@
 package pdf
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+
 	"github.com/go-pdf/fpdf"
 )
 
 const (
-	FontFamily = "Arial"
+	FontFamily = "Sarabun"
 	FontSize   = 10
 	HeaderSize = 14
 	TitleSize  = 12
 )
 
+func fontsDir() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(file), "fonts")
+}
+
+func InitFont(pdf *fpdf.Fpdf) {
+	dir := fontsDir()
+	regularPath := filepath.Join(dir, "Sarabun-Regular.ttf")
+	boldPath := filepath.Join(dir, "Sarabun-Bold.ttf")
+	italicPath := filepath.Join(dir, "Sarabun-Italic.ttf")
+
+	if _, err := os.Stat(regularPath); err == nil {
+		pdf.AddUTF8Font(FontFamily, "", regularPath)
+	}
+	if _, err := os.Stat(boldPath); err == nil {
+		pdf.AddUTF8Font(FontFamily, "B", boldPath)
+	}
+	if _, err := os.Stat(italicPath); err == nil {
+		pdf.AddUTF8Font(FontFamily, "I", italicPath)
+	}
+}
+
 func NewPDF() *fpdf.Fpdf {
 	pdf := fpdf.New("P", "mm", "A4", "")
+	InitFont(pdf)
 	pdf.SetAutoPageBreak(true, 15)
 	pdf.SetFont(FontFamily, "", FontSize)
 	return pdf
