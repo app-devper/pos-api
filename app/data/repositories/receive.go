@@ -32,6 +32,8 @@ type IReceive interface {
 	GetReceiveItemsByReceiveId(receiveId string) ([]entities.ReceiveItem, error)
 	GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
+	DeleteReceiveItemsByReceiveId(receiveId string) error
+	UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error)
 }
 
 func NewReceiveEntity(resource *db.Resource) IReceive {
@@ -361,6 +363,42 @@ func (entity *receiveEntity) RemoveReceiveItemByLotId(lotId string) (*entities.R
 		return nil, err
 	}
 	err = entity.receiveItemsRepo.FindOneAndDelete(ctx, bson.M{"lotId": lot}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *receiveEntity) DeleteReceiveItemsByReceiveId(receiveId string) error {
+	logrus.Info("DeleteReceiveItemsByReceiveId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	recvId, err := primitive.ObjectIDFromHex(receiveId)
+	if err != nil {
+		return err
+	}
+	_, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": recvId})
+	return err
+}
+
+func (entity *receiveEntity) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
+	logrus.Info("UpdateReceiveStatusById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	obId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	data := entities.Receive{}
+	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+		"status":      status,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

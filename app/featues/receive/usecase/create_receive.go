@@ -75,29 +75,6 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 
 			_, _ = receiveEntity.CreateReceiveItem(receiveId, "", item.ProductId, productReq)
 
-			unit, _ := productEntity.GetProductUnitByUnit(item.ProductId, product.Unit)
-			if unit != nil && item.Quantity > 0 {
-				stock := request.ProductStock{
-					ProductId:   item.ProductId,
-					UnitId:      unit.Id.Hex(),
-					ReceiveCode: req.Code,
-					Quantity:    item.Quantity,
-					CostPrice:   item.CostPrice,
-					ExpireDate:  productReq.ExpireDate,
-					LotNumber:   item.LotNumber,
-					ImportDate:  time.Now(),
-					UpdatedBy:   userId,
-					BranchId:    branchId,
-				}
-				created, _ := productEntity.CreateProductStock(stock)
-				if created != nil {
-					balance := productEntity.GetProductStockBalance(created.ProductId.Hex(), created.UnitId.Hex())
-					hist := request.AddProductStockHistory(created.ProductId.Hex(), product.Unit, stock, balance)
-					hist.BranchId = branchId
-					_, _ = productEntity.CreateProductHistory(hist)
-				}
-			}
-
 			totalCost += item.CostPrice * float64(item.Quantity)
 		}
 

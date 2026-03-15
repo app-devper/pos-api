@@ -42,7 +42,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.UpdateReceiveById(repository.Receive),
+		usecase.UpdateReceiveById(repository.Receive, repository.Product),
 	)
 
 	receiveRoute.DELETE("/:receiveId",
@@ -67,6 +67,14 @@ func ApplyReceiveAPI(
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateReceiveItemsById(repository.Receive),
+	)
+
+	receiveRoute.PATCH("/:receiveId/import",
+		middlewares.RequireAuthenticated(),
+		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		usecase.ImportReceiveToStock(repository.Receive, repository.Product),
 	)
 
 }
