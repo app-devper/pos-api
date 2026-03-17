@@ -1,10 +1,8 @@
 package usecase
 
 import (
-	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
-	"pos/app/core/pdf"
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
@@ -18,134 +16,80 @@ type pharmacyReportRange struct {
 	EndDate   time.Time `form:"endDate" binding:"required"`
 }
 
-func GetKHY9PDF(receiveEntity repositories.IReceive, productEntity repositories.IProduct, settingEntity repositories.ISetting) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		req := pharmacyReportRange{}
-		if err := ctx.ShouldBindQuery(&req); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_001, err.Error())
-			return
+type pharmacyReportItem struct {
+	Date           time.Time `json:"date"`
+	Code           string    `json:"code,omitempty"`
+	ProductName    string    `json:"productName"`
+	GenericName    string    `json:"genericName,omitempty"`
+	LotNumber      string    `json:"lotNumber,omitempty"`
+	Quantity       int       `json:"quantity"`
+	CostPrice      float64   `json:"costPrice,omitempty"`
+	PharmacistName string    `json:"pharmacistName,omitempty"`
+	LicenseNo      string    `json:"licenseNo,omitempty"`
+	DrugType       string    `json:"drugType,omitempty"`
+}
+
+type pharmacyReportResponse struct {
+	Key       string               `json:"key"`
+	Title     string               `json:"title"`
+	StartDate time.Time            `json:"startDate"`
+	EndDate   time.Time            `json:"endDate"`
+	Items     []pharmacyReportItem `json:"items"`
+}
+
+func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositories.IProduct, branchId string, req pharmacyReportRange) ([]pharmacyReportItem, error) {
+	receiveRange := request.GetReceiveRange{
+		StartDate: req.StartDate,
+		EndDate:   req.EndDate,
+		BranchId:  branchId,
+	}
+	receives, err := receiveEntity.GetReceives(receiveRange)
+	if err != nil {
+		return nil, err
+	}
+
+	productIdSet := make(map[string]struct{})
+	for _, recv := range receives {
+		for _, item := range recv.Items {
+			productIdSet[item.ProductId.Hex()] = struct{}{}
 		}
-		branchId := ctx.GetString("BranchId")
+	}
+	productIds := make([]string, 0, len(productIdSet))
+	for id := range productIdSet {
+		productIds = append(productIds, id)
+	}
+	productList, _ := productEntity.GetProductsByIds(productIds)
+	productMap := make(map[string]*entities.Product, len(productList))
+	for i := range productList {
+		productMap[productList[i].Id.Hex()] = &productList[i]
+	}
 
-		receiveRange := request.GetReceiveRange{
-			StartDate: req.StartDate,
-			EndDate:   req.EndDate,
-			BranchId:  branchId,
-		}
-		receives, err := receiveEntity.GetReceives(receiveRange)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
-			return
-		}
-
-		setting, _ := settingEntity.GetSettingByBranchId(branchId)
-		companyName := "Pharmacy"
-		if setting != nil && setting.CompanyName != "" {
-			companyName = setting.CompanyName
-		}
-
-		doc := pdf.NewPDF()
-		doc.AddPage()
-		pdf.AddHeader(doc, companyName, "", "", "KHY.9 - Drug Purchase Record")
-		doc.SetFont(pdf.FontFamily, "", 9)
-		doc.CellFormat(0, 5, fmt.Sprintf("Period: %s - %s", req.StartDate.Format("02/01/2006"), req.EndDate.Format("02/01/2006")), "", 1, "C", false, 0, "")
-		doc.Ln(3)
-
-		headers := []string{"#", "Date", "Code", "Product", "Lot", "Qty", "Cost"}
-		widths := []float64{10, 25, 25, 50, 25, 20, 35}
-		aligns := []string{"C", "L", "L", "L", "L", "R", "R"}
-		pdf.AddTableHeader(doc, headers, widths)
-
-		productIdSet := make(map[string]struct{})
-		for _, recv := range receives {
-			for _, item := range recv.Items {
-				productIdSet[item.ProductId.Hex()] = struct{}{}
+	items := make([]pharmacyReportItem, 0)
+	for _, recv := range receives {
+		for _, item := range recv.Items {
+			product, ok := productMap[item.ProductId.Hex()]
+			if !ok || product.DrugInfo == nil {
+				continue
 			}
+			items = append(items, pharmacyReportItem{
+				Date:        recv.CreatedDate,
+				Code:        recv.Code,
+				ProductName: product.Name,
+				LotNumber:   item.LotNumber,
+				Quantity:    item.Quantity,
+				CostPrice:   item.CostPrice,
+				DrugType:    product.DrugInfo.DrugType,
+			})
 		}
-		productIds := make([]string, 0, len(productIdSet))
-		for id := range productIdSet {
-			productIds = append(productIds, id)
-		}
-		productList, _ := productEntity.GetProductsByIds(productIds)
-		productMap := make(map[string]*entities.Product, len(productList))
-		for i := range productList {
-			productMap[productList[i].Id.Hex()] = &productList[i]
-		}
-
-		row := 1
-		for _, recv := range receives {
-			for _, item := range recv.Items {
-				product, ok := productMap[item.ProductId.Hex()]
-				if !ok || product.DrugInfo == nil {
-					continue
-				}
-				pdf.AddTableRow(doc, []string{
-					fmt.Sprintf("%d", row),
-					recv.CreatedDate.Format("02/01/2006"),
-					recv.Code,
-					product.Name,
-					item.LotNumber,
-					fmt.Sprintf("%d", item.Quantity),
-					fmt.Sprintf("%.2f", item.CostPrice),
-				}, widths, aligns)
-				row++
-			}
-		}
-
-		ctx.Header("Content-Type", "application/pdf")
-		ctx.Header("Content-Disposition", "inline; filename=khy9-report.pdf")
-		doc.Output(ctx.Writer)
 	}
+	return items, nil
 }
 
-func GetKHY10PDF(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, settingEntity repositories.ISetting) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		req := pharmacyReportRange{}
-		if err := ctx.ShouldBindQuery(&req); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_001, err.Error())
-			return
-		}
-		branchId := ctx.GetString("BranchId")
-		generateDispensingReport(ctx, dispensingEntity, productEntity, settingEntity, branchId, req, "KHY.10 - Specially Controlled Drug Sales Record", "CONTROLLED")
-	}
-}
-
-func GetKHY11PDF(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, settingEntity repositories.ISetting) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		req := pharmacyReportRange{}
-		if err := ctx.ShouldBindQuery(&req); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_001, err.Error())
-			return
-		}
-		branchId := ctx.GetString("BranchId")
-		generateDispensingReport(ctx, dispensingEntity, productEntity, settingEntity, branchId, req, "KHY.11 - Dangerous Drug Sales Record", "DANGEROUS")
-	}
-}
-
-func generateDispensingReport(ctx *gin.Context, dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, settingEntity repositories.ISetting, branchId string, req pharmacyReportRange, title string, drugType string) {
+func getDispensingReportItems(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, branchId string, req pharmacyReportRange, drugType string) ([]pharmacyReportItem, error) {
 	logs, err := dispensingEntity.GetDispensingLogsByDateRange(branchId, req.StartDate, req.EndDate)
 	if err != nil {
-		errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
-		return
+		return nil, err
 	}
-
-	setting, _ := settingEntity.GetSettingByBranchId(branchId)
-	companyName := "Pharmacy"
-	if setting != nil && setting.CompanyName != "" {
-		companyName = setting.CompanyName
-	}
-
-	doc := pdf.NewPDF()
-	doc.AddPage()
-	pdf.AddHeader(doc, companyName, "", "", title)
-	doc.SetFont(pdf.FontFamily, "", 9)
-	doc.CellFormat(0, 5, fmt.Sprintf("Period: %s - %s", req.StartDate.Format("02/01/2006"), req.EndDate.Format("02/01/2006")), "", 1, "C", false, 0, "")
-	doc.Ln(3)
-
-	headers := []string{"#", "Date", "Drug Name", "Generic Name", "Qty", "Pharmacist", "License"}
-	widths := []float64{10, 25, 40, 40, 15, 30, 30}
-	aligns := []string{"C", "L", "L", "L", "R", "L", "L"}
-	pdf.AddTableHeader(doc, headers, widths)
 
 	logProductIdSet := make(map[string]struct{})
 	for _, log := range logs {
@@ -163,32 +107,28 @@ func generateDispensingReport(ctx *gin.Context, dispensingEntity repositories.ID
 		logProductMap[logProductList[i].Id.Hex()] = &logProductList[i]
 	}
 
-	row := 1
+	items := make([]pharmacyReportItem, 0)
 	for _, log := range logs {
 		for _, item := range log.Items {
 			product, ok := logProductMap[item.ProductId.Hex()]
 			if !ok || product.DrugInfo == nil || product.DrugInfo.DrugType != drugType {
 				continue
 			}
-			pdf.AddTableRow(doc, []string{
-				fmt.Sprintf("%d", row),
-				log.CreatedDate.Format("02/01/2006"),
-				item.ProductName,
-				item.GenericName,
-				fmt.Sprintf("%d", item.Quantity),
-				log.PharmacistName,
-				log.LicenseNo,
-			}, widths, aligns)
-			row++
+			items = append(items, pharmacyReportItem{
+				Date:           log.CreatedDate,
+				ProductName:    item.ProductName,
+				GenericName:    item.GenericName,
+				Quantity:       item.Quantity,
+				PharmacistName: log.PharmacistName,
+				LicenseNo:      log.LicenseNo,
+				DrugType:       product.DrugInfo.DrugType,
+			})
 		}
 	}
-
-	ctx.Header("Content-Type", "application/pdf")
-	ctx.Header("Content-Disposition", fmt.Sprintf("inline; filename=%s-report.pdf", drugType))
-	doc.Output(ctx.Writer)
+	return items, nil
 }
 
-func GetKHY12PDF(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, settingEntity repositories.ISetting) gin.HandlerFunc {
+func GetKHY9Data(receiveEntity repositories.IReceive, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -196,11 +136,16 @@ func GetKHY12PDF(dispensingEntity repositories.IDispensingLog, productEntity rep
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		generateDispensingReport(ctx, dispensingEntity, productEntity, settingEntity, branchId, req, "KHY.12 - Prescription Drug Sales Record", "PSYCHO")
+		items, err := getKHY9Items(receiveEntity, productEntity, branchId, req)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: "khy9", Title: "KHY.9 - Drug Purchase Record", StartDate: req.StartDate, EndDate: req.EndDate, Items: items})
 	}
 }
 
-func GetKHY13PDF(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, settingEntity repositories.ISetting) gin.HandlerFunc {
+func getDispensingReportDataHandler(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, key string, title string, drugType string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -208,6 +153,27 @@ func GetKHY13PDF(dispensingEntity repositories.IDispensingLog, productEntity rep
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		generateDispensingReport(ctx, dispensingEntity, productEntity, settingEntity, branchId, req, "KHY.13 - FDA-Mandated Drug Sales Report", "NARCOTIC")
+		items, err := getDispensingReportItems(dispensingEntity, productEntity, branchId, req, drugType)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: key, Title: title, StartDate: req.StartDate, EndDate: req.EndDate, Items: items})
 	}
+}
+
+func GetKHY10Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy10", "KHY.10 - Specially Controlled Drug Sales Record", "CONTROLLED")
+}
+
+func GetKHY11Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy11", "KHY.11 - Dangerous Drug Sales Record", "DANGEROUS")
+}
+
+func GetKHY12Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy12", "KHY.12 - Prescription Drug Sales Record", "PSYCHO")
+}
+
+func GetKHY13Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy13", "KHY.13 - FDA-Mandated Drug Sales Report", "NARCOTIC")
 }

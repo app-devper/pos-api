@@ -6,7 +6,6 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/core/pdf"
 	"pos/app/data/repositories"
-	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-pdf/fpdf"
@@ -105,79 +104,6 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 
 		ctx.Header("Content-Type", "application/pdf")
 		ctx.Header("Content-Disposition", "inline; filename=barcode-labels.pdf")
-		if err := doc.Output(ctx.Writer); err != nil {
-			errcode.Abort(ctx, http.StatusInternalServerError, errcode.RP_INTERNAL_001, err.Error())
-		}
-	}
-}
-
-func GetPriceTagPDF(productEntity repositories.IProduct) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		req := request.GetProduct{}
-		if err := ctx.ShouldBindQuery(&req); err != nil {
-			req = request.GetProduct{}
-		}
-
-		products, err := productEntity.GetProductAll(req)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
-			return
-		}
-
-		labelW := 60.0
-		labelH := 30.0
-		cols := 3
-		rows := 9
-		marginX := 7.0
-		marginY := 7.0
-		gapX := 3.0
-		gapY := 1.0
-
-		doc := fpdf.New("P", "mm", "A4", "")
-		pdf.InitFont(doc)
-		doc.SetAutoPageBreak(false, 0)
-
-		idx := 0
-		for idx < len(products) {
-			doc.AddPage()
-			for r := 0; r < rows && idx < len(products); r++ {
-				for c := 0; c < cols && idx < len(products); c++ {
-					p := products[idx]
-					x := marginX + float64(c)*(labelW+gapX)
-					y := marginY + float64(r)*(labelH+gapY)
-
-					doc.Rect(x, y, labelW, labelH, "D")
-
-					doc.SetFont(pdf.FontFamily, "B", 7)
-					doc.SetXY(x+1, y+1)
-					nameStr := p.Name
-					if len(nameStr) > 30 {
-						nameStr = nameStr[:30] + ".."
-					}
-					doc.CellFormat(labelW-2, 4, nameStr, "", 1, "C", false, 0, "")
-
-					doc.SetFont(pdf.FontFamily, "", 6)
-					doc.SetX(x + 1)
-					doc.CellFormat(labelW-2, 3, fmt.Sprintf("SN: %s | %s", p.SerialNumber, p.Unit), "", 1, "C", false, 0, "")
-
-					doc.SetFont(pdf.FontFamily, "B", 8)
-					doc.SetX(x + 1)
-					doc.CellFormat(labelW-2, 5, p.SerialNumber, "", 1, "C", false, 0, "")
-
-					barcodeY := doc.GetY()
-					drawCode128(doc, x+3, barcodeY, labelW-6, 5, p.SerialNumber)
-
-					doc.SetFont(pdf.FontFamily, "B", 12)
-					doc.SetXY(x+1, y+labelH-7)
-					doc.CellFormat(labelW-2, 6, fmt.Sprintf("%.2f", p.Price), "", 1, "C", false, 0, "")
-
-					idx++
-				}
-			}
-		}
-
-		ctx.Header("Content-Type", "application/pdf")
-		ctx.Header("Content-Disposition", "inline; filename=price-tags.pdf")
 		if err := doc.Output(ctx.Writer); err != nil {
 			errcode.Abort(ctx, http.StatusInternalServerError, errcode.RP_INTERNAL_001, err.Error())
 		}

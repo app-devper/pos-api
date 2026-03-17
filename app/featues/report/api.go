@@ -15,28 +15,6 @@ func ApplyReportAPI(
 ) {
 	reportRoute := route.Group("reports")
 
-	reportRoute.GET("/receipt/:orderId/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetReceiptPDF(repository.Order, repository.Setting),
-	)
-
-	reportRoute.GET("/tax-invoice/:orderId/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetTaxInvoicePDF(repository.Order, repository.Setting),
-	)
-
-	reportRoute.GET("/sales/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetSalesReportPDF(repository.Order, repository.Setting),
-	)
-
 	reportRoute.GET("/sales/excel",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
@@ -60,44 +38,44 @@ func ApplyReportAPI(
 		usecase.GetDrugLabelPDF(repository.DispensingLog, repository.Setting),
 	)
 
-	reportRoute.GET("/pharmacy/khy9",
+	reportRoute.GET("/pharmacy/khy9/data",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY9PDF(repository.Receive, repository.Product, repository.Setting),
+		usecase.GetKHY9Data(repository.Receive, repository.Product),
 	)
 
-	reportRoute.GET("/pharmacy/khy10",
+	reportRoute.GET("/pharmacy/khy10/data",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY10PDF(repository.DispensingLog, repository.Product, repository.Setting),
+		usecase.GetKHY10Data(repository.DispensingLog, repository.Product),
 	)
 
-	reportRoute.GET("/pharmacy/khy11",
+	reportRoute.GET("/pharmacy/khy11/data",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY11PDF(repository.DispensingLog, repository.Product, repository.Setting),
+		usecase.GetKHY11Data(repository.DispensingLog, repository.Product),
 	)
 
-	reportRoute.GET("/pharmacy/khy12",
+	reportRoute.GET("/pharmacy/khy12/data",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY12PDF(repository.DispensingLog, repository.Product, repository.Setting),
+		usecase.GetKHY12Data(repository.DispensingLog, repository.Product),
 	)
 
-	reportRoute.GET("/pharmacy/khy13",
+	reportRoute.GET("/pharmacy/khy13/data",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY13PDF(repository.DispensingLog, repository.Product, repository.Setting),
+		usecase.GetKHY13Data(repository.DispensingLog, repository.Product),
 	)
 
 	// KHY CSV exports
@@ -141,54 +119,11 @@ func ApplyReportAPI(
 		usecase.GetKHY13CSV(repository.DispensingLog, repository.Product),
 	)
 
-	reportRoute.GET("/product-history/:productId/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetProductHistoryPDF(repository.Product, repository.Setting),
-	)
-
-	reportRoute.GET("/product-history/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetProductHistoryRangePDF(repository.Product, repository.Setting),
-	)
-
-	reportRoute.GET("/customer-history/:customerCode/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetCustomerHistoryPDF(repository.CustomerHistory, repository.Customer, repository.Setting),
-	)
-
 	reportRoute.POST("/barcodes/pdf",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetBarcodePDF(repository.Product),
-	)
-
-	reportRoute.GET("/price-tags/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetPriceTagPDF(repository.Product),
-	)
-
-	reportRoute.GET("/receives/summary/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetReceiveSummaryPDF(repository.Receive, repository.Setting),
-	)
-
-	reportRoute.GET("/prices/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetPriceReportPDF(repository.Product, repository.Setting),
 	)
 
 	reportRoute.GET("/promptpay/pdf",
