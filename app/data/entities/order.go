@@ -15,6 +15,7 @@ type Order struct {
 	CustomerName   string             `bson:"customerName" json:"customerName"`
 	PatientId      string             `bson:"patientId,omitempty" json:"patientId,omitempty"`
 	PharmacistName string             `bson:"pharmacistName,omitempty" json:"pharmacistName,omitempty"`
+	LicenseNo      string             `bson:"licenseNo,omitempty" json:"licenseNo,omitempty"`
 	PrescriberName string             `bson:"prescriberName,omitempty" json:"prescriberName,omitempty"`
 	BuyerName      string             `bson:"buyerName,omitempty" json:"buyerName,omitempty"`
 	BuyerIdCard    string             `bson:"buyerIdCard,omitempty" json:"buyerIdCard,omitempty"`
@@ -37,6 +38,7 @@ type OrderDetail struct {
 	CustomerName   string                   `bson:"customerName" json:"customerName"`
 	PatientId      string                   `bson:"patientId,omitempty" json:"patientId,omitempty"`
 	PharmacistName string                   `bson:"pharmacistName,omitempty" json:"pharmacistName,omitempty"`
+	LicenseNo      string                   `bson:"licenseNo,omitempty" json:"licenseNo,omitempty"`
 	PrescriberName string                   `bson:"prescriberName,omitempty" json:"prescriberName,omitempty"`
 	BuyerName      string                   `bson:"buyerName,omitempty" json:"buyerName,omitempty"`
 	BuyerIdCard    string                   `bson:"buyerIdCard,omitempty" json:"buyerIdCard,omitempty"`

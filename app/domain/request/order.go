@@ -11,6 +11,7 @@ type Order struct {
 	CustomerName   string         `json:"customerName"`
 	PatientId      string         `json:"patientId"`
 	PharmacistName string         `json:"pharmacistName"`
+	LicenseNo      string         `json:"licenseNo"`
 	PrescriberName string         `json:"prescriberName"`
 	BuyerName      string         `json:"buyerName"`
 	BuyerIdCard    string         `json:"buyerIdCard"`

@@ -140,20 +140,26 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, err
 	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
 	var orderId = primitive.NewObjectID()
 	data := entities.Order{
-		Id:           orderId,
-		BranchId:     branchId,
-		Code:         form.Code,
-		CustomerCode: form.CustomerCode,
-		CustomerName: form.CustomerName,
-		Status:       constant.ACTIVE,
-		Total:        form.Total,
-		TotalCost:    form.TotalCost,
-		Discount:     form.Discount,
-		Type:         form.Type,
-		CreatedBy:    form.CreatedBy,
-		CreatedDate:  time.Now(),
-		UpdatedBy:    form.CreatedBy,
-		UpdatedDate:  time.Now(),
+		Id:             orderId,
+		BranchId:       branchId,
+		Code:           form.Code,
+		CustomerCode:   form.CustomerCode,
+		CustomerName:   form.CustomerName,
+		PatientId:      form.PatientId,
+		PharmacistName: form.PharmacistName,
+		LicenseNo:      form.LicenseNo,
+		PrescriberName: form.PrescriberName,
+		BuyerName:      form.BuyerName,
+		BuyerIdCard:    form.BuyerIdCard,
+		Status:         constant.ACTIVE,
+		Total:          form.Total,
+		TotalCost:      form.TotalCost,
+		Discount:       form.Discount,
+		Type:           form.Type,
+		CreatedBy:      form.CreatedBy,
+		CreatedDate:    time.Now(),
+		UpdatedBy:      form.CreatedBy,
+		UpdatedDate:    time.Now(),
 	}
 	_, err := entity.orderRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -247,8 +253,8 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities
 	defer cancel()
 
 	filter := bson.M{"createdDate": bson.M{
-		"$gt": form.StartDate,
-		"$lt": form.EndDate,
+		"$gte": form.StartDate,
+		"$lt":  form.EndDate,
 	}}
 	if form.BranchId != "" {
 		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
@@ -515,8 +521,8 @@ func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]enti
 	defer cancel()
 	matchFilter := bson.M{
 		"createdDate": bson.M{
-			"$gt": form.StartDate,
-			"$lt": form.EndDate,
+			"$gte": form.StartDate,
+			"$lt":  form.EndDate,
 		},
 	}
 	if form.BranchId != "" {

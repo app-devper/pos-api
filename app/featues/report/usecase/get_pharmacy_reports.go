@@ -5,6 +5,7 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"time"
 
@@ -14,6 +15,15 @@ import (
 type pharmacyReportRange struct {
 	StartDate time.Time `form:"startDate" binding:"required"`
 	EndDate   time.Time `form:"endDate" binding:"required"`
+}
+
+func containsReg(regs []string, key string) bool {
+	for _, r := range regs {
+		if r == key {
+			return true
+		}
+	}
+	return false
 }
 
 type pharmacyReportItem struct {
@@ -86,7 +96,7 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 		supName := supplierMap[recv.SupplierId.Hex()]
 		for _, item := range recv.Items {
 			product, ok := productMap[item.ProductId.Hex()]
-			if !ok || product.DrugInfo == nil {
+			if !ok || !containsReg(product.DrugRegistrations, "KHY9") {
 				continue
 			}
 			var expDate *time.Time
@@ -97,65 +107,61 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 				Date:         recv.CreatedDate,
 				Code:         recv.Code,
 				ProductName:  product.Name,
-				GenericName:  product.DrugInfo.GenericName,
+				GenericName:  getDrugField(*product, func(d *entities.DrugInfo) string { return d.GenericName }),
 				LotNumber:    item.LotNumber,
 				Quantity:     item.Quantity,
 				Unit:         product.Unit,
 				CostPrice:    item.CostPrice,
 				SupplierName: supName,
 				ExpireDate:   expDate,
-				Strength:     product.DrugInfo.Strength,
-				DosageForm:   product.DrugInfo.DosageForm,
-				DrugType:     product.DrugInfo.DrugType,
+				Strength:     getDrugField(*product, func(d *entities.DrugInfo) string { return d.Strength }),
+				DosageForm:   getDrugField(*product, func(d *entities.DrugInfo) string { return d.DosageForm }),
+				DrugType:     getDrugField(*product, func(d *entities.DrugInfo) string { return d.DrugType }),
 			})
 		}
 	}
 	return items, nil
 }
 
-func getDispensingReportItems(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, branchId string, req pharmacyReportRange, drugType string) ([]pharmacyReportItem, error) {
-	logs, err := dispensingEntity.GetDispensingLogsByDateRange(branchId, req.StartDate, req.EndDate)
+func getSalesReportItems(orderEntity repositories.IOrder, branchId string, req pharmacyReportRange, khyKey string) ([]pharmacyReportItem, error) {
+	orderRange := request.GetOrderRange{
+		StartDate: req.StartDate,
+		EndDate:   req.EndDate,
+		BranchId:  branchId,
+	}
+	orderMap, err := buildOrderMap(orderEntity, orderRange)
 	if err != nil {
 		return nil, err
 	}
 
-	logProductIdSet := make(map[string]struct{})
-	for _, log := range logs {
-		for _, item := range log.Items {
-			logProductIdSet[item.ProductId.Hex()] = struct{}{}
-		}
-	}
-	logProductIds := make([]string, 0, len(logProductIdSet))
-	for id := range logProductIdSet {
-		logProductIds = append(logProductIds, id)
-	}
-	logProductList, _ := productEntity.GetProductsByIds(logProductIds)
-	logProductMap := make(map[string]*entities.Product, len(logProductList))
-	for i := range logProductList {
-		logProductMap[logProductList[i].Id.Hex()] = &logProductList[i]
+	orderItems, err := orderEntity.GetOrderItemRange(orderRange)
+	if err != nil {
+		return nil, err
 	}
 
 	items := make([]pharmacyReportItem, 0)
-	for _, log := range logs {
-		for _, item := range log.Items {
-			product, ok := logProductMap[item.ProductId.Hex()]
-			if !ok || product.DrugInfo == nil || product.DrugInfo.DrugType != drugType {
-				continue
-			}
-			items = append(items, pharmacyReportItem{
-				Date:           log.CreatedDate,
-				ProductName:    item.ProductName,
-				GenericName:    item.GenericName,
-				Quantity:       item.Quantity,
-				Unit:           item.Unit,
-				Dosage:         item.Dosage,
-				Strength:       product.DrugInfo.Strength,
-				DosageForm:     product.DrugInfo.DosageForm,
-				PharmacistName: log.PharmacistName,
-				LicenseNo:      log.LicenseNo,
-				DrugType:       product.DrugInfo.DrugType,
-			})
+	for _, oi := range orderItems {
+		product := oi.Product
+		if !containsReg(product.DrugRegistrations, khyKey) {
+			continue
 		}
+		order := orderMap[oi.OrderId.Hex()]
+		if order == nil || order.Status != constant.ACTIVE {
+			continue
+		}
+		items = append(items, pharmacyReportItem{
+			Date:           oi.CreatedDate,
+			ProductName:    product.Name,
+			GenericName:    getDrugField(product, func(d *entities.DrugInfo) string { return d.GenericName }),
+			Quantity:       oi.Quantity,
+			Unit:           product.Unit,
+			Dosage:         getDrugField(product, func(d *entities.DrugInfo) string { return d.Dosage }),
+			Strength:       getDrugField(product, func(d *entities.DrugInfo) string { return d.Strength }),
+			DosageForm:     getDrugField(product, func(d *entities.DrugInfo) string { return d.DosageForm }),
+			PharmacistName: order.PharmacistName,
+			LicenseNo:      order.LicenseNo,
+			DrugType:       getDrugField(product, func(d *entities.DrugInfo) string { return d.DrugType }),
+		})
 	}
 	return items, nil
 }
@@ -177,7 +183,14 @@ func GetKHY9Data(receiveEntity repositories.IReceive, productEntity repositories
 	}
 }
 
-func getDispensingReportDataHandler(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct, key string, title string, drugType string) gin.HandlerFunc {
+func getDrugField(p entities.Product, fn func(*entities.DrugInfo) string) string {
+	if p.DrugInfo != nil {
+		return fn(p.DrugInfo)
+	}
+	return ""
+}
+
+func getSalesReportDataHandler(orderEntity repositories.IOrder, key string, title string, khyKey string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -185,7 +198,7 @@ func getDispensingReportDataHandler(dispensingEntity repositories.IDispensingLog
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		items, err := getDispensingReportItems(dispensingEntity, productEntity, branchId, req, drugType)
+		items, err := getSalesReportItems(orderEntity, branchId, req, khyKey)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 			return
@@ -194,18 +207,18 @@ func getDispensingReportDataHandler(dispensingEntity repositories.IDispensingLog
 	}
 }
 
-func GetKHY10Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
-	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy10", "ข.ย.10 บัญชีการขายยาควบคุมพิเศษ", "CONTROLLED")
+func GetKHY10Data(orderEntity repositories.IOrder) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, "khy10", "ข.ย.10 บัญชีการขายยาควบคุมพิเศษ", "KHY10")
 }
 
-func GetKHY11Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
-	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy11", "ข.ย.11 บัญชีการขายยาอันตราย", "DANGEROUS")
+func GetKHY11Data(orderEntity repositories.IOrder) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, "khy11", "ข.ย.11 บัญชีการขายยาอันตราย", "KHY11")
 }
 
-func GetKHY12Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
-	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy12", "ข.ย.12 บัญชีการขายยาตามใบสั่งของผู้ประกอบวิชาชีพ", "PSYCHO")
+func GetKHY12Data(orderEntity repositories.IOrder) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, "khy12", "ข.ย.12 บัญชีการขายยาตามใบสั่งของผู้ประกอบวิชาชีพ", "KHY12")
 }
 
-func GetKHY13Data(dispensingEntity repositories.IDispensingLog, productEntity repositories.IProduct) gin.HandlerFunc {
-	return getDispensingReportDataHandler(dispensingEntity, productEntity, "khy13", "ข.ย.13 รายงานการขายยาตามที่เลขาธิการ อย. กำหนด", "NARCOTIC")
+func GetKHY13Data(orderEntity repositories.IOrder) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, "khy13", "ข.ย.13 รายงานการขายยาตามที่เลขาธิการ อย. กำหนด", "KHY13")
 }
