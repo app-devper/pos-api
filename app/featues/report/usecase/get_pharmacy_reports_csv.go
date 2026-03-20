@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.IProduct) gin.HandlerFunc {
+func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.IProduct, supplierEntity repositories.ISupplier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -33,7 +33,11 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 		}
 
 		productIdSet := make(map[string]struct{})
+		supplierIdSet := make(map[string]struct{})
 		for _, recv := range receives {
+			if !recv.SupplierId.IsZero() {
+				supplierIdSet[recv.SupplierId.Hex()] = struct{}{}
+			}
 			for _, item := range recv.Items {
 				productIdSet[item.ProductId.Hex()] = struct{}{}
 			}
@@ -48,29 +52,45 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 			productMap[productList[i].Id.Hex()] = &productList[i]
 		}
 
+		supplierMap := make(map[string]string)
+		for sid := range supplierIdSet {
+			if sup, err := supplierEntity.GetSupplierById(sid); err == nil && sup != nil {
+				supplierMap[sid] = sup.Name
+			}
+		}
+
 		ctx.Header("Content-Type", "text/csv; charset=utf-8")
 		ctx.Header("Content-Disposition", "attachment; filename=khy9-report.csv")
-		// BOM for Excel UTF-8
 		ctx.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 
 		w := csv.NewWriter(ctx.Writer)
-		w.Write([]string{"#", "Date", "Code", "Product", "Lot", "Qty", "Cost"})
+		w.Write([]string{"#", "วันที่", "เลขที่", "ชื่อยา", "ชื่อสามัญ", "ความแรง", "ล็อต", "วันหมดอายุ", "จำนวน", "หน่วย", "ต้นทุน", "ผู้จำหน่าย"})
 
 		row := 1
 		for _, recv := range receives {
+			supName := supplierMap[recv.SupplierId.Hex()]
 			for _, item := range recv.Items {
 				product, ok := productMap[item.ProductId.Hex()]
 				if !ok || product.DrugInfo == nil {
 					continue
+				}
+				expStr := ""
+				if !item.ExpireDate.IsZero() {
+					expStr = item.ExpireDate.Format("02/01/2006")
 				}
 				w.Write([]string{
 					fmt.Sprintf("%d", row),
 					recv.CreatedDate.Format("02/01/2006"),
 					recv.Code,
 					product.Name,
+					product.DrugInfo.GenericName,
+					product.DrugInfo.Strength,
 					item.LotNumber,
+					expStr,
 					fmt.Sprintf("%d", item.Quantity),
+					product.Unit,
 					fmt.Sprintf("%.2f", item.CostPrice),
+					supName,
 				})
 				row++
 			}
@@ -107,7 +127,7 @@ func generateDispensingCSV(ctx *gin.Context, dispensingEntity repositories.IDisp
 	ctx.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 
 	w := csv.NewWriter(ctx.Writer)
-	w.Write([]string{"#", "Date", "Drug Name", "Generic Name", "Qty", "Pharmacist", "License"})
+	w.Write([]string{"#", "วันที่", "ชื่อยา", "ชื่อสามัญ", "ความแรง", "รูปแบบยา", "จำนวน", "หน่วย", "วิธีใช้", "เภสัชกร", "เลขใบอนุญาต"})
 
 	row := 1
 	for _, log := range logs {
@@ -121,7 +141,11 @@ func generateDispensingCSV(ctx *gin.Context, dispensingEntity repositories.IDisp
 				log.CreatedDate.Format("02/01/2006"),
 				item.ProductName,
 				item.GenericName,
+				product.DrugInfo.Strength,
+				product.DrugInfo.DosageForm,
 				fmt.Sprintf("%d", item.Quantity),
+				item.Unit,
+				item.Dosage,
 				log.PharmacistName,
 				log.LicenseNo,
 			})

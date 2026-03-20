@@ -2,6 +2,18 @@
 
 ระบบบริหารจัดการร้านยาอัจฉริยะที่เน้นความถูกต้องตามกฎหมาย อย. และความปลอดภัยของผู้ป่วย
 
+## เอกสารที่เกี่ยวข้อง
+
+- `docs/business-logic/README.md` — สารบัญเอกสาร business logic
+- `docs/business-logic/01-auth-and-access-control.md`
+- `docs/business-logic/02-product-and-inventory.md`
+- `docs/business-logic/03-pos-and-clinical-support.md`
+- `docs/business-logic/04-regulatory-reports.md`
+- `docs/business-logic/05-patient-and-crm.md`
+- `docs/business-logic/06-dashboard-and-analytics.md`
+- `docs/business-logic/07-settings-and-master-data.md`
+- `docs/business-logic/08-promotions-and-stock-transfer.md`
+
 ---
 
 ## 1. User Roles & Access Control (ระบบจัดการสิทธิ์)
@@ -115,10 +127,12 @@
 | **ข.ย. 13** | รายงานการขายยาตามที่เลขาธิการ อย. กำหนด | รายงานสรุปยอดการขายยาบางประเภทที่ต้องส่งให้ อย. ตรวจสอบตามรอบระยะเวลาที่กำหนด |
 
 - **Date Range Filter** — เลือกช่วงวันที่ที่ต้องการออกรายงาน
-- **Preview** — ดูตัวอย่างข้อมูลก่อน export
-- **Export** — ส่งออกได้ทั้ง CSV และ PDF (client-side jsPDF + autotable)
+- **Preview** — ดูตัวอย่างข้อมูลก่อน export โดย render เอกสารจากข้อมูลดิบที่ดึงจาก API
+- **Export** — ส่งออกได้ทั้ง CSV และ PDF โดย PDF สร้างที่ฝั่ง Frontend จากข้อมูล JSON ที่ได้รับจาก Backend
 - **Pharmacist Log** — บันทึกชื่อเภสัชกรผู้ปฏิบัติหน้าที่ในทุกรายการขายยาควบคุม
 - **Role Restriction** — เฉพาะ SUPER/ADMIN เท่านั้นที่เข้าถึงรายงานได้
+- **Backend Responsibility** — ให้บริการ data endpoint สำหรับรายงาน ข.ย. 9–13 และ endpoint สำหรับ CSV export
+- **Frontend Responsibility** — สร้างเอกสาร preview/print/PDF จากข้อมูลรายงานที่ได้รับ โดยไม่พึ่ง backend PDF generator
 
 ---
 
@@ -168,7 +182,7 @@
 | **Backend** | Go 1.25+, Gin framework, MongoDB, Redis (optional) |
 | **Frontend** | Next.js 16 (App Router, Static Export), TypeScript, TailwindCSS, shadcn/ui, Zustand |
 | **Auth** | JWT via UM API (external), RBAC middleware |
-| **PDF** | jsPDF + jspdf-autotable (client-side) |
+| **PDF** | Browser print / Save as PDF จากเอกสาร HTML ที่สร้างบน Frontend |
 
 ### Non-Functional
 
@@ -202,7 +216,8 @@
 
 ### 9.3 รายงาน
 1. เลือกประเภทรายงาน (ข.ย. 9–13) → กำหนดช่วงวันที่
-2. Preview ข้อมูล → Export CSV หรือ PDF
+2. Frontend เรียก data endpoint ของรายงาน → render preview จากข้อมูลจริง
+3. Export CSV ผ่าน backend endpoint หรือ Export PDF ผ่าน frontend print / save as PDF
 
 ---
 

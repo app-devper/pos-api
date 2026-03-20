@@ -43,7 +43,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY9Data(repository.Receive, repository.Product),
+		usecase.GetKHY9Data(repository.Receive, repository.Product, repository.Supplier),
 	)
 
 	reportRoute.GET("/pharmacy/khy10/data",
@@ -84,7 +84,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY9CSV(repository.Receive, repository.Product),
+		usecase.GetKHY9CSV(repository.Receive, repository.Product, repository.Supplier),
 	)
 
 	reportRoute.GET("/pharmacy/khy10/csv",
