@@ -31,7 +31,11 @@
 
 - KHY 9-13 ใช้ data endpoints สำหรับ frontend PDF / preview
 - CSV ยังคงมาจาก backend flow
-- Backend ต้องแยกแหล่งข้อมูลให้ถูก เช่น receives สำหรับ KHY9 และ dispensing logs สำหรับ KHY10-13
+- Backend ต้องแยกแหล่งข้อมูลให้ถูก:
+  - KHY9: receives (เอกสารรับสินค้า) กรองด้วย `product.DrugRegistrations` contains "KHY9"
+  - KHY10-13: orders (order_items joined with products) กรองด้วย `product.DrugRegistrations` contains "KHY10"-"KHY13"
+- ข้อมูลเภสัชกร (`pharmacistName`) และเลขใบอนุญาต (`licenseNo`) ดึงจาก order entity
+- Response ต้องมี: date, productName, genericName, quantity, unit, strength, dosageForm, dosage, pharmacistName, licenseNo
 
 ## Error Cases
 

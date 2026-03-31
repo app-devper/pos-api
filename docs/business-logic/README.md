@@ -28,6 +28,12 @@
 - `flows/02-pos-order-flow.md`
 - `flows/03-report-generation-flow.md`
 - `flows/04-patient-customer-flow.md`
+- `flows/05-customer-management-flow.md`
+- `flows/06-patient-management-flow.md`
+- `flows/07-settings-management-flow.md`
+- `flows/08-promotion-management-flow.md`
+- `flows/09-stock-transfer-flow.md`
+- `flows/10-khy-sale-flow.md`
 
 ## เอกสาร Lifecycle / State Transition
 
@@ -36,6 +42,14 @@
 - `lifecycle/02-receive-lifecycle.md`
 - `lifecycle/03-promotion-lifecycle.md`
 - `lifecycle/04-stock-transfer-lifecycle.md`
+- `lifecycle/05-product-lifecycle.md`
+- `lifecycle/06-patient-lifecycle.md`
+- `lifecycle/07-customer-lifecycle.md`
+- `lifecycle/08-report-document-lifecycle.md`
+- `lifecycle/09-branch-lifecycle.md`
+- `lifecycle/10-employee-lifecycle.md`
+- `lifecycle/11-supplier-lifecycle.md`
+- `lifecycle/12-category-lifecycle.md`
 
 ## เอกสาร Web Screens
 
@@ -61,6 +75,15 @@
 - `api-contracts/05-reports-contract.md`
 - `api-contracts/06-patients-and-customers-contract.md`
 - `api-contracts/07-settings-contract.md`
+- `api-contracts/08-promotions-contract.md`
+- `api-contracts/09-stock-transfers-contract.md`
+- `api-contracts/10-branches-contract.md`
+- `api-contracts/11-employees-contract.md`
+- `api-contracts/12-suppliers-contract.md`
+- `api-contracts/13-categories-contract.md`
+- `api-contracts/14-dispensing-logs-contract.md`
+- `api-contracts/15-customer-histories-contract.md`
+- `api-contracts/16-dashboard-contract.md`
 
 ## หลักการออกแบบ business logic
 

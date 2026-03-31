@@ -28,11 +28,12 @@
 
 #### Backend Effects
 
-- สร้าง order record
+- สร้าง order record (รวม compliance data: `pharmacistName`, `licenseNo`, `prescriberName`, `buyerName`, `buyerIdCard`)
 - ตัด stock ตาม FEFO
 - อัปเดต lot balance
 - สร้าง product history
 - สร้าง dispensing log สำหรับรายการที่เกี่ยวข้อง
+- ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง (ไม่ใช่จาก dispensing log)
 - ทำให้ข้อมูลพร้อมสำหรับ receipt, tax invoice, sales report และ KHY reports
 
 #### Frontend Behavior

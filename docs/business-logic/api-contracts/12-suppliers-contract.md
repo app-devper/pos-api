@@ -21,10 +21,28 @@
 - Request ต้องมีข้อมูลบังคับขั้นต่ำ เช่น ชื่อและข้อมูลสำคัญที่ระบบใช้
 - Backend ต้อง validate รูปแบบข้อมูลและป้องกันข้อมูลซ้ำตามกฎธุรกิจ
 
-### 3. Supplier Usage in Receives
+### 3. Supplier Info (ข้อมูลร้านในฐานะผู้จำหน่าย)
+
+- `PUT /suppliers/info` — อัปเดตข้อมูลร้านค้าตนเองในฐานะ supplier (เช่น ใช้ในเอกสารรับสินค้า)
+- `GET /suppliers/info` — อ่านข้อมูลร้านค้าตนเองในฐานะ supplier
+- ข้อมูลนี้แยกจาก supplier ทั่วไปที่เป็นคู่ค้าภายนอก
+
+### 4. Supplier Usage in Receives
 
 - Receive flow คาดหวังให้ backend ปฏิเสธ supplier ที่ invalid หรือ inactive เมื่อนโยบายไม่อนุญาต
 - Response error ควร map กลับสู่ receive form ได้เข้าใจง่าย
+
+## Endpoints
+
+| Method | Path | คำอธิบาย |
+|---|---|---|
+| POST | /suppliers | สร้าง supplier |
+| GET | /suppliers | ดูรายการ suppliers |
+| GET | /suppliers/:supplierId | ดูรายละเอียด supplier |
+| PUT | /suppliers/:supplierId | แก้ไข supplier |
+| DELETE | /suppliers/:supplierId | ลบ supplier |
+| PUT | /suppliers/info | อัปเดตข้อมูลร้านค้า (self) |
+| GET | /suppliers/info | อ่านข้อมูลร้านค้า (self) |
 
 ## Error Cases
 

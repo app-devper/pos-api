@@ -35,7 +35,8 @@
 ### Step 3: ตรวจสอบความปลอดภัย
 
 - หากมี patient context ระบบเช็ค allergy และ drug interaction
-- หากเป็นยาควบคุม ระบบบังคับกรอกข้อมูลเภสัชกร ผู้ซื้อ และข้อมูลกำกับอื่น
+- หากตะกร้ามีสินค้าที่ `drugRegistrations[]` มี KHY10 / KHY11 / KHY12 / KHY13 → ระบบเปิด ComplianceDialog บังคับกรอกข้อมูลเภสัชกร, เลขใบอนุญาต, ผู้ซื้อ, เลขบัตรประชาชนผู้ซื้อ และผู้สั่งจ่าย (ถ้ามี)
+- **หมายเหตุ**: ดูรายละเอียด flow ข.ย. ทั้งหมดใน flow 10
 - Frontend แสดง warning/block ตามเงื่อนไข
 
 ### Step 4: Review ตะกร้า
@@ -46,7 +47,8 @@
 ### Step 5: Payment
 
 - Frontend เปิด payment flow
-- ผู้ใช้เลือกช่องทางชำระหนึ่งหรือหลายช่องทาง
+- ช่องทางชำระที่รองรับปัจจุบัน: **CASH** (เงินสด) และ **PROMPTPAY** (พร้อมเพย์)
+- ผู้ใช้สามารถเพิ่มหลายแถวชำระเงินในออเดอร์เดียวกันได้ (split payment)
 - ระบบคำนวณยอดรับรวมและเงินทอนแบบ real-time
 - ปุ่มยืนยันชำระจะเปิดได้ต่อเมื่อยอดรับเพียงพอ
 
@@ -57,11 +59,12 @@
 
 ### Step 7: Commit Business Transaction
 
-- Backend สร้าง order
+- Backend สร้าง order (รวมข้อมูล compliance: pharmacistName, licenseNo, buyerName, buyerIdCard, prescriberName)
 - ตัด stock ตาม FEFO
 - อัปเดต lot balance
 - สร้าง product history
 - สร้าง dispensing log สำหรับรายการที่เข้าข่ายรายงานยา
+- ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง (ไม่ใช้ dispensing log)
 
 ### Step 8: Post-Order Actions
 
@@ -79,7 +82,7 @@
 ## Error Flow
 
 - stock ไม่พอ → reject ก่อน commit
-- allergy / compliance data ไม่ครบ → block ยืนยันคำสั่งขาย
+- allergy / compliance data ไม่ครบ (ชื่อเภสัชกร, เลขใบอนุญาต, ผู้ซื้อ, เลขบัตรประชาชน) → block ยืนยันคำสั่งขาย
 - payment total ไม่พอ → ไม่ให้ submit
 - Backend validation fail → ไม่สร้าง order ครึ่งทาง
 

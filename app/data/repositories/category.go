@@ -89,13 +89,11 @@ func (entity *categoryEntity) CreateCategory(form request.Category) (*entities.C
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	data := entities.Category{
-		Id:                   primitive.NewObjectID(),
-		Name:                 form.Name,
-		Value:                strings.ToUpper(form.Value),
-		RequireCustomerOrder: form.RequireCustomerOrder,
-		Description:          form.Description,
-		CreatedDate:          time.Now(),
-		UpdatedDate:          time.Now(),
+		Id:          primitive.NewObjectID(),
+		Name:        form.Name,
+		Value:       strings.ToUpper(form.Value),
+		CreatedDate: time.Now(),
+		UpdatedDate: time.Now(),
 	}
 	_, err := entity.categoryRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -151,11 +149,9 @@ func (entity *categoryEntity) UpdateCategoryById(id string, form request.Categor
 	}
 	var data entities.Category
 	err = entity.categoryRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"name":                 form.Name,
-		"value":                strings.ToUpper(form.Value),
-		"requireCustomerOrder": form.RequireCustomerOrder,
-		"description":          form.Description,
-		"updatedDate":          time.Now(),
+		"name":        form.Name,
+		"value":       strings.ToUpper(form.Value),
+		"updatedDate": time.Now(),
 	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err

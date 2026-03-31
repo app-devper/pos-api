@@ -22,10 +22,30 @@
 - Backend ต้อง validate ทั้งระดับเอกสารและระดับ item
 - การตอบกลับควรมีข้อมูล receive ที่ถูกสร้างแล้ว หรือข้อมูลอย่างน้อยที่ทำให้ frontend refresh state ได้
 
-### 3. Data Integrity
+### 3. Update and Partial Update
+
+- `PUT /receives/:receiveId` — แก้ไขเอกสารรับสินค้าทั้งชุด
+- `PATCH /receives/:receiveId/total-cost` — อัปเดตต้นทุนรวมของเอกสาร
+- `PATCH /receives/:receiveId/items` — อัปเดตรายการสินค้าในเอกสาร
+- `PATCH /receives/:receiveId/import` — นำเข้าข้อมูลรับสินค้าเข้าสู่ stock (trigger stock/lot/history update)
+
+### 4. Data Integrity
 
 - ถ้า item ใด item หนึ่งผิด ต้องไม่สร้าง receive ครึ่งทาง
-- Backend ต้องรับประกันความสอดคล้องของ stock, lot และ history เมื่อ create สำเร็จ
+- Backend ต้องรับประกันความสอดคล้องของ stock, lot และ history เมื่อ create หรือ import สำเร็จ
+
+## Endpoints
+
+| Method | Path | คำอธิบาย |
+|---|---|---|
+| POST | /receives | สร้างเอกสารรับสินค้า |
+| GET | /receives | ดูรายการเอกสารรับสินค้า |
+| GET | /receives/:receiveId | ดูรายละเอียดเอกสาร |
+| PUT | /receives/:receiveId | แก้ไขเอกสาร |
+| DELETE | /receives/:receiveId | ลบเอกสาร |
+| PATCH | /receives/:receiveId/total-cost | อัปเดตต้นทุนรวม |
+| PATCH | /receives/:receiveId/items | อัปเดตรายการสินค้า |
+| PATCH | /receives/:receiveId/import | นำเข้าสู่ stock |
 
 ## Error Cases
 
@@ -33,3 +53,5 @@
 - invalid product
 - quantity / price / expiry invalid
 - branch context ไม่ถูกต้อง
+- receive not found
+- import ซ้ำ (ถ้ามีการป้องกัน)

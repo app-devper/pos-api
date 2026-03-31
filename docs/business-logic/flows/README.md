@@ -8,6 +8,12 @@
 - `02-pos-order-flow.md`
 - `03-report-generation-flow.md`
 - `04-patient-customer-flow.md`
+- `05-customer-management-flow.md`
+- `06-patient-management-flow.md`
+- `07-settings-management-flow.md`
+- `08-promotion-management-flow.md`
+- `09-stock-transfer-flow.md`
+- `10-khy-sale-flow.md` — การขายสินค้าที่เกี่ยวข้องกับรายงาน ข.ย.9–13 (DrugType vs DrugRegistrations, compliance flow, report data source)
 
 ## วิธีอ่าน
 
