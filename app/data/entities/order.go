@@ -28,6 +28,7 @@ type Order struct {
 	TotalCost      float64            `bson:"totalCost" json:"totalCost"`
 	Discount       float64            `bson:"discount" json:"discount"`
 	Type           string             `bson:"type" json:"type"`
+	Payments       []Payment          `json:"payments,omitempty"`
 }
 
 type OrderDetail struct {
@@ -52,6 +53,7 @@ type OrderDetail struct {
 	Discount       float64                  `bson:"discount" json:"discount"`
 	Type           string                   `bson:"type" json:"type"`
 	Items          []OrderItemProductDetail `json:"items"`
+	Payments       []Payment                `json:"payments"`
 	Payment        Payment                  `json:"payment"`
 }
 

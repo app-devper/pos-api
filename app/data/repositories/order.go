@@ -269,6 +269,9 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
+	if err = entity.populateOrderPayments(items); err != nil {
+		return nil, err
+	}
 	return items, nil
 }
 
@@ -287,7 +290,23 @@ func (entity *orderEntity) GetOrdersByCustomerCode(customerCode string) ([]entit
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
+	if err = entity.populateOrderPayments(items); err != nil {
+		return nil, err
+	}
 	return items, nil
+}
+
+func (entity *orderEntity) populateOrderPayments(items []entities.Order) error {
+	for i := range items {
+		payments, err := entity.GetPaymentsByOrderId(items[i].Id.Hex())
+		if err != nil && err != mongo.ErrNoDocuments {
+			return err
+		}
+		if err == nil {
+			items[i].Payments = payments
+		}
+	}
+	return nil
 }
 
 func (entity *orderEntity) UpdateTotal() ([]entities.Order, error) {
@@ -405,11 +424,14 @@ func (entity *orderEntity) GetOrderDetailById(id string) (*entities.OrderDetail,
 		return nil, err
 	}
 
-	payment, err := entity.GetPaymentByOrderId(id)
+	payments, err := entity.GetPaymentsByOrderId(id)
 	if err != nil {
 		return nil, err
 	}
-	data.Payment = *payment
+	data.Payments = payments
+	if len(payments) > 0 {
+		data.Payment = payments[0]
+	}
 
 	items, err := entity.GetOrderItemDetailByOrderId(id)
 	if err != nil {
@@ -435,9 +457,12 @@ func (entity *orderEntity) RemoveOrderById(id string) (*entities.OrderDetail, er
 		return nil, err
 	}
 
-	payment, pErr := entity.RemovePaymentByOrderId(id)
-	if pErr == nil && payment != nil {
-		data.Payment = *payment
+	payments, pErr := entity.RemovePaymentsByOrderId(id)
+	if pErr == nil {
+		data.Payments = payments
+		if len(payments) > 0 {
+			data.Payment = payments[0]
+		}
 	}
 
 	items, _ := entity.RemoveOrderItemByOrderId(id)
@@ -830,36 +855,63 @@ func (entity *orderEntity) RemoveOrderItemByOrderProductId(orderId string, produ
 	return item, nil
 }
 
-func (entity *orderEntity) GetPaymentByOrderId(orderId string) (*entities.Payment, error) {
-	logrus.Info("GetPaymentByOrderId")
+func (entity *orderEntity) GetPaymentsByOrderId(orderId string) ([]entities.Payment, error) {
+	logrus.Info("GetPaymentsByOrderId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	objId, err := primitive.ObjectIDFromHex(orderId)
 	if err != nil {
 		return nil, err
 	}
-	var data entities.Payment
-	err = entity.paymentRepo.FindOne(ctx, bson.M{"orderId": objId}).Decode(&data)
+	cursor, err := entity.paymentRepo.Find(ctx, bson.M{"orderId": objId}, options.Find().SetSort(bson.D{{Key: "createdDate", Value: 1}}))
 	if err != nil {
 		return nil, err
 	}
-	return &data, nil
+	payments := []entities.Payment{}
+	if err = cursor.All(ctx, &payments); err != nil {
+		return nil, err
+	}
+	return payments, nil
+}
+
+func (entity *orderEntity) GetPaymentByOrderId(orderId string) (*entities.Payment, error) {
+	payments, err := entity.GetPaymentsByOrderId(orderId)
+	if err != nil {
+		return nil, err
+	}
+	if len(payments) == 0 {
+		return nil, mongo.ErrNoDocuments
+	}
+	return &payments[0], nil
+}
+
+func (entity *orderEntity) RemovePaymentsByOrderId(orderId string) ([]entities.Payment, error) {
+	logrus.Info("RemovePaymentsByOrderId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	payments, err := entity.GetPaymentsByOrderId(orderId)
+	if err != nil {
+		return nil, err
+	}
+	objId, err := primitive.ObjectIDFromHex(orderId)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = entity.paymentRepo.DeleteMany(ctx, bson.M{"orderId": objId}); err != nil {
+		return nil, err
+	}
+	return payments, nil
 }
 
 func (entity *orderEntity) RemovePaymentByOrderId(orderId string) (*entities.Payment, error) {
-	logrus.Info("RemovePaymentByOrderId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(orderId)
+	payments, err := entity.RemovePaymentsByOrderId(orderId)
 	if err != nil {
 		return nil, err
 	}
-	var data entities.Payment
-	err = entity.paymentRepo.FindOneAndDelete(ctx, bson.M{"orderId": objId}).Decode(&data)
-	if err != nil {
-		return nil, err
+	if len(payments) == 0 {
+		return nil, mongo.ErrNoDocuments
 	}
-	return &data, nil
+	return &payments[0], nil
 }
 
 func (entity *orderEntity) GetOrderSummary(form request.GetOrderRange) (*entities.OrderSummary, error) {
