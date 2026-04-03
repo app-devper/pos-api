@@ -28,17 +28,10 @@ func CreateProductPrice(productEntity repositories.IProduct) gin.HandlerFunc {
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 
-		result, err := productEntity.CreateProductPrice(req)
+		result, err := productEntity.CreateProductPriceCascade(req, ctx.GetString("BranchId"), userId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
-		}
-		// Add product history
-		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
-		if unit != nil {
-			addPriceHistory := request.AddProductPriceHistory(req.ProductId, unit.Unit, req)
-			addPriceHistory.BranchId = ctx.GetString("BranchId")
-			_, _ = productEntity.CreateProductHistory(addPriceHistory)
 		}
 
 		ctx.JSON(http.StatusOK, result)
@@ -97,17 +90,10 @@ func RemoveProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc
 		id := ctx.Param("priceId")
 		userId := ctx.GetString("UserId")
 
-		result, err := productEntity.RemoveProductPriceById(id)
+		result, err := productEntity.RemoveProductPriceCascade(id, ctx.GetString("BranchId"), userId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
-		}
-		// Add product history
-		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
-		if unit != nil {
-			remPriceHistory := request.RemoveProductPriceHistory(result.ProductId.Hex(), unit.Unit, result, userId)
-			remPriceHistory.BranchId = ctx.GetString("BranchId")
-			_, _ = productEntity.CreateProductHistory(remPriceHistory)
 		}
 
 		ctx.JSON(http.StatusOK, result)

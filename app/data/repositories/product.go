@@ -56,17 +56,21 @@ type IProduct interface {
 	RemoveProductLotById(id string) (*entities.ProductLot, error)
 
 	// ProductUnit
+	CreateProductUnitCascade(param request.CreateProductUnit, branchId string, userId string) (*entities.ProductUnit, error)
 	CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error)
 	GetProductUnitById(id string) (*entities.ProductUnit, error)
 	GetProductUnitByDefault(productId string, unit string) (*entities.ProductUnit, error)
 	GetProductUnitByUnit(productId string, unit string) (*entities.ProductUnit, error)
 	UpdateProductUnitById(id string, param request.ProductUnit) (*entities.ProductUnit, error)
 	RemoveProductUnitById(id string) (*entities.ProductUnit, error)
+	RemoveProductUnitCascade(id string, branchId string, userId string) (*entities.ProductUnit, error)
 	GetProductUnitsByProductId(productId string) ([]entities.ProductUnit, error)
 
 	// ProductPrice
 	GetProductPricesByProductId(productId string) ([]entities.ProductPrice, error)
+	CreateProductPriceCascade(param request.ProductPrice, branchId string, userId string) (*entities.ProductPrice, error)
 	CreateProductPrice(param request.ProductPrice) (*entities.ProductPrice, error)
+	RemoveProductPriceCascade(id string, branchId string, userId string) (*entities.ProductPrice, error)
 	RemoveProductPriceById(id string) (*entities.ProductPrice, error)
 	RemoveProductPricesByUnitId(unitId string) error
 	UpdateProductPriceById(id string, param request.ProductPrice) (*entities.ProductPrice, error)
@@ -152,7 +156,8 @@ func ensureProductCollectionIndexes(productsRepo, productUnitsRepo, productPrice
 	defer cancel()
 
 	_, err := productsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys: bson.D{{Key: "serialNumber", Value: 1}},
+		Keys:    bson.D{{Key: "serialNumber", Value: 1}},
+		Options: options.Index().SetUnique(true),
 	})
 	if err != nil {
 		logrus.Error("failed to create products serialNumber index: ", err)
@@ -1258,6 +1263,36 @@ func (entity *productEntity) CreateProductPrice(param request.ProductPrice) (*en
 	return entity.createProductPriceWithContext(ctx, param)
 }
 
+func (entity *productEntity) CreateProductPriceCascade(param request.ProductPrice, branchId string, userId string) (*entities.ProductPrice, error) {
+	logrus.Info("CreateProductPriceCascade")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.createProductPriceCascadeWithContext(ctx, param, branchId, userId)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.ProductPrice
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.createProductPriceCascadeWithContext(sessCtx, param, branchId, userId)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (entity *productEntity) createProductPriceWithContext(ctx context.Context, param request.ProductPrice) (*entities.ProductPrice, error) {
 	data := entities.ProductPrice{}
 	data.Id = primitive.NewObjectID()
@@ -1300,6 +1335,40 @@ func (entity *productEntity) RemoveProductPriceById(id string) (*entities.Produc
 	logrus.Info("RemoveProductPriceById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.removeProductPriceByIDWithContext(ctx, id)
+}
+
+func (entity *productEntity) RemoveProductPriceCascade(id string, branchId string, userId string) (*entities.ProductPrice, error) {
+	logrus.Info("RemoveProductPriceCascade")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.removeProductPriceCascadeWithContext(ctx, id, branchId, userId)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.ProductPrice
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.removeProductPriceCascadeWithContext(sessCtx, id, branchId, userId)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (entity *productEntity) removeProductPriceByIDWithContext(ctx context.Context, id string) (*entities.ProductPrice, error) {
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
@@ -1360,6 +1429,10 @@ func (entity *productEntity) GetProductUnitById(id string) (*entities.ProductUni
 	logrus.Info("GetProductUnitById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.getProductUnitByIDWithContext(ctx, id)
+}
+
+func (entity *productEntity) getProductUnitByIDWithContext(ctx context.Context, id string) (*entities.ProductUnit, error) {
 	objId, _ := primitive.ObjectIDFromHex(id)
 	data := entities.ProductUnit{}
 	err := entity.productUnitsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
@@ -1441,6 +1514,70 @@ func (entity *productEntity) RemoveProductUnitById(id string) (*entities.Product
 	logrus.Info("RemoveProductUnitById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.removeProductUnitByIDWithContext(ctx, id)
+}
+
+func (entity *productEntity) RemoveProductUnitCascade(id string, branchId string, userId string) (*entities.ProductUnit, error) {
+	logrus.Info("RemoveProductUnitCascade")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.removeProductUnitCascadeWithContext(ctx, id, branchId, userId)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.ProductUnit
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.removeProductUnitCascadeWithContext(sessCtx, id, branchId, userId)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (entity *productEntity) CreateProductUnitCascade(param request.CreateProductUnit, branchId string, userId string) (*entities.ProductUnit, error) {
+	logrus.Info("CreateProductUnitCascade")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.createProductUnitCascadeWithContext(ctx, param, branchId, userId)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.ProductUnit
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.createProductUnitCascadeWithContext(sessCtx, param, branchId, userId)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (entity *productEntity) removeProductUnitByIDWithContext(ctx context.Context, id string) (*entities.ProductUnit, error) {
 	data := entities.ProductUnit{}
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -1458,6 +1595,112 @@ func (entity *productEntity) RemoveProductUnitById(id string) (*entities.Product
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *productEntity) removeProductUnitCascadeWithContext(ctx context.Context, id string, branchId string, userId string) (*entities.ProductUnit, error) {
+	unit, err := entity.removeProductUnitByIDWithContext(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	unitObjID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = entity.productPricesRepo.DeleteMany(ctx, bson.M{"unitId": unitObjID}); err != nil {
+		return nil, err
+	}
+
+	if branchId != "" {
+		history := request.RemoveProductUnitHistory(unit.ProductId.Hex(), unit, userId)
+		history.BranchId = branchId
+		if _, err = entity.createProductHistoryWithContext(ctx, history); err != nil {
+			return nil, err
+		}
+	}
+
+	return unit, nil
+}
+
+func (entity *productEntity) createProductUnitCascadeWithContext(ctx context.Context, param request.CreateProductUnit, branchId string, userId string) (*entities.ProductUnit, error) {
+	productUnit := request.ProductUnit{
+		ProductId:  param.ProductId,
+		Unit:       param.Unit,
+		Size:       param.Size,
+		CostPrice:  param.CostPrice,
+		Barcode:    param.Barcode,
+		Volume:     param.Volume,
+		VolumeUnit: param.VolumeUnit,
+		UpdatedBy:  userId,
+	}
+	unit, err := entity.createProductUnitWithContext(ctx, productUnit)
+	if err != nil {
+		return nil, err
+	}
+
+	productPrice := request.ProductPrice{
+		ProductId:    param.ProductId,
+		UnitId:       unit.Id.Hex(),
+		Price:        param.Price,
+		CustomerType: constant.CustomerTypeGeneral,
+		UpdatedBy:    userId,
+	}
+	if _, err = entity.createProductPriceWithContext(ctx, productPrice); err != nil {
+		return nil, err
+	}
+
+	if branchId != "" {
+		history := request.AddProductUnitHistory(param.ProductId, productUnit)
+		history.BranchId = branchId
+		if _, err = entity.createProductHistoryWithContext(ctx, history); err != nil {
+			return nil, err
+		}
+	}
+
+	return unit, nil
+}
+
+func (entity *productEntity) createProductPriceCascadeWithContext(ctx context.Context, param request.ProductPrice, branchId string, userId string) (*entities.ProductPrice, error) {
+	param.UpdatedBy = userId
+	price, err := entity.createProductPriceWithContext(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+
+	if branchId != "" {
+		unit, err := entity.getProductUnitByIDWithContext(ctx, price.UnitId.Hex())
+		if err != nil {
+			return nil, err
+		}
+		history := request.AddProductPriceHistory(param.ProductId, unit.Unit, param)
+		history.BranchId = branchId
+		if _, err = entity.createProductHistoryWithContext(ctx, history); err != nil {
+			return nil, err
+		}
+	}
+
+	return price, nil
+}
+
+func (entity *productEntity) removeProductPriceCascadeWithContext(ctx context.Context, id string, branchId string, userId string) (*entities.ProductPrice, error) {
+	price, err := entity.removeProductPriceByIDWithContext(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if branchId != "" {
+		unit, err := entity.getProductUnitByIDWithContext(ctx, price.UnitId.Hex())
+		if err != nil {
+			return nil, err
+		}
+		history := request.RemoveProductPriceHistory(price.ProductId.Hex(), unit.Unit, price, userId)
+		history.BranchId = branchId
+		if _, err = entity.createProductHistoryWithContext(ctx, history); err != nil {
+			return nil, err
+		}
+	}
+
+	return price, nil
 }
 
 func (entity *productEntity) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
