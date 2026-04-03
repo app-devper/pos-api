@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"net/http"
-	"time"
 
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
@@ -32,6 +31,11 @@ func GetStockTransferById(entity repositories.IStockTransfer) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
 			return
 		}
+		branchId := ctx.GetString("BranchId")
+		if result.FromBranchId.Hex() != branchId && result.ToBranchId.Hex() != branchId {
+			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			return
+		}
 		ctx.JSON(http.StatusOK, result)
 	}
 }
@@ -49,36 +53,21 @@ func ApproveStockTransfer(entity repositories.IStockTransfer, productEntity repo
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
 			return
 		}
+		branchId := ctx.GetString("BranchId")
+		if transfer.FromBranchId.Hex() != branchId && transfer.ToBranchId.Hex() != branchId {
+			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			return
+		}
 
 		if transfer.Status != "PENDING" {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, "transfer is not pending")
 			return
 		}
 
-		result, err := entity.UpdateStockTransferStatus(id, req)
+		result, err := entity.ApproveStockTransfer(id, req.UpdatedBy)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		// Add stock to destination branch by creating new stock entries
-		for _, item := range transfer.Items {
-			if item.StockId != "" {
-				sourceStock, err := productEntity.GetProductStockById(item.StockId)
-				if err == nil && sourceStock != nil {
-					_, _ = productEntity.CreateProductStock(request.ProductStock{
-						BranchId:   transfer.ToBranchId.Hex(),
-						ProductId:  item.ProductId.Hex(),
-						UnitId:     sourceStock.UnitId.Hex(),
-						LotNumber:  sourceStock.LotNumber,
-						CostPrice:  sourceStock.CostPrice,
-						Price:      sourceStock.Price,
-						Quantity:   item.Quantity,
-						ExpireDate: sourceStock.ExpireDate,
-						ImportDate: time.Now(),
-					})
-				}
-			}
 		}
 
 		ctx.JSON(http.StatusOK, result)
@@ -98,22 +87,21 @@ func RejectStockTransfer(entity repositories.IStockTransfer, productEntity repos
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
 			return
 		}
+		branchId := ctx.GetString("BranchId")
+		if transfer.FromBranchId.Hex() != branchId && transfer.ToBranchId.Hex() != branchId {
+			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			return
+		}
 
 		if transfer.Status != "PENDING" {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, "transfer is not pending")
 			return
 		}
 
-		result, err := entity.UpdateStockTransferStatus(id, req)
+		result, err := entity.RejectStockTransfer(id, req.UpdatedBy)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		for _, item := range transfer.Items {
-			if item.StockId != "" {
-				_, _ = productEntity.AddProductStockQuantityById(item.StockId, item.Quantity)
-			}
 		}
 
 		ctx.JSON(http.StatusOK, result)

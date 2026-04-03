@@ -7,7 +7,6 @@ import (
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,77 +31,27 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 		}
 		userId := ctx.GetString("UserId")
 		req.CreatedBy = userId
-
-		serialNumber := strings.TrimSpace(req.SerialNumber)
-		product, err := productEntity.GetProductBySerialNumber(serialNumber)
-
-		if product != nil {
-			updateProduct := request.UpdateProduct{
-				Description:       req.Description,
-				Category:          req.Category,
-				Name:              req.Name,
-				NameEn:            req.NameEn,
-				Status:            req.Status,
-				MinStock:          req.MinStock,
-				DrugRegistrations: req.DrugRegistrations,
-				UpdatedBy:         userId,
-			}
-			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
-
-			// Add product history
-			updHistory := request.UpdateProductHistory(product.Id.Hex(), updateProduct)
-			updHistory.BranchId = ctx.GetString("BranchId")
-			_, _ = productEntity.CreateProductHistory(updHistory)
-		} else {
-			createProduct := request.Product{
-				SerialNumber:      req.SerialNumber,
-				CostPrice:         req.CostPrice,
-				Price:             req.Price,
-				Description:       req.Description,
-				Status:            req.Status,
-				Quantity:          0,
-				Category:          req.Category,
-				Name:              req.Name,
-				NameEn:            req.NameEn,
-				Unit:              req.Unit,
-				DrugRegistrations: req.DrugRegistrations,
-				CreatedBy:         userId,
-			}
-			product, err = productEntity.CreateProduct(createProduct)
-			if product != nil {
-
-				// Add product history
-				addHistory := request.AddProductHistory(product.Id.Hex(), createProduct)
-				addHistory.BranchId = ctx.GetString("BranchId")
-				_, _ = productEntity.CreateProductHistory(addHistory)
-			}
-		}
+		product, err := productEntity.CreateProductCatalog(request.Product{
+			SerialNumber:      strings.TrimSpace(req.SerialNumber),
+			CostPrice:         req.CostPrice,
+			Price:             req.Price,
+			Description:       req.Description,
+			Status:            req.Status,
+			Quantity:          0,
+			Category:          req.Category,
+			Name:              req.Name,
+			NameEn:            req.NameEn,
+			Unit:              req.Unit,
+			DrugInfo:          req.DrugInfo,
+			DrugRegistrations: req.DrugRegistrations,
+			CreatedBy:         userId,
+			BranchId:          ctx.GetString("BranchId"),
+			MinStock:          req.MinStock,
+		})
 
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		// Create product unit default
-		unit, _ := productEntity.GetProductUnitByDefault(product.Id.Hex(), req.Unit)
-		if unit == nil {
-			productUnit := request.ProductUnit{
-				ProductId: product.Id.Hex(),
-				Unit:      req.Unit,
-				Size:      1,
-				CostPrice: req.CostPrice,
-				Barcode:   req.SerialNumber,
-				UpdatedBy: userId,
-			}
-			unit, _ = productEntity.CreateProductUnit(productUnit)
-			productPrice := request.ProductPrice{
-				ProductId:    product.Id.Hex(),
-				UnitId:       unit.Id.Hex(),
-				Price:        req.Price,
-				CustomerType: constant.CustomerTypeGeneral,
-				UpdatedBy:    userId,
-			}
-			_, _ = productEntity.CreateProductPrice(productPrice)
 		}
 
 		ctx.JSON(http.StatusOK, product)
@@ -119,91 +68,11 @@ func CreateProductReceive(productEntity repositories.IProduct, receiveEntity rep
 		userId := ctx.GetString("UserId")
 		req.CreatedBy = userId
 		req.BranchId = ctx.GetString("BranchId")
-
-		serialNumber := strings.TrimSpace(req.SerialNumber)
-		product, err := productEntity.GetProductBySerialNumber(serialNumber)
-
-		if product != nil {
-			updateProduct := request.UpdateProduct{
-				Description: req.Description,
-				Category:    req.Category,
-				Name:        req.Name,
-				NameEn:      req.NameEn,
-				UpdatedBy:   userId,
-			}
-			product, err = productEntity.UpdateProductById(product.Id.Hex(), updateProduct)
-		} else {
-			product, err = productEntity.CreateProduct(req)
-			if product != nil {
-				// Add product history
-				recvAddHistory := request.AddProductHistory(product.Id.Hex(), req)
-				recvAddHistory.BranchId = req.BranchId
-				_, _ = productEntity.CreateProductHistory(recvAddHistory)
-			}
-		}
-
+		_ = receiveEntity
+		product, err := productEntity.CreateProductReceive(req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		// Create product unit default
-		unit, _ := productEntity.GetProductUnitByDefault(product.Id.Hex(), req.Unit)
-		if unit == nil {
-			productUnit := request.ProductUnit{
-				ProductId: product.Id.Hex(),
-				Unit:      req.Unit,
-				Size:      1,
-				CostPrice: req.CostPrice,
-				Barcode:   req.SerialNumber,
-				UpdatedBy: userId,
-			}
-			unit, _ = productEntity.CreateProductUnit(productUnit)
-			if unit != nil {
-				productPrice := request.ProductPrice{
-					ProductId:    product.Id.Hex(),
-					UnitId:       unit.Id.Hex(),
-					Price:        req.Price,
-					CustomerType: constant.CustomerTypeGeneral,
-					UpdatedBy:    userId,
-				}
-				_, _ = productEntity.CreateProductPrice(productPrice)
-			}
-		}
-
-		if req.ReceiveId != "" {
-			receive, err := receiveEntity.GetReceiveById(req.ReceiveId)
-			if err == nil && receive != nil {
-				req.ReceiveCode = receive.Code
-			}
-			_, _ = receiveEntity.CreateReceiveItem(req.ReceiveId, "", product.Id.Hex(), req)
-		}
-
-		// Create product stock
-		unit, _ = productEntity.GetProductUnitByUnit(product.Id.Hex(), req.Unit)
-		if unit != nil && req.Quantity > 0 {
-			productStock := request.ProductStock{
-				ProductId:   product.Id.Hex(),
-				UnitId:      unit.Id.Hex(),
-				ReceiveCode: req.ReceiveCode,
-				Quantity:    req.Quantity,
-				Price:       0,
-				CostPrice:   0,
-				ExpireDate:  req.ExpireDate,
-				LotNumber:   req.LotNumber,
-				ImportDate:  time.Now(),
-				UpdatedBy:   userId,
-				BranchId:    req.BranchId,
-			}
-			stock, _ := productEntity.CreateProductStock(productStock)
-
-			if stock != nil {
-				// Add product history
-				balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), stock.UnitId.Hex())
-				stockHistory := request.AddProductStockHistory(stock.ProductId.Hex(), req.Unit, productStock, balance)
-				stockHistory.BranchId = req.BranchId
-				_, _ = productEntity.CreateProductHistory(stockHistory)
-			}
 		}
 
 		ctx.JSON(http.StatusOK, product)

@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
@@ -18,12 +19,15 @@ import (
 )
 
 type productEntity struct {
+	client             *mongo.Client
 	productsRepo       *mongo.Collection
 	productPricesRepo  *mongo.Collection
 	productLotsRepo    *mongo.Collection
 	productUnitsRepo   *mongo.Collection
 	productStockRepo   *mongo.Collection
 	productHistoryRepo *mongo.Collection
+	receiveRepo        *mongo.Collection
+	receiveItemsRepo   *mongo.Collection
 }
 
 type IProduct interface {
@@ -34,6 +38,8 @@ type IProduct interface {
 	GetProductById(id string) (*entities.Product, error)
 	GetProductsByIds(ids []string) ([]entities.Product, error)
 	CreateProduct(param request.Product) (*entities.Product, error)
+	CreateProductCatalog(param request.Product) (*entities.Product, error)
+	CreateProductReceive(param request.Product) (*entities.Product, error)
 	RemoveProductById(id string) (*entities.Product, error)
 	UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error)
 	RemoveQuantitySoldFirstById(id string, quantity int) (*entities.Product, error)
@@ -74,12 +80,13 @@ type IProduct interface {
 	RemoveProductStockById(id string) (*entities.ProductStock, error)
 	GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string) int
-	GetProductStockBalance(productId string, unitId string) int
+	GetProductStockBalance(productId string, unitId string, branchId string) int
 	RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
 	AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
 
 	// ProductHistory
 	CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error)
+	RemoveProductHistoryById(id string) (*entities.ProductHistory, error)
 	GetProductHistoryByProductId(productId string, branchId string) ([]entities.ProductHistory, error)
 	GetProductHistoryByDateRange(branchId string, startDate time.Time, endDate time.Time) ([]entities.ProductHistory, error)
 
@@ -96,13 +103,18 @@ func NewProductEntity(resource *db.Resource) IProduct {
 	productLotsRepo := resource.PosDb.Collection("product_lots")
 	productStockRepo := resource.PosDb.Collection("product_stocks")
 	productHistoryRepo := resource.PosDb.Collection("product_histories")
+	receiveRepo := resource.PosDb.Collection("receives")
+	receiveItemsRepo := resource.PosDb.Collection("receive_items")
 	entity := &productEntity{
+		client:             resource.Client,
 		productsRepo:       productsRepo,
 		productPricesRepo:  productPricesRepo,
 		productLotsRepo:    productLotsRepo,
 		productUnitsRepo:   productUnitsRepo,
 		productStockRepo:   productStockRepo,
 		productHistoryRepo: productHistoryRepo,
+		receiveRepo:        receiveRepo,
+		receiveItemsRepo:   receiveItemsRepo,
 	}
 	ensureProductIndexes(productStockRepo, productHistoryRepo)
 	ensureProductCollectionIndexes(productsRepo, productUnitsRepo, productPricesRepo, productLotsRepo)
@@ -250,6 +262,10 @@ func (entity *productEntity) GetProductBySerialNumber(serialNumber string) (*ent
 	logrus.Info("GetProductBySerialNumber")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.getProductBySerialNumberWithContext(ctx, serialNumber)
+}
+
+func (entity *productEntity) getProductBySerialNumberWithContext(ctx context.Context, serialNumber string) (*entities.Product, error) {
 	var data entities.Product
 	err := entity.productsRepo.FindOne(ctx, bson.M{"serialNumber": serialNumber, "deletedDate": bson.M{"$exists": false}}).Decode(&data)
 	if err != nil {
@@ -262,6 +278,10 @@ func (entity *productEntity) CreateProduct(param request.Product) (*entities.Pro
 	logrus.Info("CreateProduct")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.createProductWithContext(ctx, param)
+}
+
+func (entity *productEntity) createProductWithContext(ctx context.Context, param request.Product) (*entities.Product, error) {
 	serialNumber := strings.TrimSpace(param.SerialNumber)
 	data := entities.Product{}
 	data.Id = primitive.NewObjectID()
@@ -287,6 +307,259 @@ func (entity *productEntity) CreateProduct(param request.Product) (*entities.Pro
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *productEntity) CreateProductReceive(param request.Product) (*entities.Product, error) {
+	logrus.Info("CreateProductReceive")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.createProductReceiveWithContext(ctx, param)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.Product
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.createProductReceiveWithContext(sessCtx, param)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (entity *productEntity) CreateProductCatalog(param request.Product) (*entities.Product, error) {
+	logrus.Info("CreateProductCatalog")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.createProductCatalogWithContext(ctx, param)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.Product
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.createProductCatalogWithContext(sessCtx, param)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (entity *productEntity) createProductReceiveWithContext(ctx context.Context, param request.Product) (*entities.Product, error) {
+	product, err := entity.getProductBySerialNumberWithContext(ctx, strings.TrimSpace(param.SerialNumber))
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+
+	if product != nil {
+		updateProduct := request.UpdateProduct{
+			Description:       param.Description,
+			Category:          param.Category,
+			Name:              param.Name,
+			NameEn:            param.NameEn,
+			Status:            param.Status,
+			MinStock:          param.MinStock,
+			DrugInfo:          param.DrugInfo,
+			DrugRegistrations: param.DrugRegistrations,
+			UpdatedBy:         param.CreatedBy,
+		}
+		product, err = entity.updateProductByIdWithContext(ctx, product.Id.Hex(), updateProduct)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		product, err = entity.createProductWithContext(ctx, param)
+		if err != nil {
+			return nil, err
+		}
+		addHistory := request.AddProductHistory(product.Id.Hex(), param)
+		addHistory.BranchId = param.BranchId
+		if _, err = entity.createProductHistoryWithContext(ctx, addHistory); err != nil {
+			return nil, err
+		}
+	}
+
+	unit, err := entity.getProductUnitByDefaultWithContext(ctx, product.Id.Hex(), param.Unit)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+	if unit == nil {
+		productUnit := request.ProductUnit{
+			ProductId: product.Id.Hex(),
+			Unit:      param.Unit,
+			Size:      1,
+			CostPrice: param.CostPrice,
+			Barcode:   param.SerialNumber,
+			UpdatedBy: param.CreatedBy,
+		}
+		unit, err = entity.createProductUnitWithContext(ctx, productUnit)
+		if err != nil {
+			return nil, err
+		}
+
+		productPrice := request.ProductPrice{
+			ProductId:    product.Id.Hex(),
+			UnitId:       unit.Id.Hex(),
+			Price:        param.Price,
+			CustomerType: constant.CustomerTypeGeneral,
+			UpdatedBy:    param.CreatedBy,
+		}
+		if _, err = entity.createProductPriceWithContext(ctx, productPrice); err != nil {
+			return nil, err
+		}
+	}
+
+	if param.ReceiveId != "" {
+		receive, err := entity.getReceiveByIDWithContext(ctx, param.ReceiveId)
+		if err != nil {
+			return nil, err
+		}
+		param.ReceiveCode = receive.Code
+		if _, err = entity.createReceiveItemWithContext(ctx, param.ReceiveId, product.Id.Hex(), param); err != nil {
+			return nil, err
+		}
+	}
+
+	if param.Quantity <= 0 {
+		return product, nil
+	}
+
+	unit, err = entity.getProductUnitByUnitWithContext(ctx, product.Id.Hex(), param.Unit)
+	if err != nil {
+		return nil, err
+	}
+
+	productStock := request.ProductStock{
+		ProductId:   product.Id.Hex(),
+		UnitId:      unit.Id.Hex(),
+		ReceiveCode: param.ReceiveCode,
+		Quantity:    param.Quantity,
+		Price:       0,
+		CostPrice:   0,
+		ExpireDate:  param.ExpireDate,
+		LotNumber:   param.LotNumber,
+		ImportDate:  time.Now(),
+		UpdatedBy:   param.CreatedBy,
+		BranchId:    param.BranchId,
+	}
+	stock, err := entity.createProductStockWithContext(ctx, productStock)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := entity.getProductStockBalanceWithContext(ctx, stock.ProductId.Hex(), stock.UnitId.Hex(), param.BranchId)
+	if err != nil {
+		return nil, err
+	}
+	stockHistory := request.AddProductStockHistory(stock.ProductId.Hex(), param.Unit, productStock, balance)
+	stockHistory.BranchId = param.BranchId
+	if _, err = entity.createProductHistoryWithContext(ctx, stockHistory); err != nil {
+		return nil, err
+	}
+
+	return product, nil
+}
+
+func (entity *productEntity) createProductCatalogWithContext(ctx context.Context, param request.Product) (*entities.Product, error) {
+	product, err := entity.getProductBySerialNumberWithContext(ctx, strings.TrimSpace(param.SerialNumber))
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+
+	if product != nil {
+		updateProduct := request.UpdateProduct{
+			Description:       param.Description,
+			Category:          param.Category,
+			Name:              param.Name,
+			NameEn:            param.NameEn,
+			Status:            param.Status,
+			MinStock:          param.MinStock,
+			DrugInfo:          param.DrugInfo,
+			DrugRegistrations: param.DrugRegistrations,
+			UpdatedBy:         param.CreatedBy,
+		}
+		product, err = entity.updateProductByIdWithContext(ctx, product.Id.Hex(), updateProduct)
+		if err != nil {
+			return nil, err
+		}
+		if param.BranchId != "" {
+			updHistory := request.UpdateProductHistory(product.Id.Hex(), updateProduct)
+			updHistory.BranchId = param.BranchId
+			if _, err = entity.createProductHistoryWithContext(ctx, updHistory); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		product, err = entity.createProductWithContext(ctx, param)
+		if err != nil {
+			return nil, err
+		}
+		if param.BranchId != "" {
+			addHistory := request.AddProductHistory(product.Id.Hex(), param)
+			addHistory.BranchId = param.BranchId
+			if _, err = entity.createProductHistoryWithContext(ctx, addHistory); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	unit, err := entity.getProductUnitByDefaultWithContext(ctx, product.Id.Hex(), param.Unit)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
+	if unit != nil {
+		return product, nil
+	}
+
+	productUnit := request.ProductUnit{
+		ProductId: product.Id.Hex(),
+		Unit:      param.Unit,
+		Size:      1,
+		CostPrice: param.CostPrice,
+		Barcode:   param.SerialNumber,
+		UpdatedBy: param.CreatedBy,
+	}
+	unit, err = entity.createProductUnitWithContext(ctx, productUnit)
+	if err != nil {
+		return nil, err
+	}
+
+	productPrice := request.ProductPrice{
+		ProductId:    product.Id.Hex(),
+		UnitId:       unit.Id.Hex(),
+		Price:        param.Price,
+		CustomerType: constant.CustomerTypeGeneral,
+		UpdatedBy:    param.CreatedBy,
+	}
+	if _, err = entity.createProductPriceWithContext(ctx, productPrice); err != nil {
+		return nil, err
+	}
+
+	return product, nil
 }
 
 func (entity *productEntity) GetProductById(id string) (*entities.Product, error) {
@@ -357,6 +630,10 @@ func (entity *productEntity) UpdateProductById(id string, param request.UpdatePr
 	logrus.Info("UpdateProductById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.updateProductByIdWithContext(ctx, id, param)
+}
+
+func (entity *productEntity) updateProductByIdWithContext(ctx context.Context, id string, param request.UpdateProduct) (*entities.Product, error) {
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
@@ -878,6 +1155,10 @@ func (entity *productEntity) GetProductStockMaxSequence(productId string, unitId
 	logrus.Info("GetProductStockMaxSequence")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.getProductStockMaxSequenceWithContext(ctx, productId, unitId)
+}
+
+func (entity *productEntity) getProductStockMaxSequenceWithContext(ctx context.Context, productId string, unitId string) int {
 	product, _ := primitive.ObjectIDFromHex(productId)
 	unit, _ := primitive.ObjectIDFromHex(unitId)
 	opts := options.FindOne().SetSort(bson.D{{Key: "sequence", Value: -1}})
@@ -926,7 +1207,10 @@ func (entity *productEntity) RemoveProductStockQuantityById(stockId string, quan
 		ReturnDocument: &isReturnNewDoc,
 	}
 	var data entities.ProductStock
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{
+		"_id":      objId,
+		"quantity": bson.M{"$gte": quantity},
+	}, bson.M{
 		"$inc": bson.M{"quantity": -quantity},
 	}, opts).Decode(&data)
 	if err != nil {
@@ -971,6 +1255,10 @@ func (entity *productEntity) CreateProductPrice(param request.ProductPrice) (*en
 	logrus.Info("CreateProductPrice")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.createProductPriceWithContext(ctx, param)
+}
+
+func (entity *productEntity) createProductPriceWithContext(ctx context.Context, param request.ProductPrice) (*entities.ProductPrice, error) {
 	data := entities.ProductPrice{}
 	data.Id = primitive.NewObjectID()
 	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
@@ -1048,6 +1336,10 @@ func (entity *productEntity) CreateProductUnit(param request.ProductUnit) (*enti
 	logrus.Info("CreateProductUnit")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.createProductUnitWithContext(ctx, param)
+}
+
+func (entity *productEntity) createProductUnitWithContext(ctx context.Context, param request.ProductUnit) (*entities.ProductUnit, error) {
 	data := entities.ProductUnit{}
 	data.Id = primitive.NewObjectID()
 	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
@@ -1081,6 +1373,10 @@ func (entity *productEntity) GetProductUnitByDefault(productId string, unit stri
 	logrus.Info("GetProductUnitByDefault")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.getProductUnitByDefaultWithContext(ctx, productId, unit)
+}
+
+func (entity *productEntity) getProductUnitByDefaultWithContext(ctx context.Context, productId string, unit string) (*entities.ProductUnit, error) {
 	product, err := primitive.ObjectIDFromHex(productId)
 	if err != nil {
 		return nil, err
@@ -1097,6 +1393,10 @@ func (entity *productEntity) GetProductUnitByUnit(productId string, unit string)
 	logrus.Info("GetProductUnitByUnit")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.getProductUnitByUnitWithContext(ctx, productId, unit)
+}
+
+func (entity *productEntity) getProductUnitByUnitWithContext(ctx context.Context, productId string, unit string) (*entities.ProductUnit, error) {
 	product, err := primitive.ObjectIDFromHex(productId)
 	if err != nil {
 		return nil, err
@@ -1164,12 +1464,16 @@ func (entity *productEntity) CreateProductStock(param request.ProductStock) (*en
 	logrus.Info("CreateProductStock")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.createProductStockWithContext(ctx, param)
+}
+
+func (entity *productEntity) createProductStockWithContext(ctx context.Context, param request.ProductStock) (*entities.ProductStock, error) {
 	data := entities.ProductStock{}
 	data.Id = primitive.NewObjectID()
 	data.BranchId, _ = primitive.ObjectIDFromHex(param.BranchId)
 	data.ProductId, _ = primitive.ObjectIDFromHex(param.ProductId)
 	data.UnitId, _ = primitive.ObjectIDFromHex(param.UnitId)
-	data.Sequence = entity.GetProductStockMaxSequence(param.ProductId, param.UnitId) + 1
+	data.Sequence = entity.getProductStockMaxSequenceWithContext(ctx, param.ProductId, param.UnitId) + 1
 	data.LotNumber = param.LotNumber
 	data.CostPrice = param.CostPrice
 	data.Price = param.Price
@@ -1329,6 +1633,10 @@ func (entity *productEntity) CreateProductHistory(param request.ProductHistory) 
 	logrus.Info("CreateProductHistory")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	return entity.createProductHistoryWithContext(ctx, param)
+}
+
+func (entity *productEntity) createProductHistoryWithContext(ctx context.Context, param request.ProductHistory) (*entities.ProductHistory, error) {
 	data := entities.ProductHistory{}
 	data.Id = primitive.NewObjectID()
 	data.BranchId, _ = primitive.ObjectIDFromHex(param.BranchId)
@@ -1351,31 +1659,100 @@ func (entity *productEntity) CreateProductHistory(param request.ProductHistory) 
 	return &data, nil
 }
 
-func (entity *productEntity) GetProductStockBalance(productId string, unitId string) int {
+func (entity *productEntity) RemoveProductHistoryById(id string) (*entities.ProductHistory, error) {
+	logrus.Info("RemoveProductHistoryById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	data := entities.ProductHistory{}
+	err = entity.productHistoryRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) GetProductStockBalance(productId string, unitId string, branchId string) int {
 	logrus.Info("GetProductStockBalance")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	balance, err := entity.getProductStockBalanceWithContext(ctx, productId, unitId, branchId)
+	if err != nil {
+		return 0
+	}
+	return balance
+}
+
+func (entity *productEntity) getProductStockBalanceWithContext(ctx context.Context, productId string, unitId string, branchId string) (int, error) {
 	product, _ := primitive.ObjectIDFromHex(productId)
 	unit, _ := primitive.ObjectIDFromHex(unitId)
+	match := bson.M{"productId": product, "unitId": unit}
+	if branchId != "" {
+		branch, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return 0, err
+		}
+		match["branchId"] = branch
+	}
 	pipeline := []bson.M{
-		{"$match": bson.M{"productId": product, "unitId": unit}},
+		{"$match": match},
 		{"$group": bson.M{"_id": nil, "balance": bson.M{"$sum": "$quantity"}}},
 	}
 	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
 	if err != nil {
-		return 0
+		return 0, err
 	}
 	var results []bson.M
 	if err = cursor.All(ctx, &results); err != nil || len(results) == 0 {
-		return 0
+		return 0, err
 	}
 	if v, ok := results[0]["balance"].(int32); ok {
-		return int(v)
+		return int(v), nil
 	}
 	if v, ok := results[0]["balance"].(int64); ok {
-		return int(v)
+		return int(v), nil
 	}
-	return 0
+	return 0, nil
+}
+
+func (entity *productEntity) getReceiveByIDWithContext(ctx context.Context, id string) (*entities.Receive, error) {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	data := entities.Receive{}
+	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": objID}).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *productEntity) createReceiveItemWithContext(ctx context.Context, receiveId string, productId string, form request.Product) (*entities.ReceiveItem, error) {
+	recvID, err := primitive.ObjectIDFromHex(receiveId)
+	if err != nil {
+		return nil, err
+	}
+	productObjID, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
+	data := entities.ReceiveItem{
+		ReceiveId:  recvID,
+		ProductId:  productObjID,
+		Quantity:   form.Quantity,
+		CostPrice:  form.CostPrice,
+		LotNumber:  form.LotNumber,
+		ExpireDate: form.ExpireDate,
+	}
+	_, err = entity.receiveItemsRepo.InsertOne(ctx, data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
 }
 
 func (entity *productEntity) GetProductHistoryByProductId(productId string, branchId string) ([]entities.ProductHistory, error) {

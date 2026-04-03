@@ -28,7 +28,7 @@ func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(req.UnitId)
 		if unit != nil {
-			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex())
+			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex(), req.BranchId)
 			history := request.AddProductStockHistory(req.ProductId, unit.Unit, req, balance)
 			history.BranchId = req.BranchId
 			_, _ = productEntity.CreateProductHistory(history)
@@ -71,7 +71,7 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(req.UnitId)
 		if unit != nil {
-			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex())
+			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex(), ctx.GetString("BranchId"))
 			updateHistory := request.UpdateProductStockHistory(req.ProductId, unit.Unit, req, balance)
 			updateHistory.BranchId = ctx.GetString("BranchId")
 			_, _ = productEntity.CreateProductHistory(updateHistory)
@@ -100,7 +100,7 @@ func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.Han
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(stock.UnitId.Hex())
 		if unit != nil {
-			balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex())
+			balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex(), ctx.GetString("BranchId"))
 			qtyHistory := request.UpdateProductStockQuantityHistory(stock.ProductId.Hex(), unit.Unit, req, balance)
 			qtyHistory.BranchId = ctx.GetString("BranchId")
 			_, _ = productEntity.CreateProductHistory(qtyHistory)
@@ -124,7 +124,7 @@ func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 		// Add product history
 		unit, _ := productEntity.GetProductUnitById(result.UnitId.Hex())
 		if unit != nil {
-			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex())
+			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex(), ctx.GetString("BranchId"))
 			removeHistory := request.RemoveProductStockHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId)
 			removeHistory.BranchId = ctx.GetString("BranchId")
 			_, _ = productEntity.CreateProductHistory(removeHistory)

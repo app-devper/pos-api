@@ -31,9 +31,8 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 			return
 		}
 
-		_ = receiveEntity.DeleteReceiveItemsByReceiveId(id)
-
 		var totalCost float64
+		filteredItems := make([]request.ReceiveItem, 0, len(req.ReceiveItems))
 		for _, item := range req.ReceiveItems {
 			if item.ProductId == "" || item.Quantity <= 0 {
 				continue
@@ -64,20 +63,17 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 					productReq.ExpireDate = t
 				}
 			}
-			_, _ = receiveEntity.CreateReceiveItem(id, "", item.ProductId, productReq)
+			item.ExpireDate = productReq.ExpireDate.Format(time.RFC3339)
+			filteredItems = append(filteredItems, item)
 			totalCost += item.CostPrice * float64(item.Quantity)
 		}
 
+		req.ReceiveItems = filteredItems
 		req.TotalCost = totalCost
 		result, err := receiveEntity.UpdateReceiveById(id, req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		items, _ := receiveEntity.GetReceiveItemsByReceiveId(id)
-		if len(items) > 0 {
-			result.Items = items
 		}
 
 		ctx.JSON(http.StatusOK, result)

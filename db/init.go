@@ -13,8 +13,9 @@ import (
 )
 
 type Resource struct {
-	PosDb *mongo.Database
-	RdDb  *redis.Client
+	Client *mongo.Client
+	PosDb  *mongo.Database
+	RdDb   *redis.Client
 }
 
 // Close use this method to close database connection
@@ -49,7 +50,8 @@ func InitResource() (*Resource, error) {
 	rdb := redis.NewClient(redisOp)
 
 	return &Resource{
-		PosDb: mongoClient.Database(posDbName),
-		RdDb:  rdb,
+		Client: mongoClient,
+		PosDb:  mongoClient.Database(posDbName),
+		RdDb:   rdb,
 	}, nil
 }
