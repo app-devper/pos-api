@@ -96,6 +96,37 @@ Dev mode with auto-reload:
 nodemon --exec go run main.go --signal SIGTERM
 ```
 
+## Cloud Run Cost Tips
+
+โปรเจกต์นี้รองรับการ deploy บน Cloud Run ได้ดีขึ้นแล้วด้วย default ที่ช่วยลด cost:
+
+- ใช้ `GIN_MODE=release` อัตโนมัติบน Cloud Run
+- จำกัด Mongo/Redis pool ต่อ instance เพื่อลด connection overhead
+- มี HTTP timeout defaults เพื่อตัด request ที่ค้างนานเกินจำเป็น
+- ปิด `AUTO_INIT_DEFAULT_BRANCH` บน Cloud Run โดย default เพื่อลด startup I/O
+
+ตัวอย่าง env ที่แนะนำ:
+
+```env
+PORT=8080
+GIN_MODE=release
+MONGO_MAX_POOL_SIZE=10
+MONGO_MIN_POOL_SIZE=0
+MONGO_MAX_CONN_IDLE_TIME_SEC=120
+MONGO_CONNECT_TIMEOUT_SEC=3
+MONGO_SERVER_SELECTION_TIMEOUT_SEC=3
+REDIS_POOL_SIZE=10
+REDIS_MIN_IDLE_CONNS=0
+REDIS_DIAL_TIMEOUT_SEC=3
+REDIS_READ_TIMEOUT_SEC=3
+REDIS_WRITE_TIMEOUT_SEC=3
+REDIS_IDLE_TIMEOUT_SEC=120
+HTTP_READ_TIMEOUT_SEC=15
+HTTP_READ_HEADER_TIMEOUT_SEC=5
+HTTP_WRITE_TIMEOUT_SEC=30
+HTTP_IDLE_TIMEOUT_SEC=120
+```
+
 ## API Base Path
 
 ```

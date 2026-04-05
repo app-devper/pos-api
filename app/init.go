@@ -1,6 +1,7 @@
 package app
 
 import (
+	"net/http"
 	"os"
 	"pos/app/domain"
 	"pos/app/domain/request"
@@ -22,6 +23,8 @@ import (
 	"pos/app/featues/supplier"
 	"pos/db"
 	"pos/middlewares"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -31,6 +34,7 @@ type Routes struct {
 }
 
 func (app Routes) StartGin() {
+	configureGinMode()
 	r := gin.New()
 
 	err := r.SetTrustedProxies(nil)
@@ -51,7 +55,9 @@ func (app Routes) StartGin() {
 	publicRoute := r.Group("/api/pos/v1")
 
 	repository := domain.InitRepository(resource)
-	initDefaultBranch(repository)
+	if shouldAutoInitDefaultBranch() {
+		initDefaultBranch(repository)
+	}
 
 	product.ApplyProductAPI(publicRoute, repository)
 	order.ApplyOrderAPI(publicRoute, repository)
@@ -72,9 +78,22 @@ func (app Routes) StartGin() {
 
 	r.NoRoute(middlewares.NoRoute())
 
-	err = r.Run(":" + os.Getenv("PORT"))
+	server := &http.Server{
+		Addr:              ":" + getEnv("PORT", "8080"),
+		Handler:           r,
+		ReadTimeout:       getEnvDurationSeconds("HTTP_READ_TIMEOUT_SEC", 15),
+		ReadHeaderTimeout: getEnvDurationSeconds("HTTP_READ_HEADER_TIMEOUT_SEC", 5),
+		WriteTimeout:      getEnvDurationSeconds("HTTP_WRITE_TIMEOUT_SEC", 30),
+		IdleTimeout:       getEnvDurationSeconds("HTTP_IDLE_TIMEOUT_SEC", 120),
+		MaxHeaderBytes:    1 << 20,
+	}
+
+	err = server.ListenAndServe()
 	if err != nil {
-		logrus.Error(err)
+		if err == http.ErrServerClosed {
+			return
+		}
+		logrus.WithError(err).Error("http server failed")
 	}
 }
 
@@ -93,4 +112,65 @@ func initDefaultBranch(repository *domain.Repository) {
 		return
 	}
 	logrus.Info("initDefaultBranch: created default branch 'สำนักงานใหญ่'")
+}
+
+func configureGinMode() {
+	ginMode := os.Getenv("GIN_MODE")
+	if ginMode != "" {
+		gin.SetMode(ginMode)
+		return
+	}
+	if isCloudRun() {
+		gin.SetMode(gin.ReleaseMode)
+	}
+}
+
+func shouldAutoInitDefaultBranch() bool {
+	if value, ok := lookupBoolEnv("AUTO_INIT_DEFAULT_BRANCH"); ok {
+		return value
+	}
+	return !isCloudRun()
+}
+
+func isCloudRun() bool {
+	return os.Getenv("K_SERVICE") != "" || os.Getenv("K_REVISION") != ""
+}
+
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func getEnvDurationSeconds(key string, fallbackSeconds int) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return time.Duration(fallbackSeconds) * time.Second
+	}
+	seconds, err := strconv.Atoi(value)
+	if err != nil || seconds <= 0 {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"key":   key,
+			"value": value,
+		}).Warn("invalid duration env, using fallback")
+		return time.Duration(fallbackSeconds) * time.Second
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func lookupBoolEnv(key string) (bool, bool) {
+	value := os.Getenv(key)
+	if value == "" {
+		return false, false
+	}
+	result, err := strconv.ParseBool(value)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"key":   key,
+			"value": value,
+		}).Warn("invalid bool env, ignoring")
+		return false, false
+	}
+	return result, true
 }
