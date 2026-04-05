@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,9 @@ type productPriceRepoStub struct {
 	repositories.IProduct
 	createPriceCascadeFn func(param request.ProductPrice, branchId string, userId string) (*entities.ProductPrice, error)
 	removePriceCascadeFn func(id string, branchId string, userId string) (*entities.ProductPrice, error)
+	updatePriceByIDFn    func(id string, param request.ProductPrice) (*entities.ProductPrice, error)
+	getUnitByIDFn        func(id string) (*entities.ProductUnit, error)
+	createHistoryFn      func(param request.ProductHistory) (*entities.ProductHistory, error)
 }
 
 func (s *productPriceRepoStub) CreateProductPriceCascade(param request.ProductPrice, branchId string, userId string) (*entities.ProductPrice, error) {
@@ -26,6 +30,18 @@ func (s *productPriceRepoStub) CreateProductPriceCascade(param request.ProductPr
 
 func (s *productPriceRepoStub) RemoveProductPriceCascade(id string, branchId string, userId string) (*entities.ProductPrice, error) {
 	return s.removePriceCascadeFn(id, branchId, userId)
+}
+
+func (s *productPriceRepoStub) UpdateProductPriceById(id string, param request.ProductPrice) (*entities.ProductPrice, error) {
+	return s.updatePriceByIDFn(id, param)
+}
+
+func (s *productPriceRepoStub) GetProductUnitById(id string) (*entities.ProductUnit, error) {
+	return s.getUnitByIDFn(id)
+}
+
+func (s *productPriceRepoStub) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
+	return s.createHistoryFn(param)
 }
 
 func TestCreateProductPriceUsesTransactionalCascadeMethod(t *testing.T) {
@@ -111,5 +127,46 @@ func TestRemoveProductPriceByIdUsesTransactionalCascadeMethod(t *testing.T) {
 	}
 	if gotUserID != "user-2" {
 		t.Fatalf("expected user id user-2, got %s", gotUserID)
+	}
+}
+
+func TestUpdateProductPriceByIdSkipsHistoryWhenUnitLookupFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	priceID := primitive.NewObjectID().Hex()
+	productID := primitive.NewObjectID().Hex()
+	unitID := primitive.NewObjectID().Hex()
+	historyCalled := false
+
+	repo := &productPriceRepoStub{
+		updatePriceByIDFn: func(id string, param request.ProductPrice) (*entities.ProductPrice, error) {
+			return &entities.ProductPrice{Id: primitive.NewObjectID()}, nil
+		},
+		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
+			return nil, errors.New("unit lookup failed")
+		},
+		createHistoryFn: func(param request.ProductHistory) (*entities.ProductHistory, error) {
+			historyCalled = true
+			return &entities.ProductHistory{}, nil
+		},
+	}
+
+	body := `{"productId":"` + productID + `","unitId":"` + unitID + `","price":45,"customerType":"General"}`
+	req := httptest.NewRequest(http.MethodPatch, "/product-prices/"+priceID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "priceId", Value: priceID}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	UpdateProductPriceById(repo)(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if historyCalled {
+		t.Fatal("expected history creation to be skipped when unit lookup fails")
 	}
 }

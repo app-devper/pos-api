@@ -41,20 +41,12 @@ func NewStockTransferEntity(resource *db.Resource) IStockTransfer {
 }
 
 func ensureStockTransferIndexes(repo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	_, err := repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "stock_transfers fromBranchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "fromBranchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create stock_transfers fromBranch index: ", err)
-	}
-	_, err = repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "stock_transfers toBranchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "toBranchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create stock_transfers toBranch index: ", err)
-	}
 }
 
 func (entity *stockTransferEntity) CreateStockTransfer(form request.StockTransfer) (*entities.StockTransfer, error) {
@@ -123,12 +115,21 @@ func (entity *stockTransferEntity) createStockTransferWithReservationContext(ctx
 
 func (entity *stockTransferEntity) createStockTransferWithContext(ctx context.Context, form request.StockTransfer) (*entities.StockTransfer, error) {
 
-	fromBranchId, _ := primitive.ObjectIDFromHex(form.FromBranchId)
-	toBranchId, _ := primitive.ObjectIDFromHex(form.ToBranchId)
+	fromBranchId, err := primitive.ObjectIDFromHex(form.FromBranchId)
+	if err != nil {
+		return nil, err
+	}
+	toBranchId, err := primitive.ObjectIDFromHex(form.ToBranchId)
+	if err != nil {
+		return nil, err
+	}
 
 	items := make([]entities.StockTransferItem, len(form.Items))
 	for i, item := range form.Items {
-		productId, _ := primitive.ObjectIDFromHex(item.ProductId)
+		productId, err := primitive.ObjectIDFromHex(item.ProductId)
+		if err != nil {
+			return nil, err
+		}
 		items[i] = entities.StockTransferItem{
 			ProductId: productId,
 			StockId:   item.StockId,
@@ -149,7 +150,7 @@ func (entity *stockTransferEntity) createStockTransferWithContext(ctx context.Co
 		UpdatedBy:    form.CreatedBy,
 		UpdatedDate:  time.Now(),
 	}
-	_, err := entity.repo.InsertOne(ctx, data)
+	_, err = entity.repo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +163,14 @@ func (entity *stockTransferEntity) ApproveStockTransfer(id string, updatedBy str
 	defer cancel()
 
 	if entity.client == nil {
-		return entity.approveStockTransferWithContext(ctx, id, updatedBy)
+		result, err := entity.approveStockTransferWithContext(ctx, id, updatedBy)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"stockTransferId": id,
+				"updatedBy":       updatedBy,
+			}).Error("approve stock transfer failed")
+		}
+		return result, err
 	}
 
 	session, err := entity.client.StartSession()
@@ -181,6 +189,10 @@ func (entity *stockTransferEntity) ApproveStockTransfer(id string, updatedBy str
 		return result, nil
 	})
 	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"stockTransferId": id,
+			"updatedBy":       updatedBy,
+		}).Error("approve stock transfer transaction failed")
 		return nil, err
 	}
 	return updated, nil
@@ -237,7 +249,14 @@ func (entity *stockTransferEntity) RejectStockTransfer(id string, updatedBy stri
 	defer cancel()
 
 	if entity.client == nil {
-		return entity.rejectStockTransferWithContext(ctx, id, updatedBy)
+		result, err := entity.rejectStockTransferWithContext(ctx, id, updatedBy)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"stockTransferId": id,
+				"updatedBy":       updatedBy,
+			}).Error("reject stock transfer failed")
+		}
+		return result, err
 	}
 
 	session, err := entity.client.StartSession()
@@ -256,6 +275,10 @@ func (entity *stockTransferEntity) RejectStockTransfer(id string, updatedBy stri
 		return result, nil
 	})
 	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"stockTransferId": id,
+			"updatedBy":       updatedBy,
+		}).Error("reject stock transfer transaction failed")
 		return nil, err
 	}
 	return updated, nil
@@ -293,7 +316,10 @@ func (entity *stockTransferEntity) GetStockTransfers(branchId string) ([]entitie
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	objId, _ := primitive.ObjectIDFromHex(branchId)
+	objId, err := primitive.ObjectIDFromHex(branchId)
+	if err != nil {
+		return nil, err
+	}
 	filter := bson.M{
 		"$or": []bson.M{
 			{"fromBranchId": objId},

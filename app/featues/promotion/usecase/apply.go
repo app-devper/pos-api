@@ -7,12 +7,14 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ApplyPromotion{}
 		if err := ctx.ShouldBind(&req); err != nil {
+			logrus.WithError(err).Error("bind apply promotion request failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_001, err.Error())
 			return
 		}
@@ -20,11 +22,21 @@ func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 
 		promo, err := entity.GetPromotionByCode(req.PromotionCode, branchId)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"branchId":      branchId,
+				"promotionCode": req.PromotionCode,
+			}).Error("get promotion by code failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "promotion not found or expired")
 			return
 		}
 
 		if promo.MinPurchase > 0 && req.OrderTotal < promo.MinPurchase {
+			logrus.WithFields(logrus.Fields{
+				"branchId":      branchId,
+				"promotionCode": req.PromotionCode,
+				"orderTotal":    req.OrderTotal,
+				"minPurchase":   promo.MinPurchase,
+			}).Warn("apply promotion rejected due to minimum purchase")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "order total below minimum purchase")
 			return
 		}
@@ -42,6 +54,11 @@ func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 				}
 			}
 			if !hasMatch {
+				logrus.WithFields(logrus.Fields{
+					"branchId":      branchId,
+					"promotionCode": req.PromotionCode,
+					"productIds":    req.ProductIds,
+				}).Warn("apply promotion rejected due to no matching products")
 				errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "no matching products for this promotion")
 				return
 			}

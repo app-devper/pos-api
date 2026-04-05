@@ -36,23 +36,13 @@ func NewEmployeeEntity(resource *db.Resource) IEmployee {
 }
 
 func ensureEmployeeIndexes(employeeRepo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	_, err := employeeRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(employeeRepo, "employees branchId", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create employees branchId index: ", err)
-	}
-
-	_, err = employeeRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(employeeRepo, "employees userId", mongo.IndexModel{
 		Keys:    bson.D{{Key: "userId", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
-	if err != nil {
-		logrus.Error("failed to create employees userId index: ", err)
-	}
 }
 
 func (entity *employeeEntity) CreateEmployee(form request.Employee) (*entities.Employee, error) {

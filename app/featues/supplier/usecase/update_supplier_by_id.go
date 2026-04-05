@@ -8,12 +8,14 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func UpdateSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Supplier{}
 		if err := ctx.ShouldBind(&req); err != nil {
+			logrus.WithError(err).Error("bind update supplier request failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_001, err.Error())
 			return
 		}
@@ -24,6 +26,10 @@ func UpdateSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 
 		result, err := supplierEntity.UpdateSupplierById(id, req)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"supplierId": id,
+				"updatedBy":  req.UpdatedBy,
+			}).Error("update supplier failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())
 			return
 		}

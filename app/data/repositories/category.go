@@ -32,7 +32,7 @@ type ICategory interface {
 func NewCategoryEntity(resource *db.Resource) ICategory {
 	categoryRepo := resource.PosDb.Collection("categories")
 	entity := &categoryEntity{categoryRepo: categoryRepo}
-	_, _ = entity.CreateIndex()
+	ensureCollectionIndex(entity, "categories")
 	return entity
 }
 

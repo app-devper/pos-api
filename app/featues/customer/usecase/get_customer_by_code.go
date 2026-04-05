@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GetCustomerByCode(customerEntity repositories.ICustomer) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func GetCustomerByCode(customerEntity repositories.ICustomer) gin.HandlerFunc {
 		customerCode := ctx.Param("customerCode")
 		result, err := customerEntity.GetCustomerByCode(customerCode)
 		if err != nil {
+			logrus.WithError(err).WithField("customerCode", customerCode).Error("get customer by code failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
 			return
 		}

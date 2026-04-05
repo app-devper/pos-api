@@ -1,11 +1,13 @@
 package usecase
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"pos/app/core/errcode"
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
@@ -88,5 +90,90 @@ func TestUpdateReceiveByIdFiltersInvalidItemsBeforeTransactionalUpdate(t *testin
 	}
 	if gotForm.UpdatedBy != "user-1" {
 		t.Fatalf("expected UpdatedBy user-1, got %s", gotForm.UpdatedBy)
+	}
+}
+
+func TestUpdateReceiveByIdFailsWhenProductLookupFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	receiveID := primitive.NewObjectID().Hex()
+	productID := primitive.NewObjectID().Hex()
+
+	receiveRepo := &updateReceiveRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), Code: "RC-001"}, nil
+		},
+		updateByIDFn: func(id string, form request.UpdateReceive) (*entities.Receive, error) {
+			t.Fatal("update receive should not be called when product lookup fails")
+			return nil, nil
+		},
+	}
+	productRepo := &updateReceiveProductStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			return nil, errors.New("product lookup failed")
+		},
+	}
+
+	body := `{"supplierId":"` + primitive.NewObjectID().Hex() + `","reference":"ref-1","items":[{"productId":"` + productID + `","costPrice":5,"quantity":2}]}`
+	req := httptest.NewRequest(http.MethodPut, "/receives/"+receiveID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: receiveID}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	UpdateReceiveById(receiveRepo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), errcode.RC_BAD_REQUEST_002) {
+		t.Fatalf("expected errcode %s, got %s", errcode.RC_BAD_REQUEST_002, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "product lookup failed") {
+		t.Fatalf("expected product lookup error, got %s", w.Body.String())
+	}
+}
+
+func TestUpdateReceiveByIdFailsWhenProductNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	receiveID := primitive.NewObjectID().Hex()
+	productID := primitive.NewObjectID().Hex()
+
+	receiveRepo := &updateReceiveRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), Code: "RC-001"}, nil
+		},
+		updateByIDFn: func(id string, form request.UpdateReceive) (*entities.Receive, error) {
+			t.Fatal("update receive should not be called when product is missing")
+			return nil, nil
+		},
+	}
+	productRepo := &updateReceiveProductStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			return nil, nil
+		},
+	}
+
+	body := `{"supplierId":"` + primitive.NewObjectID().Hex() + `","reference":"ref-1","items":[{"productId":"` + productID + `","costPrice":5,"quantity":2}]}`
+	req := httptest.NewRequest(http.MethodPut, "/receives/"+receiveID, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: receiveID}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	UpdateReceiveById(receiveRepo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "product "+productID+" not found") {
+		t.Fatalf("expected product not found error, got %s", w.Body.String())
 	}
 }

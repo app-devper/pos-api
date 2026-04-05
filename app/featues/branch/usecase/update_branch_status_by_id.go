@@ -8,6 +8,7 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func UpdateBranchStatusById(branchEntity repositories.IBranch) gin.HandlerFunc {
@@ -15,6 +16,7 @@ func UpdateBranchStatusById(branchEntity repositories.IBranch) gin.HandlerFunc {
 		branchId := ctx.Param("branchId")
 		req := request.UpdateBranchStatus{}
 		if err := ctx.ShouldBind(&req); err != nil {
+			logrus.WithError(err).WithField("branchId", branchId).Error("bind update branch status request failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_001, err.Error())
 			return
 		}
@@ -24,6 +26,10 @@ func UpdateBranchStatusById(branchEntity repositories.IBranch) gin.HandlerFunc {
 
 		result, err := branchEntity.UpdateBranchStatusById(branchId, req)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"branchId":  branchId,
+				"updatedBy": req.UpdatedBy,
+			}).Error("update branch status failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
 			return
 		}

@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GetBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func GetBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
 		branchId := ctx.Param("branchId")
 		result, err := branchEntity.GetBranchById(branchId)
 		if err != nil {
+			logrus.WithError(err).WithField("branchId", branchId).Error("get branch by id failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
 			return
 		}

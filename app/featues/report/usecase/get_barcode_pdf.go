@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-pdf/fpdf"
+	"github.com/sirupsen/logrus"
 )
 
 type barcodeRequest struct {
@@ -34,10 +35,30 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 			Unit         string
 		}
 
+		productList, err := productEntity.GetProductsByIds(req.ProductIds)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"productIds": req.ProductIds,
+				"copies":     req.Copies,
+			}).Error("get barcode products failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
+		productMap := make(map[string]*repositoriesLabelProduct, len(productList))
+		for i := range productList {
+			product := productList[i]
+			productMap[product.Id.Hex()] = &repositoriesLabelProduct{
+				Name:         product.Name,
+				SerialNumber: product.SerialNumber,
+				Price:        product.Price,
+				Unit:         product.Unit,
+			}
+		}
+
 		var labels []labelData
 		for _, pid := range req.ProductIds {
-			product, err := productEntity.GetProductById(pid)
-			if err != nil {
+			product, ok := productMap[pid]
+			if !ok {
 				continue
 			}
 			for i := 0; i < req.Copies; i++ {
@@ -105,9 +126,21 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 		ctx.Header("Content-Type", "application/pdf")
 		ctx.Header("Content-Disposition", "inline; filename=barcode-labels.pdf")
 		if err := doc.Output(ctx.Writer); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"productIds": req.ProductIds,
+				"copies":     req.Copies,
+			}).Error("write barcode pdf failed")
 			errcode.Abort(ctx, http.StatusInternalServerError, errcode.RP_INTERNAL_001, err.Error())
+			return
 		}
 	}
+}
+
+type repositoriesLabelProduct struct {
+	Name         string
+	SerialNumber string
+	Price        float64
+	Unit         string
 }
 
 func drawCode128(pdf *fpdf.Fpdf, x, y, w, h float64, code string) {

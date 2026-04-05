@@ -9,6 +9,7 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func CreateStockTransfer(entity repositories.IStockTransfer, productEntity repositories.IProduct, sequenceEntity repositories.ISequence) gin.HandlerFunc {
@@ -25,13 +26,24 @@ func CreateStockTransfer(entity repositories.IStockTransfer, productEntity repos
 			return
 		}
 
-		sequence, _ := sequenceEntity.NextSequence(constant.STOCK_TRANSFER)
-		if sequence != nil {
-			req.Code = "TF-" + sequence.GenerateCode()
+		sequence, err := sequenceEntity.NextSequence(constant.STOCK_TRANSFER)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			return
 		}
+		if sequence == nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, "stock transfer sequence not available")
+			return
+		}
+		req.Code = "TF-" + sequence.GenerateCode()
 
 		result, err := entity.CreateStockTransferWithReservation(req)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"fromBranchId": req.FromBranchId,
+				"toBranchId":   req.ToBranchId,
+				"code":         req.Code,
+			}).Error("create stock transfer failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
 			return
 		}

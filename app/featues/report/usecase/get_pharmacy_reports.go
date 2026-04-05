@@ -12,6 +12,65 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func resolveUnitName(unitMap map[string]string, unitID string, fallback string) string {
+	if unitID == "" {
+		return fallback
+	}
+	if unit, ok := unitMap[unitID]; ok && unit != "" {
+		return unit
+	}
+	return fallback
+}
+
+func buildUnitNameMap(productEntity repositories.IProduct, unitIds []string) (map[string]string, error) {
+	if len(unitIds) == 0 {
+		return map[string]string{}, nil
+	}
+	units, err := productEntity.GetProductUnitsByIds(unitIds)
+	if err != nil {
+		return nil, err
+	}
+	unitMap := make(map[string]string, len(units))
+	for _, unit := range units {
+		unitMap[unit.Id.Hex()] = unit.Unit
+	}
+	return unitMap, nil
+}
+
+func getReceiveItemsMap(receiveEntity repositories.IReceive, receives []entities.Receive) (map[string][]entities.ReceiveItem, error) {
+	if len(receives) == 0 {
+		return map[string][]entities.ReceiveItem{}, nil
+	}
+	receiveIds := make([]string, 0, len(receives))
+	for _, recv := range receives {
+		receiveIds = append(receiveIds, recv.Id.Hex())
+	}
+	receiveItems, err := receiveEntity.GetReceiveItemsByReceiveIds(receiveIds)
+	if err != nil {
+		return nil, err
+	}
+	receiveItemsMap := make(map[string][]entities.ReceiveItem, len(receives))
+	for _, item := range receiveItems {
+		receiveItemsMap[item.ReceiveId.Hex()] = append(receiveItemsMap[item.ReceiveId.Hex()], item)
+	}
+	return receiveItemsMap, nil
+}
+
+func getSupplierNameMap(supplierEntity repositories.ISupplier, supplierIds []string) (map[string]string, error) {
+	if len(supplierIds) == 0 {
+		return map[string]string{}, nil
+	}
+	suppliers, err := supplierEntity.GetSuppliersByIds(supplierIds)
+	if err != nil {
+		return nil, err
+	}
+	supplierMap := make(map[string]string, len(suppliers))
+	for _, supplier := range suppliers {
+		supplierMap[supplier.Id.Hex()] = supplier.Name
+	}
+	return supplierMap, nil
+}
+
 type pharmacyReportRange struct {
 	StartDate time.Time `form:"startDate" binding:"required"`
 	EndDate   time.Time `form:"endDate" binding:"required"`
@@ -64,37 +123,58 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 		return nil, err
 	}
 
+	receiveItemsMap, err := getReceiveItemsMap(receiveEntity, receives)
+	if err != nil {
+		return nil, err
+	}
 	productIdSet := make(map[string]struct{})
 	supplierIdSet := make(map[string]struct{})
+	unitIdSet := make(map[string]struct{})
 	for _, recv := range receives {
 		if !recv.SupplierId.IsZero() {
 			supplierIdSet[recv.SupplierId.Hex()] = struct{}{}
 		}
-		for _, item := range recv.Items {
+		for _, item := range receiveItemsMap[recv.Id.Hex()] {
 			productIdSet[item.ProductId.Hex()] = struct{}{}
+			if item.UnitId != "" {
+				unitIdSet[item.UnitId] = struct{}{}
+			}
 		}
 	}
 	productIds := make([]string, 0, len(productIdSet))
 	for id := range productIdSet {
 		productIds = append(productIds, id)
 	}
-	productList, _ := productEntity.GetProductsByIds(productIds)
+	productList, err := productEntity.GetProductsByIds(productIds)
+	if err != nil {
+		return nil, err
+	}
 	productMap := make(map[string]*entities.Product, len(productList))
 	for i := range productList {
 		productMap[productList[i].Id.Hex()] = &productList[i]
 	}
+	unitIds := make([]string, 0, len(unitIdSet))
+	for id := range unitIdSet {
+		unitIds = append(unitIds, id)
+	}
+	unitMap, err := buildUnitNameMap(productEntity, unitIds)
+	if err != nil {
+		return nil, err
+	}
 
-	supplierMap := make(map[string]string)
+	supplierIds := make([]string, 0, len(supplierIdSet))
 	for sid := range supplierIdSet {
-		if sup, err := supplierEntity.GetSupplierById(sid); err == nil && sup != nil {
-			supplierMap[sid] = sup.Name
-		}
+		supplierIds = append(supplierIds, sid)
+	}
+	supplierMap, err := getSupplierNameMap(supplierEntity, supplierIds)
+	if err != nil {
+		return nil, err
 	}
 
 	items := make([]pharmacyReportItem, 0)
 	for _, recv := range receives {
 		supName := supplierMap[recv.SupplierId.Hex()]
-		for _, item := range recv.Items {
+		for _, item := range receiveItemsMap[recv.Id.Hex()] {
 			product, ok := productMap[item.ProductId.Hex()]
 			if !ok || !containsReg(product.DrugRegistrations, "KHY9") {
 				continue
@@ -110,7 +190,7 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 				GenericName:  getDrugField(*product, func(d *entities.DrugInfo) string { return d.GenericName }),
 				LotNumber:    item.LotNumber,
 				Quantity:     item.Quantity,
-				Unit:         product.Unit,
+				Unit:         resolveUnitName(unitMap, item.UnitId, product.Unit),
 				CostPrice:    item.CostPrice,
 				SupplierName: supName,
 				ExpireDate:   expDate,
@@ -123,7 +203,7 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 	return items, nil
 }
 
-func getSalesReportItems(orderEntity repositories.IOrder, branchId string, req pharmacyReportRange, khyKey string) ([]pharmacyReportItem, error) {
+func getSalesReportItems(orderEntity repositories.IOrder, productEntity repositories.IProduct, branchId string, req pharmacyReportRange, khyKey string) ([]pharmacyReportItem, error) {
 	orderRange := request.GetOrderRange{
 		StartDate: req.StartDate,
 		EndDate:   req.EndDate,
@@ -135,6 +215,20 @@ func getSalesReportItems(orderEntity repositories.IOrder, branchId string, req p
 	}
 
 	orderItems, err := orderEntity.GetOrderItemRange(orderRange)
+	if err != nil {
+		return nil, err
+	}
+	unitIdSet := make(map[string]struct{})
+	for _, oi := range orderItems {
+		if !oi.UnitId.IsZero() {
+			unitIdSet[oi.UnitId.Hex()] = struct{}{}
+		}
+	}
+	unitIds := make([]string, 0, len(unitIdSet))
+	for id := range unitIdSet {
+		unitIds = append(unitIds, id)
+	}
+	unitMap, err := buildUnitNameMap(productEntity, unitIds)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +248,7 @@ func getSalesReportItems(orderEntity repositories.IOrder, branchId string, req p
 			ProductName:    product.Name,
 			GenericName:    getDrugField(product, func(d *entities.DrugInfo) string { return d.GenericName }),
 			Quantity:       oi.Quantity,
-			Unit:           product.Unit,
+			Unit:           resolveUnitName(unitMap, oi.UnitId.Hex(), product.Unit),
 			Dosage:         getDrugField(product, func(d *entities.DrugInfo) string { return d.Dosage }),
 			Strength:       getDrugField(product, func(d *entities.DrugInfo) string { return d.Strength }),
 			DosageForm:     getDrugField(product, func(d *entities.DrugInfo) string { return d.DosageForm }),
@@ -190,7 +284,7 @@ func getDrugField(p entities.Product, fn func(*entities.DrugInfo) string) string
 	return ""
 }
 
-func getSalesReportDataHandler(orderEntity repositories.IOrder, key string, title string, khyKey string) gin.HandlerFunc {
+func getSalesReportDataHandler(orderEntity repositories.IOrder, productEntity repositories.IProduct, key string, title string, khyKey string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -198,7 +292,7 @@ func getSalesReportDataHandler(orderEntity repositories.IOrder, key string, titl
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		items, err := getSalesReportItems(orderEntity, branchId, req, khyKey)
+		items, err := getSalesReportItems(orderEntity, productEntity, branchId, req, khyKey)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 			return
@@ -207,18 +301,18 @@ func getSalesReportDataHandler(orderEntity repositories.IOrder, key string, titl
 	}
 }
 
-func GetKHY10Data(orderEntity repositories.IOrder) gin.HandlerFunc {
-	return getSalesReportDataHandler(orderEntity, "khy10", "ข.ย.10 บัญชีการขายยาควบคุมพิเศษ", "KHY10")
+func GetKHY10Data(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, productEntity, "khy10", "ข.ย.10 บัญชีการขายยาควบคุมพิเศษ", "KHY10")
 }
 
-func GetKHY11Data(orderEntity repositories.IOrder) gin.HandlerFunc {
-	return getSalesReportDataHandler(orderEntity, "khy11", "ข.ย.11 บัญชีการขายยาอันตราย", "KHY11")
+func GetKHY11Data(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, productEntity, "khy11", "ข.ย.11 บัญชีการขายยาอันตราย", "KHY11")
 }
 
-func GetKHY12Data(orderEntity repositories.IOrder) gin.HandlerFunc {
-	return getSalesReportDataHandler(orderEntity, "khy12", "ข.ย.12 บัญชีการขายยาตามใบสั่งของผู้ประกอบวิชาชีพ", "KHY12")
+func GetKHY12Data(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, productEntity, "khy12", "ข.ย.12 บัญชีการขายยาตามใบสั่งของผู้ประกอบวิชาชีพ", "KHY12")
 }
 
-func GetKHY13Data(orderEntity repositories.IOrder) gin.HandlerFunc {
-	return getSalesReportDataHandler(orderEntity, "khy13", "ข.ย.13 รายงานการขายยาตามที่เลขาธิการ อย. กำหนด", "KHY13")
+func GetKHY13Data(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
+	return getSalesReportDataHandler(orderEntity, productEntity, "khy13", "ข.ย.13 รายงานการขายยาตามที่เลขาธิการ อย. กำหนด", "KHY13")
 }

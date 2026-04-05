@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GetSetting(settingEntity repositories.ISetting) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func GetSetting(settingEntity repositories.ISetting) gin.HandlerFunc {
 		branchId := ctx.GetString("BranchId")
 		result, err := settingEntity.GetSettingByBranchId(branchId)
 		if err != nil {
+			logrus.WithError(err).WithField("branchId", branchId).Error("get setting failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.SE_BAD_REQUEST_002, err.Error())
 			return
 		}

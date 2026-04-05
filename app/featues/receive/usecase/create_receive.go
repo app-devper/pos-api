@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
@@ -24,10 +25,16 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 		userId := utils.GetUserId(ctx)
 		branchId := utils.GetBranchId(ctx)
 
-		sequence, _ := sequenceEntity.NextSequence(constant.RECEIVE)
-		if sequence != nil {
-			req.Code = sequence.GenerateCode()
+		sequence, err := sequenceEntity.NextSequence(constant.RECEIVE)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			return
 		}
+		if sequence == nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "receive sequence not available")
+			return
+		}
+		req.Code = sequence.GenerateCode()
 		req.UpdatedBy = userId
 		req.BranchId = branchId
 
@@ -38,6 +45,21 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 		}
 
 		receiveId := result.Id.Hex()
+		rollback := func(cause error) {
+			if _, rollbackErr := receiveEntity.RemoveReceiveById(receiveId); rollbackErr != nil {
+				logrus.WithError(rollbackErr).WithFields(logrus.Fields{
+					"receiveId": receiveId,
+					"branchId":  branchId,
+					"code":      req.Code,
+				}).Error("create receive rollback failed")
+			}
+			logrus.WithError(cause).WithFields(logrus.Fields{
+				"receiveId": receiveId,
+				"branchId":  branchId,
+				"code":      req.Code,
+			}).Error("create receive rolled back")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, cause.Error())
+		}
 		var totalCost float64
 
 		for _, item := range req.Items {
@@ -46,9 +68,13 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 			}
 
 			product, pErr := productEntity.GetProductById(item.ProductId)
-			if pErr != nil || product == nil {
-				logrus.Warnf("CreateReceive: product %s not found, skipping", item.ProductId)
-				continue
+			if pErr != nil {
+				rollback(fmt.Errorf("failed to load product %s: %w", item.ProductId, pErr))
+				return
+			}
+			if product == nil {
+				rollback(fmt.Errorf("product %s not found", item.ProductId))
+				return
 			}
 
 			productReq := request.Product{
@@ -73,13 +99,19 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 				}
 			}
 
-			_, _ = receiveEntity.CreateReceiveItem(receiveId, "", item.ProductId, productReq)
+			if _, err := receiveEntity.CreateReceiveItem(receiveId, "", item.ProductId, productReq); err != nil {
+				rollback(fmt.Errorf("failed to create receive item for product %s: %w", item.ProductId, err))
+				return
+			}
 
 			totalCost += item.CostPrice * float64(item.Quantity)
 		}
 
 		if totalCost > 0 {
-			_, _ = receiveEntity.UpdateReceiveTotalCostById(receiveId, totalCost)
+			if _, err := receiveEntity.UpdateReceiveTotalCostById(receiveId, totalCost); err != nil {
+				rollback(fmt.Errorf("failed to update receive total cost: %w", err))
+				return
+			}
 		}
 
 		ctx.JSON(http.StatusOK, result)

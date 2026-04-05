@@ -31,16 +31,10 @@ func NewSettingEntity(resource *db.Resource) ISetting {
 }
 
 func ensureSettingIndexes(settingRepo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	_, err := settingRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(settingRepo, "settings branchId", mongo.IndexModel{
 		Keys:    bson.D{{Key: "branchId", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
-	if err != nil {
-		logrus.Error("failed to create settings branchId index: ", err)
-	}
 }
 
 func (entity *settingEntity) GetSettingByBranchId(branchId string) (*entities.Setting, error) {

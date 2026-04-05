@@ -51,7 +51,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY10Data(repository.Order),
+		usecase.GetKHY10Data(repository.Order, repository.Product),
 	)
 
 	reportRoute.GET("/pharmacy/khy11/data",
@@ -59,7 +59,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY11Data(repository.Order),
+		usecase.GetKHY11Data(repository.Order, repository.Product),
 	)
 
 	reportRoute.GET("/pharmacy/khy12/data",
@@ -67,7 +67,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY12Data(repository.Order),
+		usecase.GetKHY12Data(repository.Order, repository.Product),
 	)
 
 	reportRoute.GET("/pharmacy/khy13/data",
@@ -75,7 +75,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY13Data(repository.Order),
+		usecase.GetKHY13Data(repository.Order, repository.Product),
 	)
 
 	// KHY CSV exports
@@ -92,7 +92,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY10CSV(repository.Order),
+		usecase.GetKHY10CSV(repository.Order, repository.Product),
 	)
 
 	reportRoute.GET("/pharmacy/khy11/csv",
@@ -100,7 +100,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY11CSV(repository.Order),
+		usecase.GetKHY11CSV(repository.Order, repository.Product),
 	)
 
 	reportRoute.GET("/pharmacy/khy12/csv",
@@ -108,7 +108,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY12CSV(repository.Order),
+		usecase.GetKHY12CSV(repository.Order, repository.Product),
 	)
 
 	reportRoute.GET("/pharmacy/khy13/csv",
@@ -116,7 +116,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetKHY13CSV(repository.Order),
+		usecase.GetKHY13CSV(repository.Order, repository.Product),
 	)
 
 	reportRoute.POST("/barcodes/pdf",

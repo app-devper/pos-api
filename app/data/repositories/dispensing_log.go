@@ -27,8 +27,8 @@ type RefillReminder struct {
 type IDispensingLog interface {
 	CreateDispensingLog(form request.DispensingLog) (*entities.DispensingLog, error)
 	GetDispensingLogs(branchId string) ([]entities.DispensingLog, error)
-	GetDispensingLogById(id string) (*entities.DispensingLog, error)
-	GetDispensingLogsByPatientId(patientId string) ([]entities.DispensingLog, error)
+	GetDispensingLogById(id string, branchId string) (*entities.DispensingLog, error)
+	GetDispensingLogsByPatientId(patientId string, branchId string) ([]entities.DispensingLog, error)
 	GetDispensingLogsByDateRange(branchId string, startDate time.Time, endDate time.Time) ([]entities.DispensingLog, error)
 	GetRefillReminders(branchId string, refillDays int) ([]RefillReminder, error)
 }
@@ -41,20 +41,12 @@ func NewDispensingLogEntity(resource *db.Resource) IDispensingLog {
 }
 
 func ensureDispensingLogIndexes(repo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	_, err := repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "dispensing_logs branchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create dispensing_logs index: ", err)
-	}
-	_, err = repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "dispensing_logs patientId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "patientId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create dispensing_logs patientId index: ", err)
-	}
 }
 
 func (entity *dispensingLogEntity) CreateDispensingLog(form request.DispensingLog) (*entities.DispensingLog, error) {
@@ -62,13 +54,25 @@ func (entity *dispensingLogEntity) CreateDispensingLog(form request.DispensingLo
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
-	orderId, _ := primitive.ObjectIDFromHex(form.OrderId)
-	patientId, _ := primitive.ObjectIDFromHex(form.PatientId)
+	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
+	if err != nil {
+		return nil, err
+	}
+	orderId, err := primitive.ObjectIDFromHex(form.OrderId)
+	if err != nil {
+		return nil, err
+	}
+	patientId, err := primitive.ObjectIDFromHex(form.PatientId)
+	if err != nil {
+		return nil, err
+	}
 
 	items := make([]entities.DispensingItem, len(form.Items))
 	for i, item := range form.Items {
-		productId, _ := primitive.ObjectIDFromHex(item.ProductId)
+		productId, err := primitive.ObjectIDFromHex(item.ProductId)
+		if err != nil {
+			return nil, err
+		}
 		items[i] = entities.DispensingItem{
 			ProductId:   productId,
 			ProductName: item.ProductName,
@@ -92,7 +96,7 @@ func (entity *dispensingLogEntity) CreateDispensingLog(form request.DispensingLo
 		CreatedBy:      form.CreatedBy,
 		CreatedDate:    time.Now(),
 	}
-	_, err := entity.repo.InsertOne(ctx, data)
+	_, err = entity.repo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +110,10 @@ func (entity *dispensingLogEntity) GetDispensingLogs(branchId string) ([]entitie
 
 	filter := bson.M{}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 	opts := options.Find().SetSort(bson.M{"createdDate": -1})
@@ -124,7 +131,7 @@ func (entity *dispensingLogEntity) GetDispensingLogs(branchId string) ([]entitie
 	return results, nil
 }
 
-func (entity *dispensingLogEntity) GetDispensingLogById(id string) (*entities.DispensingLog, error) {
+func (entity *dispensingLogEntity) GetDispensingLogById(id string, branchId string) (*entities.DispensingLog, error) {
 	logrus.Info("GetDispensingLogById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -132,21 +139,40 @@ func (entity *dispensingLogEntity) GetDispensingLogById(id string) (*entities.Di
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
 	data := entities.DispensingLog{}
-	err = entity.repo.FindOne(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.repo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
 	return &data, nil
 }
 
-func (entity *dispensingLogEntity) GetDispensingLogsByPatientId(patientId string) ([]entities.DispensingLog, error) {
+func (entity *dispensingLogEntity) GetDispensingLogsByPatientId(patientId string, branchId string) ([]entities.DispensingLog, error) {
 	logrus.Info("GetDispensingLogsByPatientId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(patientId)
+	objId, err := primitive.ObjectIDFromHex(patientId)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"patientId": objId}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
 	opts := options.Find().SetSort(bson.M{"createdDate": -1})
-	cursor, err := entity.repo.Find(ctx, bson.M{"patientId": objId}, opts)
+	cursor, err := entity.repo.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +199,10 @@ func (entity *dispensingLogEntity) GetRefillReminders(branchId string, refillDay
 		"patientId": bson.M{"$ne": primitive.NilObjectID},
 	}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		matchFilter["branchId"] = objId
 	}
 
@@ -221,7 +250,10 @@ func (entity *dispensingLogEntity) GetDispensingLogsByDateRange(branchId string,
 		"createdDate": bson.M{"$gte": startDate, "$lte": endDate},
 	}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 	opts := options.Find().SetSort(bson.M{"createdDate": -1})

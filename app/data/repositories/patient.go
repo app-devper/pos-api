@@ -21,10 +21,10 @@ type patientEntity struct {
 type IPatient interface {
 	CreatePatient(form request.Patient) (*entities.Patient, error)
 	GetPatients(branchId string) ([]entities.Patient, error)
-	GetPatientById(id string) (*entities.Patient, error)
+	GetPatientById(id string, branchId string) (*entities.Patient, error)
 	GetPatientByCustomerCode(customerCode string, branchId string) (*entities.Patient, error)
-	UpdatePatientById(id string, form request.UpdatePatient) (*entities.Patient, error)
-	RemovePatientById(id string) (*entities.Patient, error)
+	UpdatePatientById(id string, form request.UpdatePatient, branchId string) (*entities.Patient, error)
+	RemovePatientById(id string, branchId string) (*entities.Patient, error)
 }
 
 func NewPatientEntity(resource *db.Resource) IPatient {
@@ -35,15 +35,10 @@ func NewPatientEntity(resource *db.Resource) IPatient {
 }
 
 func ensurePatientIndexes(repo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	_, err := repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "patients customerCode+branchId", mongo.IndexModel{
 		Keys:    bson.D{{Key: "customerCode", Value: 1}, {Key: "branchId", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
-	if err != nil {
-		logrus.Error("failed to create patients index: ", err)
-	}
 }
 
 func toEntityAllergies(items []request.PatientDrugAllergy) []entities.DrugAllergy {
@@ -63,7 +58,10 @@ func (entity *patientEntity) CreatePatient(form request.Patient) (*entities.Pati
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
+	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.Patient{
 		Id:                 primitive.NewObjectID(),
 		BranchId:           branchId,
@@ -91,7 +89,7 @@ func (entity *patientEntity) CreatePatient(form request.Patient) (*entities.Pati
 	if data.CurrentMedications == nil {
 		data.CurrentMedications = []string{}
 	}
-	_, err := entity.repo.InsertOne(ctx, data)
+	_, err = entity.repo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +103,10 @@ func (entity *patientEntity) GetPatients(branchId string) ([]entities.Patient, e
 
 	filter := bson.M{}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 	opts := options.Find().SetSort(bson.M{"createdDate": -1})
@@ -123,7 +124,7 @@ func (entity *patientEntity) GetPatients(branchId string) ([]entities.Patient, e
 	return results, nil
 }
 
-func (entity *patientEntity) GetPatientById(id string) (*entities.Patient, error) {
+func (entity *patientEntity) GetPatientById(id string, branchId string) (*entities.Patient, error) {
 	logrus.Info("GetPatientById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -131,8 +132,16 @@ func (entity *patientEntity) GetPatientById(id string) (*entities.Patient, error
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
 	data := entities.Patient{}
-	err = entity.repo.FindOne(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.repo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +155,10 @@ func (entity *patientEntity) GetPatientByCustomerCode(customerCode string, branc
 
 	filter := bson.M{"customerCode": customerCode}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 	data := entities.Patient{}
@@ -157,7 +169,7 @@ func (entity *patientEntity) GetPatientByCustomerCode(customerCode string, branc
 	return &data, nil
 }
 
-func (entity *patientEntity) UpdatePatientById(id string, form request.UpdatePatient) (*entities.Patient, error) {
+func (entity *patientEntity) UpdatePatientById(id string, form request.UpdatePatient, branchId string) (*entities.Patient, error) {
 	logrus.Info("UpdatePatientById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -165,12 +177,20 @@ func (entity *patientEntity) UpdatePatientById(id string, form request.UpdatePat
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
 
 	isReturnNewDoc := options.After
 	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
 
 	data := entities.Patient{}
-	err = entity.repo.FindOneAndUpdate(ctx, bson.M{"_id": objectId}, bson.M{"$set": bson.M{
+	err = entity.repo.FindOneAndUpdate(ctx, filter, bson.M{"$set": bson.M{
 		"idCard":             form.IdCard,
 		"dateOfBirth":        form.DateOfBirth,
 		"gender":             form.Gender,
@@ -189,7 +209,7 @@ func (entity *patientEntity) UpdatePatientById(id string, form request.UpdatePat
 	return &data, nil
 }
 
-func (entity *patientEntity) RemovePatientById(id string) (*entities.Patient, error) {
+func (entity *patientEntity) RemovePatientById(id string, branchId string) (*entities.Patient, error) {
 	logrus.Info("RemovePatientById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -197,8 +217,16 @@ func (entity *patientEntity) RemovePatientById(id string) (*entities.Patient, er
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
 	data := entities.Patient{}
-	err = entity.repo.FindOneAndDelete(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.repo.FindOneAndDelete(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

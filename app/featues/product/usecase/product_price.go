@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func CreateProductPrice(productEntity repositories.IProduct) gin.HandlerFunc {
@@ -73,13 +75,11 @@ func UpdateProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		// Add product history
-		unit, _ := productEntity.GetProductUnitById(req.UnitId)
-		if unit != nil {
+		appendProductPriceHistory(ctx.GetString("BranchId"), productEntity, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
 			updPriceHistory := request.UpdateProductPriceHistory(req.ProductId, unit.Unit, req)
-			updPriceHistory.BranchId = ctx.GetString("BranchId")
-			_, _ = productEntity.CreateProductHistory(updPriceHistory)
-		}
+			updPriceHistory.BranchId = branchId
+			return updPriceHistory
+		})
 
 		ctx.JSON(http.StatusOK, result)
 	}
@@ -97,5 +97,22 @@ func RemoveProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc
 		}
 
 		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func appendProductPriceHistory(branchId string, productEntity repositories.IProduct, unitId string, buildHistory func(unit *entities.ProductUnit, branchId string) request.ProductHistory) {
+	unit, err := productEntity.GetProductUnitById(unitId)
+	if err != nil {
+		logrus.WithError(err).WithField("unitId", unitId).Error("failed to load product unit for price history")
+		return
+	}
+	if unit == nil {
+		logrus.WithField("unitId", unitId).Warn("product unit missing for price history")
+		return
+	}
+
+	history := buildHistory(unit, branchId)
+	if _, err = productEntity.CreateProductHistory(history); err != nil {
+		logrus.WithError(err).WithField("unitId", unitId).Error("failed to create product price history")
 	}
 }

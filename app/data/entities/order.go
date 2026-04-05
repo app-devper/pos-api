@@ -141,6 +141,7 @@ type ABCProduct struct {
 type DeadStockProduct struct {
 	ProductId   string  `bson:"_id" json:"productId"`
 	ProductName string  `bson:"name" json:"productName"`
+	Unit        string  `bson:"unit" json:"unit"`
 	Quantity    int     `bson:"quantity" json:"quantity"`
 	LastSold    string  `bson:"lastSold,omitempty" json:"lastSold,omitempty"`
 	CostPrice   float64 `bson:"costPrice" json:"costPrice"`

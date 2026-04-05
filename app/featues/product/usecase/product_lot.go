@@ -16,7 +16,7 @@ func GetAllLots(productEntity repositories.IProduct) gin.HandlerFunc {
 		req := request.GetProductLotsExpireRange{}
 		// Date range is optional for listing all lots
 		_ = ctx.ShouldBindQuery(&req)
-		result, err := productEntity.GetProductLots(req)
+		result, err := productEntity.GetProductLots(req, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -28,7 +28,7 @@ func GetAllLots(productEntity repositories.IProduct) gin.HandlerFunc {
 func GetLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		lotId := ctx.Param("lotId")
-		result, err := productEntity.GetProductLotById(lotId)
+		result, err := productEntity.GetProductLotById(lotId, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -44,6 +44,7 @@ func CreateLot(productEntity repositories.IProduct) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
+		req.BranchId = ctx.GetString("BranchId")
 		req.UpdatedBy = utils.GetUserId(ctx)
 		result, err := productEntity.CreateProductLot(req)
 		if err != nil {
@@ -62,8 +63,9 @@ func UpdateLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
+		req.BranchId = ctx.GetString("BranchId")
 		req.UpdatedBy = utils.GetUserId(ctx)
-		result, err := productEntity.UpdateProductLotById(lotId, req)
+		result, err := productEntity.UpdateProductLotById(lotId, req, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -75,7 +77,7 @@ func UpdateLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 func DeleteLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		lotId := ctx.Param("lotId")
-		result, err := productEntity.RemoveProductLotById(lotId)
+		result, err := productEntity.RemoveProductLotById(lotId, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -94,7 +96,7 @@ func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.Handler
 			StartDate: startDate.UTC(),
 			EndDate:   endDate.UTC(),
 		}
-		result, err := productEntity.GetProductLotsExpireNotify(req)
+		result, err := productEntity.GetExpiringProductStocks(req, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return

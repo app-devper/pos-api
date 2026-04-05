@@ -127,7 +127,9 @@ func TestCreateOrderRollsBackWhenHistoryCreationFails(t *testing.T) {
 	}
 
 	sequenceRepo := &sequenceStub{
-		nextFn: func(field string) (*entities.Sequence, error) { return nil, nil },
+		nextFn: func(field string) (*entities.Sequence, error) {
+			return &entities.Sequence{Field: field, Prefix: "OR", Value: 1, Format: 4}, nil
+		},
 	}
 
 	body := `{"items":[{"productId":"` + productID.Hex() + `","quantity":2,"unitId":"` + unitID.Hex() + `","price":10,"costPrice":5,"stocks":[{"stockId":"` + stockID.Hex() + `","quantity":2}]}],"amount":20,"type":"cash","total":20}`
@@ -152,5 +154,77 @@ func TestCreateOrderRollsBackWhenHistoryCreationFails(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), errcode.OR_BAD_REQUEST_002) {
 		t.Fatalf("expected errcode %s in response body, got %s", errcode.OR_BAD_REQUEST_002, w.Body.String())
+	}
+}
+
+func TestCreateOrderFailsWhenSequenceLookupFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	orderRepo := &orderRepoStub{
+		createOrderFn: func(form request.Order) (*entities.Order, error) {
+			t.Fatal("create order should not be called when sequence fails")
+			return nil, nil
+		},
+		removeOrderById: func(id string) (*entities.OrderDetail, error) {
+			return &entities.OrderDetail{}, nil
+		},
+	}
+	productRepo := &productStub{}
+	sequenceRepo := &sequenceStub{
+		nextFn: func(field string) (*entities.Sequence, error) {
+			return nil, errors.New("sequence failed")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/orders", strings.NewReader(`{"items":[],"amount":20,"type":"cash","total":20}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	CreateOrder(orderRepo, productRepo, sequenceRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "sequence failed") {
+		t.Fatalf("expected sequence failure in response, got %s", w.Body.String())
+	}
+}
+
+func TestCreateOrderFailsWhenSequenceIsMissing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	orderRepo := &orderRepoStub{
+		createOrderFn: func(form request.Order) (*entities.Order, error) {
+			t.Fatal("create order should not be called when sequence is missing")
+			return nil, nil
+		},
+		removeOrderById: func(id string) (*entities.OrderDetail, error) {
+			return &entities.OrderDetail{}, nil
+		},
+	}
+	productRepo := &productStub{}
+	sequenceRepo := &sequenceStub{
+		nextFn: func(field string) (*entities.Sequence, error) { return nil, nil },
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/orders", strings.NewReader(`{"items":[],"amount":20,"type":"cash","total":20}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	CreateOrder(orderRepo, productRepo, sequenceRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "order sequence not available") {
+		t.Fatalf("expected missing sequence error, got %s", w.Body.String())
 	}
 }

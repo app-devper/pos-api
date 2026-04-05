@@ -7,6 +7,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -16,6 +17,7 @@ func GetStockReportExcel(productEntity repositories.IProduct) gin.HandlerFunc {
 
 		stocks, err := productEntity.GetStockReport(branchId)
 		if err != nil {
+			logrus.WithError(err).WithField("branchId", branchId).Error("get stock report data failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 			return
 		}
@@ -51,6 +53,7 @@ func GetStockReportExcel(productEntity repositories.IProduct) gin.HandlerFunc {
 		ctx.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 		ctx.Header("Content-Disposition", "attachment; filename=stock-report.xlsx")
 		if err := f.Write(ctx.Writer); err != nil {
+			logrus.WithError(err).WithField("branchId", branchId).Error("write stock report excel failed")
 			errcode.Abort(ctx, http.StatusInternalServerError, errcode.RP_INTERNAL_001, err.Error())
 			return
 		}

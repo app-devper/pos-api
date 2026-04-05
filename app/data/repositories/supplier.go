@@ -21,6 +21,7 @@ type supplierEntity struct {
 type ISupplier interface {
 	GetSupplierByClientId(id string) (*entities.Supplier, error)
 	GetSupplierById(id string) (*entities.Supplier, error)
+	GetSuppliersByIds(ids []string) ([]entities.Supplier, error)
 	RemoveSupplierById(id string) (*entities.Supplier, error)
 	GetSuppliers() ([]entities.Supplier, error)
 	CreateOrUpdateSupplierByClientId(id string, form request.Supplier) (*entities.Supplier, error)
@@ -36,14 +37,9 @@ func NewSupplierEntity(resource *db.Resource) ISupplier {
 }
 
 func ensureSupplierIndexes(repo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	_, err := repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "suppliers clientId", mongo.IndexModel{
 		Keys: bson.D{{Key: "clientId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create suppliers clientId index: ", err)
-	}
 }
 
 func (entity *supplierEntity) GetSupplierByClientId(id string) (*entities.Supplier, error) {
@@ -72,6 +68,34 @@ func (entity *supplierEntity) GetSupplierById(id string) (*entities.Supplier, er
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *supplierEntity) GetSuppliersByIds(ids []string) ([]entities.Supplier, error) {
+	logrus.Info("GetSuppliersByIds")
+	if len(ids) == 0 {
+		return []entities.Supplier{}, nil
+	}
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	objectIDs := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
+		objectIDs = append(objectIDs, objID)
+	}
+
+	cursor, err := entity.supplierRepo.Find(ctx, bson.M{"_id": bson.M{"$in": objectIDs}})
+	if err != nil {
+		return nil, err
+	}
+	items := []entities.Supplier{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func (entity *supplierEntity) RemoveSupplierById(id string) (*entities.Supplier, error) {

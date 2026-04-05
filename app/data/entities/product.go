@@ -73,6 +73,7 @@ type ProductDetail struct {
 
 type ProductLot struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId    primitive.ObjectID `bson:"branchId,omitempty" json:"branchId,omitempty"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
 	LotNumber   string             `bson:"lotNumber" json:"lotNumber"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
@@ -87,6 +88,7 @@ type ProductLot struct {
 
 type ProductLotDetail struct {
 	Id          primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId    primitive.ObjectID `bson:"branchId,omitempty" json:"branchId,omitempty"`
 	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
 	LotNumber   string             `bson:"lotNumber" json:"lotNumber"`
 	CostPrice   float64            `bson:"costPrice" json:"costPrice"`

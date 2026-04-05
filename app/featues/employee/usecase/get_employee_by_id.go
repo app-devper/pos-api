@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GetEmployeeById(employeeEntity repositories.IEmployee) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func GetEmployeeById(employeeEntity repositories.IEmployee) gin.HandlerFunc {
 		employeeId := ctx.Param("employeeId")
 		result, err := employeeEntity.GetEmployeeById(employeeId)
 		if err != nil {
+			logrus.WithError(err).WithField("employeeId", employeeId).Error("get employee by id failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_002, err.Error())
 			return
 		}

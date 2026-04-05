@@ -8,19 +8,26 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func AllergyCheck(patientEntity repositories.IPatient, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		patientId := ctx.Param("id")
+		branchId := ctx.GetString("BranchId")
 		req := request.AllergyCheck{}
 		if err := ctx.ShouldBind(&req); err != nil {
+			logrus.WithError(err).WithField("patientId", patientId).Error("bind allergy check request failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_001, err.Error())
 			return
 		}
 
-		patient, err := patientEntity.GetPatientById(patientId)
+		patient, err := patientEntity.GetPatientById(patientId, branchId)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"patientId": patientId,
+				"branchId":  branchId,
+			}).Error("get patient for allergy check failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, "patient not found")
 			return
 		}
@@ -35,7 +42,16 @@ func AllergyCheck(patientEntity repositories.IPatient, productEntity repositorie
 			allergyMap[strings.ToLower(a.DrugName)] = i
 		}
 
-		products, _ := productEntity.GetProductsByIds(req.ProductIds)
+		products, err := productEntity.GetProductsByIds(req.ProductIds)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"patientId":  patientId,
+				"branchId":   branchId,
+				"productIds": req.ProductIds,
+			}).Error("get products for allergy check failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			return
+		}
 
 		var warnings []request.AllergyCheckResult
 		for _, p := range products {

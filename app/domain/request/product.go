@@ -5,7 +5,8 @@ import (
 )
 
 type GetProduct struct {
-	Category string `json:"category"`
+	Category string `json:"category" form:"category"`
+	BranchId string `json:"-"`
 }
 
 type Product struct {

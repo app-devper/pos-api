@@ -36,21 +36,13 @@ func NewPromotionEntity(resource *db.Resource) IPromotion {
 }
 
 func ensurePromotionIndexes(repo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	_, err := repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "promotions branchId+status", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "status", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create promotions index: ", err)
-	}
-	_, err = repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "promotions code+branchId", mongo.IndexModel{
 		Keys:    bson.D{{Key: "code", Value: 1}, {Key: "branchId", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
-	if err != nil {
-		logrus.Error("failed to create promotions code index: ", err)
-	}
 }
 
 func (entity *promotionEntity) CreatePromotion(form request.Promotion) (*entities.Promotion, error) {
@@ -58,10 +50,16 @@ func (entity *promotionEntity) CreatePromotion(form request.Promotion) (*entitie
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
+	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
+	if err != nil {
+		return nil, err
+	}
 	productIds := make([]primitive.ObjectID, len(form.ProductIds))
 	for i, id := range form.ProductIds {
-		productIds[i], _ = primitive.ObjectIDFromHex(id)
+		productIds[i], err = primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	data := entities.Promotion{
@@ -83,7 +81,7 @@ func (entity *promotionEntity) CreatePromotion(form request.Promotion) (*entitie
 		UpdatedBy:   form.CreatedBy,
 		UpdatedDate: time.Now(),
 	}
-	_, err := entity.repo.InsertOne(ctx, data)
+	_, err = entity.repo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +95,10 @@ func (entity *promotionEntity) GetPromotions(branchId string) ([]entities.Promot
 
 	filter := bson.M{}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 
@@ -142,7 +143,10 @@ func (entity *promotionEntity) GetPromotionByCode(code string, branchId string) 
 		"status": constant.ACTIVE,
 	}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 
@@ -169,7 +173,10 @@ func (entity *promotionEntity) UpdatePromotionById(id string, form request.Updat
 
 	productIds := make([]primitive.ObjectID, len(form.ProductIds))
 	for i, pid := range form.ProductIds {
-		productIds[i], _ = primitive.ObjectIDFromHex(pid)
+		productIds[i], err = primitive.ObjectIDFromHex(pid)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	isReturnNewDoc := options.After

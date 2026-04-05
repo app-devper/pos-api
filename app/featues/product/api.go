@@ -20,6 +20,7 @@ func ApplyProductAPI(
 	productRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetProducts(repository.Product),
 	)
 
@@ -42,6 +43,7 @@ func ApplyProductAPI(
 	productRoute.GET("/:productId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetProductById(repository.Product),
 	)
 
@@ -118,6 +120,7 @@ func ApplyProductAPI(
 	productRoute.PATCH("/stocks/sequence",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.UpdateProductStockSequence(repository.Product),
 	)
 
@@ -196,18 +199,21 @@ func ApplyProductAPI(
 	productRoute.GET("/lots",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetAllLots(repository.Product),
 	)
 
 	productRoute.GET("/lots/expire-notify",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetProductLotsExpireNotify(repository.Product),
 	)
 
 	productRoute.GET("/lots/:lotId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetLotById(repository.Product),
 	)
 

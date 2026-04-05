@@ -31,14 +31,9 @@ func NewCustomerHistoryEntity(resource *db.Resource) ICustomerHistory {
 }
 
 func ensureCustomerHistoryIndexes(repo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	_, err := repo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(repo, "customer_histories customerCode+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "customerCode", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create customer_histories index: ", err)
-	}
 }
 
 func (entity *customerHistoryEntity) CreateCustomerHistory(form request.CustomerHistory) (*entities.CustomerHistory, error) {
@@ -46,7 +41,10 @@ func (entity *customerHistoryEntity) CreateCustomerHistory(form request.Customer
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
+	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.CustomerHistory{
 		Id:           primitive.NewObjectID(),
 		BranchId:     branchId,
@@ -57,7 +55,7 @@ func (entity *customerHistoryEntity) CreateCustomerHistory(form request.Customer
 		CreatedBy:    form.CreatedBy,
 		CreatedDate:  time.Now(),
 	}
-	_, err := entity.repo.InsertOne(ctx, data)
+	_, err = entity.repo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +69,10 @@ func (entity *customerHistoryEntity) GetCustomerHistories(customerCode string, b
 
 	filter := bson.M{"customerCode": customerCode}
 	if branchId != "" {
-		objId, _ := primitive.ObjectIDFromHex(branchId)
+		objId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = objId
 	}
 

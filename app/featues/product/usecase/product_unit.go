@@ -7,6 +7,7 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
@@ -57,10 +58,11 @@ func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 			return
 		}
 
-		// Add product history
-		updUnitHistory := request.UpdateProductUnitHistory(req.ProductId, req)
-		updUnitHistory.BranchId = ctx.GetString("BranchId")
-		_, _ = productEntity.CreateProductHistory(updUnitHistory)
+		appendProductUnitHistory(ctx.GetString("BranchId"), productEntity, func(branchId string) request.ProductHistory {
+			updUnitHistory := request.UpdateProductUnitHistory(req.ProductId, req)
+			updUnitHistory.BranchId = branchId
+			return updUnitHistory
+		})
 
 		ctx.JSON(http.StatusOK, unit)
 	}
@@ -76,5 +78,12 @@ func RemoveProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func appendProductUnitHistory(branchId string, productEntity repositories.IProduct, buildHistory func(branchId string) request.ProductHistory) {
+	history := buildHistory(branchId)
+	if _, err := productEntity.CreateProductHistory(history); err != nil {
+		logrus.WithError(err).WithField("branchId", branchId).Error("failed to create product unit history")
 	}
 }

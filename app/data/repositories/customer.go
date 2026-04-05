@@ -33,7 +33,7 @@ type ICustomer interface {
 func NewCustomerEntity(resource *db.Resource) ICustomer {
 	customerRepo := resource.PosDb.Collection("customers")
 	entity := &customerEntity{customerRepo: customerRepo}
-	_, _ = entity.CreateIndex()
+	ensureCollectionIndex(entity, "customers")
 	return entity
 }
 

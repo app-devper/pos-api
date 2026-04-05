@@ -8,6 +8,7 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func CreateEmployee(
@@ -16,6 +17,7 @@ func CreateEmployee(
 	return func(ctx *gin.Context) {
 		req := request.Employee{}
 		if err := ctx.ShouldBind(&req); err != nil {
+			logrus.WithError(err).Error("bind create employee request failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_001, err.Error())
 			return
 		}
@@ -25,6 +27,7 @@ func CreateEmployee(
 
 		result, err := employeeEntity.CreateEmployee(req)
 		if err != nil {
+			logrus.WithError(err).WithField("createdBy", req.CreatedBy).Error("create employee failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_002, err.Error())
 			return
 		}

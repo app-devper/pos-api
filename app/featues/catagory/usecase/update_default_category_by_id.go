@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func UpdateDefaultCategoryById(entity repositories.ICategory) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func UpdateDefaultCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 		categoryId := ctx.Param("categoryId")
 		result, err := entity.UpdateDefaultCategoryById(categoryId)
 		if err != nil {
+			logrus.WithError(err).WithField("categoryId", categoryId).Error("update default category failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
 			return
 		}

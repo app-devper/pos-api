@@ -33,7 +33,8 @@ type UpdateProductStockQuantity struct {
 }
 
 type UpdateProductStockSequence struct {
-	Stocks []ProductStockSequence `json:"stocks" binding:"required"`
+	Stocks   []ProductStockSequence `json:"stocks" binding:"required"`
+	BranchId string
 }
 
 type ProductStockSequence struct {

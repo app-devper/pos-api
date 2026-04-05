@@ -37,16 +37,10 @@ func NewBranchEntity(resource *db.Resource) IBranch {
 }
 
 func ensureBranchIndexes(branchRepo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	_, err := branchRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(branchRepo, "branches code", mongo.IndexModel{
 		Keys:    bson.D{{Key: "code", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	})
-	if err != nil {
-		logrus.Error("failed to create branches code index: ", err)
-	}
 }
 
 func (entity *branchEntity) CreateBranch(form request.Branch) (*entities.Branch, error) {

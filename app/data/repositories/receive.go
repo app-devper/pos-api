@@ -37,6 +37,7 @@ type IReceive interface {
 	UpdateReceiveItemsById(id string, form request.UpdateReceiveItems) (*entities.Receive, error)
 	CreateReceiveItem(receiveId string, lotId string, productId string, form request.Product) (*entities.ReceiveItem, error)
 	GetReceiveItemsByReceiveId(receiveId string) ([]entities.ReceiveItem, error)
+	GetReceiveItemsByReceiveIds(receiveIds []string) ([]entities.ReceiveItem, error)
 	GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	DeleteReceiveItemsByReceiveId(receiveId string) error
@@ -65,36 +66,18 @@ func NewReceiveEntity(resource *db.Resource) IReceive {
 }
 
 func ensureReceiveIndexes(receiveRepo *mongo.Collection, receiveItemsRepo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	_, err := receiveRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(receiveRepo, "receives createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create createdDate index: ", err)
-	}
-
-	_, err = receiveItemsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(receiveItemsRepo, "receive_items receiveId", mongo.IndexModel{
 		Keys: bson.D{{Key: "receiveId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create receiveId index: ", err)
-	}
-
-	_, err = receiveItemsRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(receiveItemsRepo, "receive_items lotId", mongo.IndexModel{
 		Keys: bson.D{{Key: "lotId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create lotId index: ", err)
-	}
-
-	_, err = receiveRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(receiveRepo, "receives branchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create receives branchId+createdDate index: ", err)
-	}
 }
 
 func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []entities.Receive, err error) {
@@ -109,7 +92,10 @@ func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []
 		},
 	}
 	if form.BranchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
+		branchObjId, err := primitive.ObjectIDFromHex(form.BranchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = branchObjId
 	}
 	cursor, err := entity.receiveRepo.Find(ctx, filter)
@@ -131,7 +117,10 @@ func (entity *receiveEntity) CreateReceive(form request.Receive) (*entities.Rece
 	if err != nil {
 		return nil, err
 	}
-	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
+	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.Receive{
 		Id:          primitive.NewObjectID(),
 		BranchId:    branchId,
@@ -387,7 +376,10 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, produ
 	if err != nil {
 		return nil, err
 	}
-	recvId, _ := primitive.ObjectIDFromHex(receiveId)
+	recvId, err := primitive.ObjectIDFromHex(receiveId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.ReceiveItem{
 		ReceiveId:  recvId,
 		ProductId:  product,
@@ -412,6 +404,34 @@ func (entity *receiveEntity) GetReceiveItemsByReceiveId(receiveId string) (items
 		return nil, err
 	}
 	cursor, err := entity.receiveItemsRepo.Find(ctx, bson.M{"receiveId": receive})
+	if err != nil {
+		return nil, err
+	}
+	items = []entities.ReceiveItem{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (entity *receiveEntity) GetReceiveItemsByReceiveIds(receiveIds []string) (items []entities.ReceiveItem, err error) {
+	logrus.Info("GetReceiveItemsByReceiveIds")
+	if len(receiveIds) == 0 {
+		return []entities.ReceiveItem{}, nil
+	}
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	objectIDs := make([]primitive.ObjectID, 0, len(receiveIds))
+	for _, id := range receiveIds {
+		receiveID, convErr := primitive.ObjectIDFromHex(id)
+		if convErr != nil {
+			return nil, convErr
+		}
+		objectIDs = append(objectIDs, receiveID)
+	}
+
+	cursor, err := entity.receiveItemsRepo.Find(ctx, bson.M{"receiveId": bson.M{"$in": objectIDs}})
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +516,15 @@ func (entity *receiveEntity) ImportReceiveToStock(receiveId string, userId strin
 	defer cancel()
 
 	if entity.client == nil {
-		return entity.importReceiveToStockWithContext(ctx, receiveId, userId, branchId)
+		result, err := entity.importReceiveToStockWithContext(ctx, receiveId, userId, branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"receiveId": receiveId,
+				"userId":    userId,
+				"branchId":  branchId,
+			}).Error("import receive to stock failed")
+		}
+		return result, err
 	}
 
 	session, err := entity.client.StartSession()
@@ -515,6 +543,11 @@ func (entity *receiveEntity) ImportReceiveToStock(receiveId string, userId strin
 		return data, nil
 	})
 	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"receiveId": receiveId,
+			"userId":    userId,
+			"branchId":  branchId,
+		}).Error("import receive to stock transaction failed")
 		return nil, err
 	}
 	return result, nil
@@ -561,7 +594,7 @@ func (entity *receiveEntity) importReceiveToStockWithContext(ctx context.Context
 		}
 
 		if item.Quantity > 0 {
-			sequence, err := entity.getNextReceiveProductStockSequence(ctx, item.ProductId, unit.Id)
+			sequence, err := entity.getNextReceiveProductStockSequence(ctx, item.ProductId, unit.Id, branchObjID)
 			if err != nil {
 				return nil, err
 			}
@@ -642,9 +675,9 @@ func (entity *receiveEntity) importReceiveToStockWithContext(ctx context.Context
 	return &result, nil
 }
 
-func (entity *receiveEntity) getNextReceiveProductStockSequence(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID) (int, error) {
+func (entity *receiveEntity) getNextReceiveProductStockSequence(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId primitive.ObjectID) (int, error) {
 	pipeline := []bson.M{
-		{"$match": bson.M{"productId": productId, "unitId": unitId}},
+		{"$match": buildReceiveProductStockSequenceMatch(productId, unitId, branchId)},
 		{"$group": bson.M{"_id": nil, "maxSequence": bson.M{"$max": "$sequence"}}},
 	}
 	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
@@ -668,6 +701,10 @@ func (entity *receiveEntity) getNextReceiveProductStockSequence(ctx context.Cont
 	default:
 		return 1, nil
 	}
+}
+
+func buildReceiveProductStockSequenceMatch(productId primitive.ObjectID, unitId primitive.ObjectID, branchId primitive.ObjectID) bson.M {
+	return bson.M{"productId": productId, "unitId": unitId, "branchId": branchId}
 }
 
 func (entity *receiveEntity) getReceiveProductStockBalance(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId primitive.ObjectID) (int, error) {

@@ -11,6 +11,7 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type stockAdjustment struct {
@@ -39,10 +40,16 @@ func CreateOrder(
 		req.CreatedBy = userId
 		req.BranchId = utils.GetBranchId(ctx)
 
-		sequence, _ := sequenceEntity.NextSequence(constant.ORDER)
-		if sequence != nil {
-			req.Code = sequence.GenerateCode()
+		sequence, err := sequenceEntity.NextSequence(constant.ORDER)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			return
 		}
+		if sequence == nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, "order sequence not available")
+			return
+		}
+		req.Code = sequence.GenerateCode()
 
 		result, err := orderEntity.CreateOrder(req)
 		if err != nil {
@@ -68,6 +75,14 @@ func CreateOrder(
 			if orderCreated && result != nil {
 				_, _ = orderEntity.RemoveOrderById(result.Id.Hex())
 			}
+			fields := logrus.Fields{
+				"branchId": req.BranchId,
+				"code":     req.Code,
+			}
+			if result != nil {
+				fields["orderId"] = result.Id.Hex()
+			}
+			logrus.WithError(cause).WithFields(fields).Error("create order rolled back")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, cause.Error())
 		}
 

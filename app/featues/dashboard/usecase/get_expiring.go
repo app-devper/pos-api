@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GetExpiringProducts(productEntity repositories.IProduct) gin.HandlerFunc {
@@ -18,8 +19,14 @@ func GetExpiringProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 			StartDate: now,
 			EndDate:   sixMonthsLater,
 		}
-		result, err := productEntity.GetProductLotsExpireNotify(param)
+		branchId := ctx.GetString("BranchId")
+		result, err := productEntity.GetExpiringProductStocks(param, branchId)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"branchId":  branchId,
+				"startDate": param.StartDate,
+				"endDate":   param.EndDate,
+			}).Error("get expiring products failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
 			return
 		}

@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func DeleteCustomerById(customerEntity repositories.ICustomer) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func DeleteCustomerById(customerEntity repositories.ICustomer) gin.HandlerFunc {
 		customerId := ctx.Param("customerId")
 		result, err := customerEntity.RemoveCustomerById(customerId)
 		if err != nil {
+			logrus.WithError(err).WithField("customerId", customerId).Error("delete customer failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
 			return
 		}

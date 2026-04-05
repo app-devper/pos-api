@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-pdf/fpdf"
+	"github.com/sirupsen/logrus"
 )
 
 func GetDrugLabelPDF(dispensingEntity repositories.IDispensingLog, settingEntity repositories.ISetting) gin.HandlerFunc {
@@ -16,13 +17,25 @@ func GetDrugLabelPDF(dispensingEntity repositories.IDispensingLog, settingEntity
 		logId := ctx.Param("logId")
 		branchId := ctx.GetString("BranchId")
 
-		dispLog, err := dispensingEntity.GetDispensingLogById(logId)
+		dispLog, err := dispensingEntity.GetDispensingLogById(logId, branchId)
 		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"logId":    logId,
+				"branchId": branchId,
+			}).Error("get drug label dispensing log failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 			return
 		}
 
-		setting, _ := settingEntity.GetSettingByBranchId(branchId)
+		setting, err := settingEntity.GetSettingByBranchId(branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"logId":    logId,
+				"branchId": branchId,
+			}).Error("get drug label setting failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
 		companyName := "Pharmacy"
 		if setting != nil && setting.CompanyName != "" {
 			companyName = setting.CompanyName
@@ -101,7 +114,12 @@ func GetDrugLabelPDF(dispensingEntity repositories.IDispensingLog, settingEntity
 		ctx.Header("Content-Type", "application/pdf")
 		ctx.Header("Content-Disposition", fmt.Sprintf("inline; filename=drug-labels-%s.pdf", logId))
 		if err := doc.Output(ctx.Writer); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"logId":    logId,
+				"branchId": branchId,
+			}).Error("write drug label pdf failed")
 			errcode.Abort(ctx, http.StatusInternalServerError, errcode.RP_INTERNAL_001, err.Error())
+			return
 		}
 	}
 }

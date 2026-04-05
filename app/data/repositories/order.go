@@ -30,7 +30,7 @@ type orderEntity struct {
 type IOrder interface {
 	CreateOrder(form request.Order) (*entities.Order, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
-	GetOrdersByCustomerCode(customerCode string) ([]entities.Order, error)
+	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
 	UpdateTotal() ([]entities.Order, error)
 	GetOrderById(id string) (*entities.Order, error)
 	GetOrderDetailById(id string) (*entities.OrderDetail, error)
@@ -81,71 +81,33 @@ func NewOrderEntity(resource *db.Resource) IOrder {
 }
 
 func ensureOrderIndexes(orderRepo *mongo.Collection, orderItemRepo *mongo.Collection, paymentRepo *mongo.Collection) {
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	_, err := orderRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderRepo, "orders createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create orders createdDate index: ", err)
-	}
-
-	_, err = orderRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderRepo, "orders customerCode", mongo.IndexModel{
 		Keys: bson.D{{Key: "customerCode", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create orders customerCode index: ", err)
-	}
-
-	_, err = orderItemRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderItemRepo, "order_items orderId", mongo.IndexModel{
 		Keys: bson.D{{Key: "orderId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create order_items orderId index: ", err)
-	}
-
-	_, err = orderItemRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderItemRepo, "order_items productId", mongo.IndexModel{
 		Keys: bson.D{{Key: "productId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create order_items productId index: ", err)
-	}
-
-	_, err = orderItemRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderItemRepo, "order_items createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create order_items createdDate index: ", err)
-	}
-
-	_, err = paymentRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(paymentRepo, "payments orderId", mongo.IndexModel{
 		Keys: bson.D{{Key: "orderId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create payments orderId index: ", err)
-	}
-
-	_, err = orderRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderRepo, "orders branchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create orders branchId+createdDate index: ", err)
-	}
-
-	_, err = orderItemRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(orderItemRepo, "order_items branchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create order_items branchId+createdDate index: ", err)
-	}
-
-	_, err = paymentRepo.Indexes().CreateOne(ctx, mongo.IndexModel{
+	createCollectionIndex(paymentRepo, "payments branchId+orderId", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "orderId", Value: 1}},
 	})
-	if err != nil {
-		logrus.Error("failed to create payments branchId+orderId index: ", err)
-	}
 }
 
 func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, error) {
@@ -179,7 +141,10 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, err
 }
 
 func (entity *orderEntity) createOrderWithContext(ctx context.Context, form request.Order) (*entities.Order, error) {
-	branchId, _ := primitive.ObjectIDFromHex(form.BranchId)
+	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
+	if err != nil {
+		return nil, err
+	}
 	var orderId = primitive.NewObjectID()
 	data := entities.Order{
 		Id:             orderId,
@@ -203,7 +168,7 @@ func (entity *orderEntity) createOrderWithContext(ctx context.Context, form requ
 		UpdatedBy:      form.CreatedBy,
 		UpdatedDate:    time.Now(),
 	}
-	_, err := entity.orderRepo.InsertOne(ctx, data)
+	_, err = entity.orderRepo.InsertOne(ctx, data)
 	if err != nil {
 		return nil, err
 	}
@@ -212,8 +177,14 @@ func (entity *orderEntity) createOrderWithContext(ctx context.Context, form requ
 	orderItem := make([]interface{}, count)
 	for i := 0; i < count; i++ {
 		formItem := form.Items[i]
-		productId, _ := primitive.ObjectIDFromHex(formItem.ProductId)
-		unitId, _ := primitive.ObjectIDFromHex(formItem.UnitId)
+		productId, err := primitive.ObjectIDFromHex(formItem.ProductId)
+		if err != nil {
+			return nil, err
+		}
+		unitId, err := primitive.ObjectIDFromHex(formItem.UnitId)
+		if err != nil {
+			return nil, err
+		}
 		countStock := len(formItem.Stocks)
 		stocks := make([]entities.OrderItemStock, countStock)
 		for j := 0; j < countStock; j++ {
@@ -299,7 +270,10 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities
 		"$lt":  form.EndDate,
 	}}
 	if form.BranchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
+		branchObjId, err := primitive.ObjectIDFromHex(form.BranchId)
+		if err != nil {
+			return nil, err
+		}
 		filter["branchId"] = branchObjId
 	}
 	var items []entities.Order
@@ -317,14 +291,22 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities
 	return items, nil
 }
 
-func (entity *orderEntity) GetOrdersByCustomerCode(customerCode string) ([]entities.Order, error) {
+func (entity *orderEntity) GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error) {
 	logrus.Info("GetOrdersByCustomerCode")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
 	var items []entities.Order
 	opts := options.Find().SetSort(bson.D{{Key: "createdDate", Value: -1}})
-	cursor, err := entity.orderRepo.Find(ctx, bson.M{"customerCode": customerCode}, opts)
+	filter := bson.M{"customerCode": customerCode}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
+	cursor, err := entity.orderRepo.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -364,8 +346,7 @@ func (entity *orderEntity) UpdateTotal() ([]entities.Order, error) {
 		var data entities.Order
 		err = cursor.Decode(&data)
 		if err != nil {
-			logrus.Error(err)
-			logrus.Info(cursor.Current)
+			logrus.WithError(err).WithField("current", cursor.Current.String()).Error("failed to decode order while updating totals")
 		} else {
 			if data.Total == 0 {
 				data.Total = entity.GetTotalOrderById(data.Id.Hex())
@@ -381,6 +362,9 @@ func (entity *orderEntity) UpdateTotal() ([]entities.Order, error) {
 			}
 			items = append(items, data)
 		}
+	}
+	if err = cursor.Err(); err != nil {
+		return nil, err
 	}
 	if items == nil {
 		items = []entities.Order{}
@@ -519,7 +503,15 @@ func (entity *orderEntity) CancelOrderById(id string, userId string, branchId st
 	defer cancel()
 
 	if entity.client == nil {
-		return entity.cancelOrderByIdWithContext(ctx, id, userId, branchId)
+		result, err := entity.cancelOrderByIdWithContext(ctx, id, userId, branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"orderId":  id,
+				"userId":   userId,
+				"branchId": branchId,
+			}).Error("cancel order failed")
+		}
+		return result, err
 	}
 
 	session, err := entity.client.StartSession()
@@ -538,6 +530,11 @@ func (entity *orderEntity) CancelOrderById(id string, userId string, branchId st
 		return data, nil
 	})
 	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"orderId":  id,
+			"userId":   userId,
+			"branchId": branchId,
+		}).Error("cancel order transaction failed")
 		return nil, err
 	}
 	return result, nil
@@ -576,7 +573,10 @@ func (entity *orderEntity) getOrderTotals(orderId string) (total float64, totalC
 	logrus.Info("getOrderTotals")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, _ := primitive.ObjectIDFromHex(orderId)
+	objId, err := primitive.ObjectIDFromHex(orderId)
+	if err != nil {
+		return 0, 0
+	}
 	pipeline := []bson.M{
 		{"$match": bson.M{"orderId": objId}},
 		{"$group": bson.M{
@@ -623,7 +623,10 @@ func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]enti
 		},
 	}
 	if form.BranchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
+		branchObjId, err := primitive.ObjectIDFromHex(form.BranchId)
+		if err != nil {
+			return nil, err
+		}
 		matchFilter["branchId"] = branchObjId
 	}
 	cursor, err := entity.orderItemRepo.Aggregate(ctx, []bson.M{
@@ -716,7 +719,15 @@ func (entity *orderEntity) CancelOrderItemById(id string, userId string, branchI
 	defer cancel()
 
 	if entity.client == nil {
-		return entity.cancelOrderItemByIdWithContext(ctx, id, userId, branchId)
+		result, err := entity.cancelOrderItemByIdWithContext(ctx, id, userId, branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"orderItemId": id,
+				"userId":      userId,
+				"branchId":    branchId,
+			}).Error("cancel order item failed")
+		}
+		return result, err
 	}
 
 	session, err := entity.client.StartSession()
@@ -735,6 +746,11 @@ func (entity *orderEntity) CancelOrderItemById(id string, userId string, branchI
 		return data, nil
 	})
 	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"orderItemId": id,
+			"userId":      userId,
+			"branchId":    branchId,
+		}).Error("cancel order item transaction failed")
 		return nil, err
 	}
 	return result, nil
@@ -963,7 +979,16 @@ func (entity *orderEntity) CancelOrderItemByOrderProductId(orderId string, produ
 	defer cancel()
 
 	if entity.client == nil {
-		return entity.cancelOrderItemByOrderProductIdWithContext(ctx, orderId, productId, userId, branchId)
+		result, err := entity.cancelOrderItemByOrderProductIdWithContext(ctx, orderId, productId, userId, branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"orderId":   orderId,
+				"productId": productId,
+				"userId":    userId,
+				"branchId":  branchId,
+			}).Error("cancel order item by product failed")
+		}
+		return result, err
 	}
 
 	session, err := entity.client.StartSession()
@@ -982,6 +1007,12 @@ func (entity *orderEntity) CancelOrderItemByOrderProductId(orderId string, produ
 		return data, nil
 	})
 	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"orderId":   orderId,
+			"productId": productId,
+			"userId":    userId,
+			"branchId":  branchId,
+		}).Error("cancel order item by product transaction failed")
 		return nil, err
 	}
 	return result, nil
@@ -1372,15 +1403,9 @@ func (entity *orderEntity) GetOrderSummary(form request.GetOrderRange) (*entitie
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	matchFilter := bson.M{
-		"createdDate": bson.M{
-			"$gt": form.StartDate,
-			"$lt": form.EndDate,
-		},
-	}
-	if form.BranchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
-		matchFilter["branchId"] = branchObjId
+	matchFilter, err := buildActiveOrderAnalyticsMatchFilter(form.StartDate, form.EndDate, form.BranchId)
+	if err != nil {
+		return nil, err
 	}
 
 	pipeline := []bson.M{
@@ -1415,15 +1440,9 @@ func (entity *orderEntity) GetOrderDailyChart(form request.GetOrderRange) ([]ent
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	matchFilter := bson.M{
-		"createdDate": bson.M{
-			"$gt": form.StartDate,
-			"$lt": form.EndDate,
-		},
-	}
-	if form.BranchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(form.BranchId)
-		matchFilter["branchId"] = branchObjId
+	matchFilter, err := buildActiveOrderAnalyticsMatchFilter(form.StartDate, form.EndDate, form.BranchId)
+	if err != nil {
+		return nil, err
 	}
 
 	pipeline := []bson.M{
@@ -1462,12 +1481,9 @@ func (entity *orderEntity) GetOrderMonthlyChart(branchId string) ([]entities.Ord
 	defer cancel()
 
 	startDate := time.Now().AddDate(-1, 0, 0)
-	matchFilter := bson.M{
-		"createdDate": bson.M{"$gte": startDate},
-	}
-	if branchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
-		matchFilter["branchId"] = branchObjId
+	matchFilter, err := buildMonthlyActiveOrderAnalyticsMatchFilter(startDate, branchId)
+	if err != nil {
+		return nil, err
 	}
 
 	pipeline := []bson.M{
@@ -1500,39 +1516,48 @@ func (entity *orderEntity) GetOrderMonthlyChart(branchId string) ([]entities.Ord
 	return results, nil
 }
 
+func buildMonthlyActiveOrderAnalyticsMatchFilter(startDate time.Time, branchId string) (bson.M, error) {
+	matchFilter := bson.M{
+		"createdDate": bson.M{"$gte": startDate},
+		"status":      constant.ACTIVE,
+	}
+	if branchId != "" {
+		branchObjId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		matchFilter["branchId"] = branchObjId
+	}
+	return matchFilter, nil
+}
+
+func buildActiveOrderAnalyticsMatchFilter(startDate time.Time, endDate time.Time, branchId string) (bson.M, error) {
+	matchFilter := bson.M{
+		"createdDate": bson.M{
+			"$gt": startDate,
+			"$lt": endDate,
+		},
+		"status": constant.ACTIVE,
+	}
+	if branchId != "" {
+		branchObjId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		matchFilter["branchId"] = branchObjId
+	}
+	return matchFilter, nil
+}
+
 func (entity *orderEntity) GetABCAnalysis(branchId string) ([]entities.ABCProduct, error) {
 	logrus.Info("GetABCAnalysis")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
 	startDate := time.Now().AddDate(0, -3, 0)
-	matchFilter := bson.M{
-		"createdDate": bson.M{"$gte": startDate},
-	}
-	if branchId != "" {
-		branchObjId, _ := primitive.ObjectIDFromHex(branchId)
-		matchFilter["branchId"] = branchObjId
-	}
-
-	pipeline := []bson.M{
-		{"$match": matchFilter},
-		{"$group": bson.M{
-			"_id":          "$productId",
-			"totalRevenue": bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}},
-			"totalQty":     bson.M{"$sum": "$quantity"},
-		}},
-		{"$lookup": bson.M{
-			"from":         "products",
-			"localField":   "_id",
-			"foreignField": "_id",
-			"as":           "product",
-		}},
-		{"$unwind": bson.M{"path": "$product", "preserveNullAndEmptyArrays": true}},
-		{"$addFields": bson.M{
-			"productName": bson.M{"$ifNull": bson.A{"$product.name", ""}},
-		}},
-		{"$project": bson.M{"product": 0}},
-		{"$sort": bson.M{"totalRevenue": -1}},
+	pipeline, err := buildABCAnalysisPipeline(startDate, branchId)
+	if err != nil {
+		return nil, err
 	}
 
 	var abcResults []entities.ABCProduct
@@ -1567,4 +1592,53 @@ func (entity *orderEntity) GetABCAnalysis(branchId string) ([]entities.ABCProduc
 	}
 
 	return abcResults, nil
+}
+
+func buildABCAnalysisPipeline(startDate time.Time, branchId string) ([]bson.M, error) {
+	matchFilter := bson.M{
+		"createdDate": bson.M{"$gte": startDate},
+	}
+	orderMatch := bson.A{
+		bson.M{"$eq": bson.A{"$_id", "$$oid"}},
+		bson.M{"$eq": bson.A{"$status", constant.ACTIVE}},
+	}
+	if branchId != "" {
+		branchObjId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		matchFilter["branchId"] = branchObjId
+		orderMatch = append(orderMatch, bson.M{"$eq": bson.A{"$branchId", branchObjId}})
+	}
+
+	return []bson.M{
+		{"$match": matchFilter},
+		{"$lookup": bson.M{
+			"from": "orders",
+			"let":  bson.M{"oid": "$orderId"},
+			"pipeline": bson.A{
+				bson.M{"$match": bson.M{"$expr": bson.M{"$and": orderMatch}}},
+				bson.M{"$project": bson.M{"_id": 1}},
+			},
+			"as": "order",
+		}},
+		{"$match": bson.M{"order.0": bson.M{"$exists": true}}},
+		{"$group": bson.M{
+			"_id":          "$productId",
+			"totalRevenue": bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}},
+			"totalQty":     bson.M{"$sum": "$quantity"},
+		}},
+		{"$lookup": bson.M{
+			"from":         "products",
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "product",
+		}},
+		{"$unwind": bson.M{"path": "$product", "preserveNullAndEmptyArrays": true}},
+		{"$addFields": bson.M{
+			"productName": bson.M{"$ifNull": bson.A{"$product.name", ""}},
+		}},
+		{"$project": bson.M{"product": 0}},
+		{"$sort": bson.M{"totalRevenue": -1}},
+	}, nil
 }

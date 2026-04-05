@@ -3,12 +3,14 @@ package usecase
 import (
 	"net/http"
 	"pos/app/core/errcode"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GenerateSerialNumber(sequenceEntity repositories.ISequence) gin.HandlerFunc {
@@ -86,6 +88,7 @@ func GetProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
+		req.BranchId = ctx.GetString("BranchId")
 		results, err := productEntity.GetProductAll(req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
@@ -131,7 +134,48 @@ func GetProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 			return
 		}
 
-		ctx.JSON(http.StatusOK, product)
+		branchId := ctx.GetString("BranchId")
+		units, err := productEntity.GetProductUnitsByProductId(id)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		prices, err := productEntity.GetProductPricesByProductId(id)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		stocks, err := productEntity.GetProductStocksByProductId(id, branchId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+
+		ctx.JSON(http.StatusOK, entities.ProductDetail{
+			Id:                product.Id,
+			Name:              product.Name,
+			NameEn:            product.NameEn,
+			Description:       product.Description,
+			Price:             product.Price,
+			CostPrice:         product.CostPrice,
+			Unit:              product.Unit,
+			Quantity:          product.Quantity,
+			SoldFirst:         product.SoldFirst,
+			SerialNumber:      product.SerialNumber,
+			Category:          product.Category,
+			Status:            product.Status,
+			MinStock:          product.MinStock,
+			DrugInfo:          product.DrugInfo,
+			DrugRegistrations: product.DrugRegistrations,
+			DeletedDate:       product.DeletedDate,
+			CreatedBy:         product.CreatedBy,
+			CreatedDate:       product.CreatedDate,
+			UpdatedBy:         product.UpdatedBy,
+			UpdatedDate:       product.UpdatedDate,
+			ProductUnits:      units,
+			ProductPrices:     prices,
+			ProductStocks:     stocks,
+		})
 	}
 }
 
@@ -151,9 +195,11 @@ func UpdateProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 			return
 		}
 
-		updProdHistory := request.UpdateProductHistory(id, req)
-		updProdHistory.BranchId = ctx.GetString("BranchId")
-		_, _ = productEntity.CreateProductHistory(updProdHistory)
+		appendProductMasterHistory(ctx.GetString("BranchId"), productEntity, func(branchId string) request.ProductHistory {
+			updProdHistory := request.UpdateProductHistory(id, req)
+			updProdHistory.BranchId = branchId
+			return updProdHistory
+		})
 
 		ctx.JSON(http.StatusOK, result)
 	}
@@ -168,5 +214,12 @@ func ClearQuantitySoldFirstById(productEntity repositories.IProduct) gin.Handler
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
+	}
+}
+
+func appendProductMasterHistory(branchId string, productEntity repositories.IProduct, buildHistory func(branchId string) request.ProductHistory) {
+	history := buildHistory(branchId)
+	if _, err := productEntity.CreateProductHistory(history); err != nil {
+		logrus.WithError(err).WithField("branchId", branchId).Error("failed to create product history")
 	}
 }

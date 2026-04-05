@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 )
 
 func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity repositories.IProduct) gin.HandlerFunc {
@@ -38,9 +38,13 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 				continue
 			}
 			product, pErr := productEntity.GetProductById(item.ProductId)
-			if pErr != nil || product == nil {
-				logrus.Warnf("UpdateReceive: product %s not found, skipping", item.ProductId)
-				continue
+			if pErr != nil {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Errorf("failed to load product %s: %w", item.ProductId, pErr).Error())
+				return
+			}
+			if product == nil {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Sprintf("product %s not found", item.ProductId))
+				return
 			}
 			productReq := request.Product{
 				Name:         product.Name,

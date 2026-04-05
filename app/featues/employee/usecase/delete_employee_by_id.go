@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func DeleteEmployeeById(employeeEntity repositories.IEmployee) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func DeleteEmployeeById(employeeEntity repositories.IEmployee) gin.HandlerFunc {
 		employeeId := ctx.Param("employeeId")
 		result, err := employeeEntity.RemoveEmployeeById(employeeId)
 		if err != nil {
+			logrus.WithError(err).WithField("employeeId", employeeId).Error("delete employee failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_002, err.Error())
 			return
 		}

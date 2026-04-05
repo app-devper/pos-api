@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func DeleteBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func DeleteBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
 		branchId := ctx.Param("branchId")
 		result, err := branchEntity.RemoveBranchById(branchId)
 		if err != nil {
+			logrus.WithError(err).WithField("branchId", branchId).Error("delete branch failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
 			return
 		}

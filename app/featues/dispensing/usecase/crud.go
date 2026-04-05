@@ -23,7 +23,7 @@ func GetDispensingLogs(entity repositories.IDispensingLog) gin.HandlerFunc {
 func GetDispensingLogById(entity repositories.IDispensingLog) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := entity.GetDispensingLogById(id)
+		result, err := entity.GetDispensingLogById(id, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.DI_BAD_REQUEST_002, err.Error())
 			return
@@ -35,7 +35,7 @@ func GetDispensingLogById(entity repositories.IDispensingLog) gin.HandlerFunc {
 func GetDispensingLogsByPatientId(entity repositories.IDispensingLog) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		patientId := ctx.Param("patientId")
-		result, err := entity.GetDispensingLogsByPatientId(patientId)
+		result, err := entity.GetDispensingLogsByPatientId(patientId, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.DI_BAD_REQUEST_002, err.Error())
 			return

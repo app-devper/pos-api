@@ -46,31 +46,57 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 			return
 		}
 
+		receiveItemsMap, err := getReceiveItemsMap(receiveEntity, receives)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
+
 		productIdSet := make(map[string]struct{})
 		supplierIdSet := make(map[string]struct{})
+		unitIdSet := make(map[string]struct{})
 		for _, recv := range receives {
 			if !recv.SupplierId.IsZero() {
 				supplierIdSet[recv.SupplierId.Hex()] = struct{}{}
 			}
-			for _, item := range recv.Items {
+			for _, item := range receiveItemsMap[recv.Id.Hex()] {
 				productIdSet[item.ProductId.Hex()] = struct{}{}
+				if item.UnitId != "" {
+					unitIdSet[item.UnitId] = struct{}{}
+				}
 			}
 		}
 		productIds := make([]string, 0, len(productIdSet))
 		for id := range productIdSet {
 			productIds = append(productIds, id)
 		}
-		productList, _ := productEntity.GetProductsByIds(productIds)
+		productList, err := productEntity.GetProductsByIds(productIds)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
 		productMap := make(map[string]*entities.Product, len(productList))
 		for i := range productList {
 			productMap[productList[i].Id.Hex()] = &productList[i]
 		}
+		unitIds := make([]string, 0, len(unitIdSet))
+		for id := range unitIdSet {
+			unitIds = append(unitIds, id)
+		}
+		unitMap, err := buildUnitNameMap(productEntity, unitIds)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
 
-		supplierMap := make(map[string]string)
+		supplierIds := make([]string, 0, len(supplierIdSet))
 		for sid := range supplierIdSet {
-			if sup, err := supplierEntity.GetSupplierById(sid); err == nil && sup != nil {
-				supplierMap[sid] = sup.Name
-			}
+			supplierIds = append(supplierIds, sid)
+		}
+		supplierMap, err := getSupplierNameMap(supplierEntity, supplierIds)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
 		}
 
 		ctx.Header("Content-Type", "text/csv; charset=utf-8")
@@ -83,7 +109,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 		row := 1
 		for _, recv := range receives {
 			supName := supplierMap[recv.SupplierId.Hex()]
-			for _, item := range recv.Items {
+			for _, item := range receiveItemsMap[recv.Id.Hex()] {
 				product, ok := productMap[item.ProductId.Hex()]
 				if !ok || !containsReg(product.DrugRegistrations, "KHY9") {
 					continue
@@ -102,7 +128,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 					item.LotNumber,
 					expStr,
 					fmt.Sprintf("%d", item.Quantity),
-					product.Unit,
+					resolveUnitName(unitMap, item.UnitId, product.Unit),
 					fmt.Sprintf("%.2f", item.CostPrice),
 					supName,
 				})
@@ -113,7 +139,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 	}
 }
 
-func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, branchId string, req pharmacyReportRange, khyKey string, filename string) {
+func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, productEntity repositories.IProduct, branchId string, req pharmacyReportRange, khyKey string, filename string) {
 	orderRange := request.GetOrderRange{
 		StartDate: req.StartDate,
 		EndDate:   req.EndDate,
@@ -125,6 +151,21 @@ func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, branchI
 		return
 	}
 	orderItems, err := orderEntity.GetOrderItemRange(orderRange)
+	if err != nil {
+		errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+		return
+	}
+	unitIdSet := make(map[string]struct{})
+	for _, oi := range orderItems {
+		if !oi.UnitId.IsZero() {
+			unitIdSet[oi.UnitId.Hex()] = struct{}{}
+		}
+	}
+	unitIds := make([]string, 0, len(unitIdSet))
+	for id := range unitIdSet {
+		unitIds = append(unitIds, id)
+	}
+	unitMap, err := buildUnitNameMap(productEntity, unitIds)
 	if err != nil {
 		errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 		return
@@ -155,7 +196,7 @@ func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, branchI
 			getDrugField(product, func(d *entities.DrugInfo) string { return d.Strength }),
 			getDrugField(product, func(d *entities.DrugInfo) string { return d.DosageForm }),
 			fmt.Sprintf("%d", oi.Quantity),
-			product.Unit,
+			resolveUnitName(unitMap, oi.UnitId.Hex(), product.Unit),
 			getDrugField(product, func(d *entities.DrugInfo) string { return d.Dosage }),
 			order.PharmacistName,
 			order.LicenseNo,
@@ -165,7 +206,7 @@ func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, branchI
 	w.Flush()
 }
 
-func GetKHY10CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetKHY10CSV(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -173,11 +214,11 @@ func GetKHY10CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		generateSalesCSV(ctx, orderEntity, branchId, req, "KHY10", "khy10-report")
+		generateSalesCSV(ctx, orderEntity, productEntity, branchId, req, "KHY10", "khy10-report")
 	}
 }
 
-func GetKHY11CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetKHY11CSV(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -185,11 +226,11 @@ func GetKHY11CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		generateSalesCSV(ctx, orderEntity, branchId, req, "KHY11", "khy11-report")
+		generateSalesCSV(ctx, orderEntity, productEntity, branchId, req, "KHY11", "khy11-report")
 	}
 }
 
-func GetKHY12CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetKHY12CSV(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -197,11 +238,11 @@ func GetKHY12CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		generateSalesCSV(ctx, orderEntity, branchId, req, "KHY12", "khy12-report")
+		generateSalesCSV(ctx, orderEntity, productEntity, branchId, req, "KHY12", "khy12-report")
 	}
 }
 
-func GetKHY13CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetKHY13CSV(orderEntity repositories.IOrder, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := pharmacyReportRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -209,6 +250,6 @@ func GetKHY13CSV(orderEntity repositories.IOrder) gin.HandlerFunc {
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		generateSalesCSV(ctx, orderEntity, branchId, req, "KHY13", "khy13-report")
+		generateSalesCSV(ctx, orderEntity, productEntity, branchId, req, "KHY13", "khy13-report")
 	}
 }

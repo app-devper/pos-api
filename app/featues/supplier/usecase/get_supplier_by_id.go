@@ -6,6 +6,7 @@ import (
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GetSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
@@ -13,6 +14,7 @@ func GetSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 		id := ctx.Param("supplierId")
 		result, err := supplierEntity.GetSupplierById(id)
 		if err != nil {
+			logrus.WithError(err).WithField("supplierId", id).Error("get supplier by id failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())
 			return
 		}

@@ -10,15 +10,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-pdf/fpdf"
+	"github.com/sirupsen/logrus"
 )
 
 func GetPromptPayQR(settingEntity repositories.ISetting) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		branchId := ctx.GetString("BranchId")
 		amountStr := ctx.Query("amount")
-		amount, _ := strconv.ParseFloat(amountStr, 64)
+		amount, err := parsePromptPayAmount(amountStr)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_001, err.Error())
+			return
+		}
 
-		setting, _ := settingEntity.GetSettingByBranchId(branchId)
+		setting, err := settingEntity.GetSettingByBranchId(branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"branchId": branchId,
+				"amount":   amount,
+			}).Error("get promptpay qr setting failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
 		companyName := "POS System"
 		promptPayId := ""
 		if setting != nil {
@@ -62,7 +75,14 @@ func GetPromptPayQR(settingEntity repositories.ISetting) gin.HandlerFunc {
 
 		ctx.Header("Content-Type", "application/pdf")
 		ctx.Header("Content-Disposition", "inline; filename=promptpay-qr.pdf")
-		doc.Output(ctx.Writer)
+		if err := doc.Output(ctx.Writer); err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"branchId": branchId,
+				"amount":   amount,
+			}).Error("write promptpay qr pdf failed")
+			errcode.Abort(ctx, http.StatusInternalServerError, errcode.RP_INTERNAL_001, err.Error())
+			return
+		}
 	}
 }
 
@@ -70,9 +90,21 @@ func GetPromptPayPayload(settingEntity repositories.ISetting) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		branchId := ctx.GetString("BranchId")
 		amountStr := ctx.Query("amount")
-		amount, _ := strconv.ParseFloat(amountStr, 64)
+		amount, err := parsePromptPayAmount(amountStr)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_001, err.Error())
+			return
+		}
 
-		setting, _ := settingEntity.GetSettingByBranchId(branchId)
+		setting, err := settingEntity.GetSettingByBranchId(branchId)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"branchId": branchId,
+				"amount":   amount,
+			}).Error("get promptpay payload setting failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			return
+		}
 		promptPayId := ""
 		if setting != nil && setting.PromptPayId != "" {
 			promptPayId = setting.PromptPayId
@@ -86,6 +118,17 @@ func GetPromptPayPayload(settingEntity repositories.ISetting) gin.HandlerFunc {
 		payload := generatePromptPayPayload(promptPayId, amount)
 		ctx.JSON(http.StatusOK, gin.H{"payload": payload, "promptPayId": promptPayId, "amount": amount})
 	}
+}
+
+func parsePromptPayAmount(amountStr string) (float64, error) {
+	if amountStr == "" {
+		return 0, nil
+	}
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("amount is not valid")
+	}
+	return amount, nil
 }
 
 func generatePromptPayPayload(promptPayId string, amount float64) string {

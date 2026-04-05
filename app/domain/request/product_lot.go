@@ -10,6 +10,7 @@ type ProductLot struct {
 	LotNumber  string    `json:"lotNumber" binding:"required"`
 	ExpireDate time.Time `json:"expireDate" binding:"required"`
 	CostPrice  float64   `json:"costPrice" binding:"required"`
+	BranchId   string
 	UpdatedBy  string
 }
 
@@ -18,6 +19,7 @@ type UpdateProductLot struct {
 	LotNumber  string    `json:"lotNumber" binding:"required"`
 	ExpireDate time.Time `json:"expireDate" binding:"required"`
 	CostPrice  float64   `json:"costPrice" binding:"required"`
+	BranchId   string
 	UpdatedBy  string
 }
 
