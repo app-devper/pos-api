@@ -16,6 +16,9 @@
 - `10-employee-lifecycle.md`
 - `11-supplier-lifecycle.md`
 - `12-category-lifecycle.md`
+- `13-settings-lifecycle.md`
+- `15-customer-history-lifecycle.md`
+- `16-dashboard-query-lifecycle.md`
 
 ## วิธีใช้เอกสารชุดนี้
 

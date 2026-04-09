@@ -17,7 +17,6 @@
 - `11-employees-contract.md`
 - `12-suppliers-contract.md`
 - `13-categories-contract.md`
-- `14-dispensing-logs-contract.md`
 - `15-customer-histories-contract.md`
 - `16-dashboard-contract.md`
 

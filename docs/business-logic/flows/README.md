@@ -14,6 +14,13 @@
 - `08-promotion-management-flow.md`
 - `09-stock-transfer-flow.md`
 - `10-khy-sale-flow.md` — การขายสินค้าที่เกี่ยวข้องกับรายงาน ข.ย.9–13 (DrugType vs DrugRegistrations, compliance flow, report data source)
+- `11-product-management-flow.md`
+- `13-dashboard-analytics-flow.md`
+- `14-branch-management-flow.md`
+- `15-employee-management-flow.md`
+- `16-supplier-management-flow.md`
+- `17-category-management-flow.md`
+- `18-customer-history-flow.md`
 
 ## วิธีอ่าน
 

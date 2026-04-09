@@ -53,7 +53,7 @@
 - KHY PDF ใช้ frontend-generated document จาก `/reports/pharmacy/khy*/data`
 - KHY CSV ยังคงสร้างจาก backend endpoint
 - ข้อมูล KHY 9 มาจาก receives (การรับยาเข้า)
-- ข้อมูล KHY 10-13 มาจาก orders (การขายยา) ไม่ใช่ dispensing logs
+- ข้อมูล KHY 10-13 มาจาก orders (การขายยา) โดยตรง
 - การคัดกรองใช้ `product.DrugRegistrations` array (KHY9, KHY10, KHY11, KHY12, KHY13)
 - Order entity มี LicenseNo และ PharmacistName สำหรับรายงาน
 

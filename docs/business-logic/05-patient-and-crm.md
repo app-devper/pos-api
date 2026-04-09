@@ -9,9 +9,55 @@
 - Patient Profile
 - Allergy
 - Chronic Disease
-- Dispensing History
 - Customer Profile
 - Customer Purchase History
+
+## Workflow References
+
+- `flows/04-patient-customer-flow.md` — ความสัมพันธ์ระดับภาพรวมระหว่าง patient กับ customer
+- `flows/05-customer-management-flow.md` — customer CRUD และการใช้งานฝั่ง CRM
+- `flows/06-patient-management-flow.md` — patient management
+- `flows/18-customer-history-flow.md` — customer activity log
+- `lifecycle/06-patient-lifecycle.md` — patient lifecycle
+- `lifecycle/07-customer-lifecycle.md` — customer lifecycle
+- `lifecycle/15-customer-history-lifecycle.md` — customer history lifecycle
+
+## End-to-End Workflow Summary
+
+### 1. Create or Identify Customer Context
+
+- พนักงานสามารถสร้างหรือค้นหาลูกค้าเพื่อผูกกับการขาย
+- customer context ใช้กับ purchase history, CRM activity และ follow-up เชิงธุรกิจ
+
+### 2. Create or Identify Patient Context
+
+- ถ้าการขายเกี่ยวข้องกับการดูแลทางคลินิก ผู้ใช้เลือกหรือสร้าง patient profile
+- patient domain แยกจาก customer แม้ในเชิงธุรกิจจะอาจเป็นคนเดียวกัน
+
+### 3. Maintain Clinical Information
+
+- ระบบเก็บ allergy, chronic disease และข้อมูลสุขภาพที่เกี่ยวข้อง
+- ข้อมูลกลุ่มนี้ถูกใช้ใน checkpoint ก่อนการขายและการจ่ายยา
+
+### 4. Use Patient Data During Sale
+
+- เมื่อมี patient context ระบบตรวจ allergy check ก่อน commit order
+- warning หรือ block ที่สำคัญต้องเกิดก่อนตัด stock และปิดการขาย
+
+### 5. Record Clinical Follow-up
+
+- หลังการขายที่เกี่ยวข้องกับผู้ป่วย ระบบเก็บ patient context และ order history ไว้ใช้ติดตามต่อ
+- ประวัติการขายและข้อมูลผู้ป่วยใช้กับ patient review และการติดตามการรักษา
+
+### 6. Build CRM and Service History
+
+- customer history ถูกเพิ่มจากกิจกรรมที่เกี่ยวข้องกับลูกค้าในสาขานั้น
+- purchase history และ service history ช่วยให้ทีมหน้าร้านติดตามลูกค้าระยะยาวได้
+
+### 7. Review Historical Context
+
+- ผู้ใช้สามารถย้อนดู patient history, customer histories และ orders ที่เกี่ยวข้อง
+- ข้อมูลทั้งหมดต้องอ่านกลับภายใต้ branch scope และสิทธิ์ที่ถูกต้อง
 
 ## Business Rules
 
@@ -27,18 +73,13 @@
 - severity ของ allergy มีผลต่อระดับการเตือน
 - ข้อมูลโรคประจำตัวควรถูกใช้ร่วมกับการตัดสินใจของเภสัชกร แต่ไม่ควรถูกแก้ไขโดยไม่มีสิทธิ์
 
-### 3. Dispensing History
+### 3. Patient-Linked Order History
 
 - ทุกการขายที่ผูกกับ patient ต้องสามารถย้อนกลับมาดูประวัติได้
-- ประวัติการจ่ายยาควรเชื่อมกับ order และ dispensing log
-- ประวัตินี้ใช้เพื่อการติดตามการรักษาและการเตือน refill
+- ประวัตินี้ควรเชื่อมกับ order และ patient profile
+- ประวัตินี้ใช้เพื่อการติดตามการรักษา
 
-### 4. Refill Reminder
-
-- ระบบคำนวณวันเติมยาซ้ำจากการจ่ายล่าสุดและจำนวนวันที่กำหนด
-- รายการที่ใกล้ถึงกำหนดควรถูกแสดงใน dashboard หรือหน้าติดตาม
-
-### 5. Customer CRM
+### 4. Customer CRM
 
 - ลูกค้าใช้สำหรับติดตามประวัติการซื้อ การขายเครดิต หรือการตลาดพื้นฐาน
 - ลูกค้ากับผู้ป่วยอาจเป็นคนเดียวกันได้ในเชิงธุรกิจ แต่ต้องแยก domain ตามวัตถุประสงค์การใช้งาน

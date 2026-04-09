@@ -20,7 +20,6 @@ type Repository struct {
 	Promotion       repositories.IPromotion
 	CustomerHistory repositories.ICustomerHistory
 	Patient         repositories.IPatient
-	DispensingLog   repositories.IDispensingLog
 	StockTransfer   repositories.IStockTransfer
 }
 
@@ -40,7 +39,6 @@ func InitRepository(resource *db.Resource) *Repository {
 		Promotion:       repositories.NewPromotionEntity(resource),
 		CustomerHistory: repositories.NewCustomerHistoryEntity(resource),
 		Patient:         repositories.NewPatientEntity(resource),
-		DispensingLog:   repositories.NewDispensingLogEntity(resource),
 		StockTransfer:   repositories.NewStockTransferEntity(resource),
 	}
 }

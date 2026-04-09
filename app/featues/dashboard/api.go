@@ -56,13 +56,6 @@ func ApplyDashboardAPI(
 		usecase.GetExpiringProducts(repository.Product),
 	)
 
-	dashboardRoute.GET("/refill-reminders",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetRefillReminders(repository.DispensingLog),
-	)
-
 	dashboardRoute.GET("/abc-analysis",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),

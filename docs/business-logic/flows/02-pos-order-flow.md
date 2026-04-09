@@ -10,7 +10,7 @@
 - เภสัชกร
 - ลูกค้า / ผู้ป่วย
 - Frontend หน้า POS
-- Backend order / stock / dispensing logic
+- Backend order / stock logic
 
 ## Preconditions
 
@@ -55,16 +55,16 @@
 ### Step 6: Submit Order
 
 - Frontend ส่ง order payload ไปยัง Backend
-- Backend ตรวจ stock, compliance data, payment totals, และ branch context ซ้ำอีกครั้ง
+- Backend ตรวจ branch context, payment totals และความสามารถในการตัด stock จาก `item.Stocks` ที่ client ส่งมา
+- Compliance data ถูกบันทึกตาม payload ที่ frontend ส่งมา โดย backend ไม่ได้ derive จาก `drugRegistrations` ซ้ำในชั้นนี้
 
 ### Step 7: Commit Business Transaction
 
 - Backend สร้าง order (รวมข้อมูล compliance: pharmacistName, licenseNo, buyerName, buyerIdCard, prescriberName)
-- ตัด stock ตาม FEFO
+- ตัด stock ตาม `item.Stocks` ที่ frontend เลือกและส่งมา
 - อัปเดต lot balance
 - สร้าง product history
-- สร้าง dispensing log สำหรับรายการที่เข้าข่ายรายงานยา
-- ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง (ไม่ใช้ dispensing log)
+- ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง
 
 ### Step 8: Post-Order Actions
 
@@ -82,13 +82,13 @@
 ## Error Flow
 
 - stock ไม่พอ → reject ก่อน commit
-- allergy / compliance data ไม่ครบ (ชื่อเภสัชกร, เลขใบอนุญาต, ผู้ซื้อ, เลขบัตรประชาชน) → block ยืนยันคำสั่งขาย
+- allergy / compliance data ไม่ครบ (ชื่อเภสัชกร, เลขใบอนุญาต, ผู้ซื้อ, เลขบัตรประชาชน) → ปัจจุบันต้อง block ที่ frontend ตาม workflow ของ POS
 - payment total ไม่พอ → ไม่ให้ submit
 - Backend validation fail → ไม่สร้าง order ครึ่งทาง
 
 ## Expected Outcome
 
 - order ถูกสร้างสมบูรณ์
-- stock ถูกตัดถูก lot
-- ข้อมูลกำกับของยาควบคุมถูกบันทึกครบ
+- stock ถูกตัดตาม stock lots ที่ frontend ส่งมา
+- ข้อมูลกำกับของยาควบคุมถูกบันทึกตาม payload ที่ frontend ส่งมา
 - เอกสารหลังการขายสามารถออกได้จากข้อมูลจริง

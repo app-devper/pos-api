@@ -25,7 +25,8 @@
 ### 3. Feature Toggles
 
 - Frontend ใช้ค่าพวกนี้ในการซ่อน/แสดง flow บางส่วน
-- Backend ต้องเป็นแหล่ง truth ของการเปิด/ปิด feature จริง
+- Backend ทำหน้าที่เก็บและคืนค่า toggle configuration ของ branch
+- การ enforce ว่าจะเปิด/ปิด flow ใดใน runtime ปัจจุบันเป็นความรับผิดชอบของ frontend หรือ consumer ที่อ่าน config นี้ไปใช้
 
 ## Error Cases
 

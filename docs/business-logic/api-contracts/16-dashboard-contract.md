@@ -7,7 +7,7 @@
 ## ฝั่งที่เกี่ยวข้อง
 
 - Frontend หน้า dashboard
-- Backend dashboard, order, stock, dispensing และ product services
+- Backend dashboard, order, stock และ product services
 
 ## Contract Expectations
 
@@ -39,8 +39,7 @@
 ### 6. Refill Reminders
 
 - Frontend คาดหวังรายการผู้ป่วยที่ใกล้ถึงกำหนดเติมยา
-- คำนวณจาก dispensing history และจำนวนวันที่กำหนด
-- แสดงเฉพาะเมื่อเปิด patient feature
+- ปกติ frontend ควรแสดงเฉพาะเมื่อ patient feature ถูกเปิดตาม config ที่อ่านจาก settings โดย backend ไม่ได้ gate endpoint นี้จาก toggle ดังกล่าวโดยตรง
 
 ### 7. ABC Analysis
 
@@ -62,7 +61,6 @@
 | GET | /dashboard/low-stock | รายการสินค้า stock ต่ำ |
 | GET | /dashboard/stock-report | รายงานสรุป stock |
 | GET | /dashboard/expiring | สินค้าใกล้หมดอายุ |
-| GET | /dashboard/refill-reminders | รายการเตือนเติมยา |
 | GET | /dashboard/abc-analysis | วิเคราะห์ ABC |
 | GET | /dashboard/dead-stock | สินค้าค้างสต็อก |
 
@@ -71,4 +69,4 @@
 - invalid date range
 - unauthorized access
 - branch context ไม่ถูกต้อง
-- patient feature disabled (สำหรับ refill reminders)
+- refill reminders not available in current frontend feature configuration

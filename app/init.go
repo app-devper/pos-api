@@ -10,7 +10,6 @@ import (
 	"pos/app/featues/customer"
 	"pos/app/featues/customer_history"
 	"pos/app/featues/dashboard"
-	"pos/app/featues/dispensing"
 	"pos/app/featues/employee"
 	"pos/app/featues/order"
 	"pos/app/featues/patient"
@@ -73,7 +72,6 @@ func (app Routes) StartGin() {
 	promotion.ApplyPromotionAPI(publicRoute, repository)
 	customer_history.ApplyCustomerHistoryAPI(publicRoute, repository)
 	patient.ApplyPatientAPI(publicRoute, repository)
-	dispensing.ApplyDispensingAPI(publicRoute, repository)
 	stock_transfer.ApplyStockTransferAPI(publicRoute, repository)
 
 	r.NoRoute(middlewares.NoRoute())

@@ -7,7 +7,7 @@
 ## ฝั่งที่เกี่ยวข้อง
 
 - Frontend หน้า POS
-- Backend order, payment, stock deduction, dispensing และ document-related services
+- Backend order, payment, stock deduction และ document-related services
 
 ## Contract Expectations
 
@@ -20,7 +20,8 @@
 
 - Request ต้องรวม cart items, payment data, customer/patient references และ compliance data เมื่อจำเป็น
 - Compliance fields ในกรณียาควบคุม: `pharmacistName`, `licenseNo`, `prescriberName`, `buyerName`, `buyerIdCard`
-- Backend ต้อง validate stock, payment total, drug compliance fields และ branch authorization
+- Backend ต้อง validate branch authorization, payment total และความสามารถในการตัด stock จาก `item.Stocks`
+- ปัจจุบัน compliance fields ถูกเก็บตาม payload ที่ client ส่งมา และ frontend เป็นตัว enforce rule ว่าต้องกรอกเมื่อใด
 - Response ควรมีข้อมูล order ที่บันทึกสำเร็จและ identifiers ที่ใช้กับเอกสารหลังการขาย
 - Order entity เก็บ compliance data โดยตรง เพื่อรองรับรายงาน ข.ย. 10–13 ที่ดึงจาก orders
 

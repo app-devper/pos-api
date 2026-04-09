@@ -13,7 +13,7 @@
 
 ## Preconditions
 
-- เปิดใช้งาน patient feature
+- frontend เปิด flow ผู้ป่วยตามค่า settings ที่อ่านได้
 - ผู้ใช้มีสิทธิ์เข้าถึงข้อมูลผู้ป่วย
 
 ## Main Flow
@@ -24,11 +24,11 @@
 4. ผู้ใช้บันทึก allergy, chronic disease และข้อมูลสุขภาพอื่น
 5. Backend บันทึกข้อมูลและคืนผลล่าสุด
 6. ผู้ใช้เลือกผู้ป่วยไปใช้ใน POS
-7. Frontend และ Backend ใช้ข้อมูลผู้ป่วยในการตรวจสอบ allergy / history / dispensing context
+7. Frontend และ Backend ใช้ข้อมูลผู้ป่วยในการตรวจสอบ allergy / history / clinical context
 
 ## Error Flow
 
-- feature ปิดอยู่ → ไม่ควรเข้าถึง flow นี้
+- frontend/consumer ตีความว่า feature ปิดอยู่ → ไม่ควรเปิด flow นี้ให้ผู้ใช้
 - ไม่มีสิทธิ์ → แสดง restricted state
 - ข้อมูลสุขภาพไม่ครบ → เตือนผู้ใช้และไม่หลอกว่าผ่านการตรวจครบแล้ว
 

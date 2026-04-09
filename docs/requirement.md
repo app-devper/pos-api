@@ -52,9 +52,9 @@
 
 ### 2.2 Batch Tracking (คลังสินค้า)
 
-- **Batch Management Page** — หน้าดูรายการ Lot ทั้งหมด (`/batches`) พร้อม search, pagination, เรียงตาม FEFO
+- **Batch Management Page** — หน้าดูรายการ Lot ทั้งหมด (`/batches`) พร้อม search และ pagination
 - **Batch CRUD** — สร้าง/แก้ไข/ลบ Lot พร้อม Lot Number, วันหมดอายุ, จำนวน, ราคาทุน, ผู้จำหน่าย
-- **FEFO Logic** — ระบบตัดสต็อกจาก Lot ที่ "หมดอายุก่อน" เสมอ (First Expired, First Out)
+- **Lot Visibility** — ระบบเก็บข้อมูล lot และวันหมดอายุเพื่อให้ frontend ใช้ช่วยเลือก lot ที่เหมาะสมใน workflow การขาย
 
 ### 2.3 Goods Receipt (รับสินค้าเข้าสต็อก)
 
@@ -100,17 +100,16 @@
 - **Smart Search** — ค้นหาด้วยชื่อการค้า (Trade Name), ชื่อสามัญ (Generic Name), หรือ Barcode (รวมบาร์โค้ดหน่วยนับเพิ่มเติม)
 - **Multi-Cart Tabs** — รองรับ 6 ตะกร้าพร้อมกัน สลับไปมาได้ทันที สำหรับรับลูกค้าหลายรายพร้อมกัน
 - **Unit Selector** — สินค้าที่มีหลายหน่วยนับ จะแสดง popup ให้เลือกหน่วยขาย หรือสแกนบาร์โค้ดหน่วยใดก็เลือกอัตโนมัติ
-- **Drug Interaction Alert** — แจ้งเตือนทันทีหากมียาในตะกร้าที่มีปฏิกิริยาต่อกัน
+- **Drug Interaction Alert** — รองรับการตรวจสอบ interaction จากข้อมูล drug metadata เมื่อ frontend เรียก flow นี้
 - **Allergy Check** — หากผูกผู้ป่วย แล้วพบว่าแพ้ยาที่กำลังจะขาย ระบบแจ้งเตือน Block ทันที
 - **Controlled Drug Compliance** — ยาควบคุม (DANGEROUS, CONTROLLED, PSYCHO, NARCOTIC) บังคับบันทึก:
     - ชื่อเภสัชกรผู้จ่ายยา (pharmacistName)
     - ชื่อผู้สั่งจ่าย (prescriberName)
     - ชื่อผู้ซื้อ (buyerName)
     - เลขบัตรประชาชนผู้ซื้อ (buyerIdCard)
-- **Prescription Label** — พิมพ์ฉลากยาอัตโนมัติ (ชื่อยา, ชื่อสามัญ, วิธีใช้, ผลข้างเคียง) รองรับขนาด 8×5 cm และ 5×3 cm
-- **Multiple Payments** — รองรับเงินสด (CASH), โอนเงิน (TRANSFER), บัตรเครดิต (CREDIT_CARD) พร้อมคำนวณเงินทอน
-- **Patient Linking** — เลือกผู้ป่วยจากระบบ CRM เพื่อตรวจสอบแพ้ยาและบันทึกประวัติการจ่ายยา
-- **FEFO Deduction** — ระบบตัดสต็อกจาก Lot ที่หมดอายุก่อนอัตโนมัติ
+- **Multiple Payments** — รองรับเงินสด (CASH) และพร้อมเพย์ (PROMPTPAY) พร้อมคำนวณเงินทอน
+- **Patient Linking** — เลือกผู้ป่วยจากระบบ CRM เพื่อตรวจสอบแพ้ยาและผูก patient context เข้ากับ order
+- **Lot-Based Deduction** — ระบบตัดสต็อกจากรายการ lot ที่ frontend เลือกและส่งมาใน payload
 
 ---
 
@@ -138,14 +137,12 @@
 
 ## 5. Patient Profile & CRM (ประวัติผู้ป่วย)
 
-ฟีเจอร์นี้สามารถเปิด/ปิดได้จากหน้า Settings (Feature Toggle)
+ฟีเจอร์นี้สามารถตั้งค่าเปิด/ปิดได้จากหน้า Settings โดยปัจจุบัน frontend เป็นผู้ใช้ค่า toggle นี้ในการซ่อนหรือเปิด flow ที่เกี่ยวข้อง
 
 - **Patient CRUD** — เพิ่ม/แก้ไข/ลบ/ค้นหาผู้ป่วย พร้อม pagination
 - **Patient Detail Page** — หน้ารายละเอียดผู้ป่วยแบบเต็ม (`/patients/[id]`)
 - **Medical History** — บันทึกโรคประจำตัว (Chronic Diseases), ประวัติการแพ้ยา (Allergies พร้อม Severity: MILD/MODERATE/SEVERE)
-- **Dispensing History** — ดูประวัติการจ่ายยาย้อนหลังจากระบบ POS
 - **PDPA Compliance** — ระบบบันทึกความยินยอม (Consent) และวันที่ยินยอมในการเก็บข้อมูลสุขภาพ
-- **Refill Reminder** — ระบบคำนวณวันยาหมดอัตโนมัติ (default 30 วัน) และแจ้งเตือนบน Dashboard
 - **Patient Fields** — เลขบัตรประชาชน, ชื่อ-นามสกุล, โทรศัพท์, อีเมล, วันเกิด, เพศ, ที่อยู่, หมายเหตุ
 
 ---
@@ -161,13 +158,12 @@
 | **Dead Stock** | รายงานสินค้าไม่เคลื่อนไหวเกิน 90 วัน |
 | **Expiring Items** | รายการยาใกล้หมดอายุภายใน 6 เดือน |
 | **Low Stock** | รายการสินค้าที่สต็อกต่ำกว่า Min Stock |
-| **Refill Reminders** | รายชื่อผู้ป่วยที่ถึงกำหนดซื้อยาซ้ำ พร้อมวันที่คาดว่าหมด |
 
 ---
 
 ## 7. System Settings (ตั้งค่าระบบ)
 
-- **Feature Toggles** — เปิด/ปิดฟีเจอร์ต่างๆ ของระบบ เช่น ฟีเจอร์ข้อมูลผู้ป่วย (`patient_feature_enabled`)
+- **Feature Toggles** — เก็บค่าเปิด/ปิดฟีเจอร์ต่างๆ ของระบบ เช่น ฟีเจอร์ข้อมูลผู้ป่วย (`patient_feature_enabled`) เพื่อให้ frontend/consumer นำไปใช้ตัดสินใจซ่อนหรือเปิด flow
 - **Key-Value Store** — เก็บค่าตั้งค่าทั่วไปในรูปแบบ key-value
 - **Role Restriction** — เฉพาะ SUPER/ADMIN เท่านั้นที่แก้ไขได้
 
@@ -192,8 +188,8 @@
     - JWT Token Authentication
     - Role-Based Access Control (RBAC) middleware
     - Data Encryption สำหรับข้อมูลสุขภาพ
-    - Daily Backup บน Cloud Storage
-- **Hardware Integration** — รองรับเครื่องยิงบาร์โค้ด (USB HID), เครื่องพิมพ์ใบเสร็จ (Thermal), เครื่องพิมพ์ฉลากยา
+    - Daily Backup บน Cloud Storage (ขึ้นกับนโยบาย deployment/infrastructure)
+- **Hardware Integration** — รองรับเครื่องยิงบาร์โค้ด (USB HID) และ workflow เอกสารที่พิมพ์ผ่าน browser/client
 
 ---
 
@@ -203,16 +199,15 @@
 1. เลือกสินค้า → กรอก Lot Number + วันหมดอายุ + จำนวน + ราคาทุน
 2. (ถ้ามีหลายหน่วย) เลือกหน่วยรับเข้า → ระบบแสดงจำนวนหน่วยฐานที่จะเข้าสต็อก
 3. เพิ่มรายการทีละตัว → review ทั้งหมด → บันทึกพร้อมกัน
-4. ระบบสร้าง Goods Receipt + Batch อัตโนมัติ
+4. ระบบสร้าง Goods Receipt และ lot records ที่เกี่ยวข้องอัตโนมัติ
 
 ### 9.2 ขายสินค้า (POS)
 1. สแกนบาร์โค้ด หรือ ค้นหาด้วยชื่อ
 2. (ถ้ามีหลายหน่วย) เลือกหน่วยขาย หรือสแกนบาร์โค้ดหน่วยที่ต้องการ
-3. ระบบเช็ค Drug Interaction + Allergy Check อัตโนมัติ
+3. Frontend เรียก flow ตรวจ Drug Interaction + Allergy Check ก่อนยืนยันการขาย
 4. (ยาควบคุม) บันทึกชื่อเภสัชกร/ผู้ซื้อ/เลขบัตร
-5. พิมพ์ฉลากยา (ถ้าต้องการ)
-6. ชำระเงิน → ระบบตัดสต็อกตาม FEFO อัตโนมัติ
-7. บันทึกลงรายงาน ข.ย. ที่เกี่ยวข้องอัตโนมัติ
+5. ชำระเงิน → ระบบตัดสต็อกจากรายการ lot ที่ frontend ส่งมา
+6. บันทึกลงรายงาน ข.ย. ที่เกี่ยวข้องอัตโนมัติ
 
 ### 9.3 รายงาน
 1. เลือกประเภทรายงาน (ข.ย. 9–13) → กำหนดช่วงวันที่
@@ -298,15 +293,7 @@
 
 | รายงาน | รายละเอียด | สิทธิ์ |
 |--------|-----------|--------|
-| **ใบเสร็จ PDF** | พิมพ์ใบเสร็จต่อ Order | ทุก Role |
-| **ใบกำกับภาษี PDF** | พิมพ์ใบกำกับภาษีต่อ Order | ทุก Role |
-| **รายงานการขาย** | PDF + Excel สรุปยอดขายตามช่วงวันที่ | ADMIN/SUPER |
+| **รายงานการขาย** | Excel สรุปยอดขายตามช่วงวันที่ | ADMIN/SUPER |
 | **รายงานสต็อก** | Excel รายงานสต็อกคงเหลือ | ADMIN/SUPER |
-| **ฉลากยา PDF** | พิมพ์ฉลากยาจาก DispensingLog | ทุก Role |
 | **บาร์โค้ด PDF** | พิมพ์บาร์โค้ดสินค้าหลายรายการ | ทุก Role |
-| **ป้ายราคา PDF** | พิมพ์ป้ายราคาสินค้า | ทุก Role |
-| **ประวัติสินค้า PDF** | รายงานความเคลื่อนไหวสินค้า (รายตัว / ช่วงวันที่) | ทุก Role |
-| **ประวัติลูกค้า PDF** | รายงานประวัติการซื้อของลูกค้า | ทุก Role |
-| **สรุปรับสินค้า PDF** | สรุปการรับสินค้าตามช่วงวันที่ | ADMIN/SUPER |
-| **รายงานราคา PDF** | รายงานราคาสินค้าทั้งหมด | ทุก Role |
 | **PromptPay QR** | สร้าง QR Code PromptPay (PDF + Payload) | ทุก Role |

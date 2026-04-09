@@ -50,5 +50,5 @@
 
 ## ความสัมพันธ์กับ Backend
 
-- Backend รับผิดชอบ order commit, stock deduction, compliance data, dispensing logs และเอกสารข้อมูลหลังการขาย
+- Backend รับผิดชอบ order commit, stock deduction, compliance data และเอกสารข้อมูลหลังการขาย
 - Frontend รับผิดชอบ interaction ความเร็วสูง, cart UX, payment UX, และ post-order print flow

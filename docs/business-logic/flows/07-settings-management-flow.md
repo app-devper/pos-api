@@ -29,7 +29,7 @@
 
 - ค่าใดมีผลทันที
 - ค่าใดมีผลในหน้าจอหรือเอกสารถัดไป
-- feature toggle ใดควรซ่อนหรือปิด flow ทั้งชุด
+- feature toggle ใดควรซ่อนหรือปิด flow ทั้งชุดในฝั่ง frontend/consumer ที่อ่านค่า settings นี้
 
 ## Error Flow
 

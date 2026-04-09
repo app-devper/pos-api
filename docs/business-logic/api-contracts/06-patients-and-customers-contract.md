@@ -7,7 +7,7 @@
 ## ฝั่งที่เกี่ยวข้อง
 
 - Frontend หน้า customers, patients, POS
-- Backend customer, patient, history และ dispensing-related services
+- Backend customer, patient และ history-related services
 
 ## Contract Expectations
 
@@ -20,7 +20,7 @@
 
 - Frontend คาดหวังข้อมูลผู้ป่วยที่แยกส่วนข้อมูลทั่วไปกับข้อมูลสุขภาพได้
 - Backend ต้อง enforce สิทธิ์เข้าถึงข้อมูลสุขภาพ
-- Response ควรมีข้อมูลพอสำหรับ allergy checks, dispensing history และ patient context ใน POS
+- Response ควรมีข้อมูลพอสำหรับ allergy checks, order history และ patient context ใน POS
 
 ### 3. Create / Update Flows
 
@@ -31,5 +31,5 @@
 
 - duplicate customer/patient
 - insufficient permission for medical data
-- patient feature disabled
+- patient flow not available in current frontend feature configuration
 - record not found

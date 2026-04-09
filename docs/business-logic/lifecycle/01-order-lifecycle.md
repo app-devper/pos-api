@@ -23,17 +23,16 @@
 - รายการสินค้าในตะกร้าถูกต้อง
 - stock เพียงพอ
 - payment total ครอบคลุมยอดสุทธิ
-- ข้อมูลกำกับยาควบคุมครบถ้วนเมื่อจำเป็น
+- ข้อมูลกำกับยาควบคุมครบถ้วนเมื่อจำเป็นตาม workflow ฝั่ง frontend
 - branch context และ authorization ถูกต้อง
 
 #### Backend Effects
 
 - สร้าง order record (รวม compliance data: `pharmacistName`, `licenseNo`, `prescriberName`, `buyerName`, `buyerIdCard`)
-- ตัด stock ตาม FEFO
+- ตัด stock ตาม `item.Stocks` ที่ request ส่งมา
 - อัปเดต lot balance
 - สร้าง product history
-- สร้าง dispensing log สำหรับรายการที่เกี่ยวข้อง
-- ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง (ไม่ใช่จาก dispensing log)
+- ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง
 - ทำให้ข้อมูลพร้อมสำหรับ receipt, tax invoice, sales report และ KHY reports
 
 #### Frontend Behavior

@@ -11,6 +11,54 @@
 - ลูกค้า
 - ผู้ป่วย
 
+## Workflow References
+
+- `flows/02-pos-order-flow.md` — sequence flow ของการขายหน้าร้าน
+- `flows/10-khy-sale-flow.md` — compliance flow ของ ข.ย.10–13
+- `lifecycle/01-order-lifecycle.md` — order lifecycle
+- `api-contracts/04-pos-orders-contract.md` — order / POS contracts
+
+## End-to-End Workflow Summary
+
+### 1. Build Cart
+
+- พนักงานค้นหาสินค้าหรือสแกนบาร์โค้ด
+- ระบบเลือกสินค้าและหน่วยขายที่ถูกต้อง
+- quantity และ stock availability ต้องถูก validate ตั้งแต่ก่อนชำระเงิน
+
+### 2. Attach Customer or Patient Context
+
+- ถ้าเป็นลูกค้าทั่วไป ระบบอาจผูก customer code เพื่อใช้กับประวัติการซื้อ
+- ถ้าเป็นผู้ป่วย ระบบผูก patient context เพื่อใช้กับ allergy check และข้อมูลกำกับทางคลินิก
+
+### 3. Run Clinical Safety Checks
+
+- เมื่อมี patient context ระบบตรวจ allergy และ clinical constraints ก่อนปิดการขาย
+- warning ที่รุนแรงต้องถูกแจ้งก่อน commit order
+- เป้าหมายคือ block หรือเตือนให้เร็วที่สุด ไม่ใช่หลังตัด stock ไปแล้ว
+
+### 4. Collect Controlled-Drug Metadata
+
+- ถ้าสินค้าอยู่ในกลุ่มที่ trigger ข.ย.10–13 ระบบต้องเก็บ pharmacist, license, buyer และข้อมูลกำกับอื่นให้ครบ
+- หากข้อมูลบังคับไม่ครบ ต้องไม่ให้ยืนยัน order
+
+### 5. Validate Payment and Commit Order
+
+- ระบบรับ payment ได้หลายช่องทางใน order เดียว
+- ยอดรวม payment ต้องครอบคลุมยอดสุทธิ
+- เมื่อ validation ผ่าน Backend จึง commit order, order items, payments และ stock movement
+
+### 6. Deduct Stock and Generate Audit Trail
+
+- stock ถูกตัดตาม unit / quantity ของ transaction จริง
+- ระบบสร้าง product history และรักษา consistency ระหว่าง order กับ inventory
+- ถ้าตัด stock ไม่ครบหรือ step สำคัญล้มเหลว ต้องไม่ปล่อย order ค้างครึ่งทาง
+
+### 7. Create Downstream Clinical Outputs
+
+- ประวัติการขายและ patient context ถูกใช้เป็นข้อมูลอ้างอิงต่อในงานติดตามผู้ป่วย
+- ข้อมูลสำหรับ ข.ย.10–13 ถูกอ่านจาก order/product data ตามกฎ compliance
+
 ## Business Flow หลัก
 
 1. ค้นหาสินค้าหรือสแกนบาร์โค้ด
@@ -41,6 +89,7 @@
 - ถ้ามี patient context ระบบต้องตรวจสอบ allergy และ interaction
 - allergy ที่ตรงเงื่อนไขรุนแรงต้อง block หรือเตือนระดับสูง
 - interaction ควรแจ้งเตือนก่อนชำระเงิน ไม่ใช่หลังปิดการขาย
+- ปัจจุบันเป็น workflow ที่ frontend ต้องเรียกและ enforce ก่อน submit order
 
 ### 4. Controlled Drug Compliance
 
@@ -64,14 +113,14 @@
 
 ### 6. Stock Deduction
 
-- การยืนยันขายต้องตัดสต็อกจริงจาก lot ตาม FEFO
-- ต้องตัด stock, lot balance, และ product history ใน transaction เชิงธุรกิจเดียวกัน
+- การยืนยันขายใช้ stock lots ที่ frontend เลือกและส่งมาใน `item.Stocks`
+- Backend ตัด stock, lot balance, และ product history จาก payload นั้นใน transaction เชิงธุรกิจเดียวกัน
 - ถ้าตัด stock ไม่ครบ ต้องยกเลิกการบันทึกออเดอร์ทั้งชุด
 
-### 7. Dispensing Log และ KHY Data Source
+### 7. KHY Data Source
 
-- เมื่อขายสินค้าที่อยู่ในกลุ่มรายงานยา ข้อมูลต้องถูกบันทึกใน dispensing log หรือเอกสารที่เทียบเท่า
-- รายงาน ข.ย. 10–13 ดึงข้อมูลจาก orders (order_items joined with products) โดยตรง ไม่ใช่จาก dispensing logs
+- เมื่อขายสินค้าที่อยู่ในกลุ่มรายงานยา ข้อมูลต้องถูกบันทึกใน order entity และข้อมูลกำกับที่เกี่ยวข้อง
+- รายงาน ข.ย. 10–13 ดึงข้อมูลจาก orders (order_items joined with products) โดยตรง
 - การคัดกรองใช้ `product.DrugRegistrations` array (ค่า: KHY10, KHY11, KHY12, KHY13)
 - ข้อมูลเภสัชกรและเลขใบอนุญาตดึงจาก order entity
 
@@ -79,7 +128,7 @@
 
 - quantity ต้องมากกว่า 0
 - unit ต้อง map กับ product จริง
-- buyer / pharmacist / licenseNo / prescriber data ต้องครบเมื่อสินค้าอยู่ในกลุ่มควบคุม
+- buyer / pharmacist / licenseNo / prescriber data ต้องครบเมื่อสินค้าอยู่ในกลุ่มควบคุมตาม rule ฝั่ง frontend/POS workflow
 - payment total ต้องครอบคลุมยอดสุทธิ
 
 ## Edge Cases

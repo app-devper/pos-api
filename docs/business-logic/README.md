@@ -20,6 +20,7 @@
 - `06-dashboard-and-analytics.md`
 - `07-settings-and-master-data.md`
 - `08-promotions-and-stock-transfer.md`
+- `feature-flow-matrix.md`
 
 ## เอกสาร Workflow / Sequence Flow
 
@@ -34,6 +35,13 @@
 - `flows/08-promotion-management-flow.md`
 - `flows/09-stock-transfer-flow.md`
 - `flows/10-khy-sale-flow.md`
+- `flows/11-product-management-flow.md`
+- `flows/13-dashboard-analytics-flow.md`
+- `flows/14-branch-management-flow.md`
+- `flows/15-employee-management-flow.md`
+- `flows/16-supplier-management-flow.md`
+- `flows/17-category-management-flow.md`
+- `flows/18-customer-history-flow.md`
 
 ## เอกสาร Lifecycle / State Transition
 
@@ -50,6 +58,9 @@
 - `lifecycle/10-employee-lifecycle.md`
 - `lifecycle/11-supplier-lifecycle.md`
 - `lifecycle/12-category-lifecycle.md`
+- `lifecycle/13-settings-lifecycle.md`
+- `lifecycle/15-customer-history-lifecycle.md`
+- `lifecycle/16-dashboard-query-lifecycle.md`
 
 ## เอกสาร Web Screens
 
@@ -81,7 +92,6 @@
 - `api-contracts/11-employees-contract.md`
 - `api-contracts/12-suppliers-contract.md`
 - `api-contracts/13-categories-contract.md`
-- `api-contracts/14-dispensing-logs-contract.md`
 - `api-contracts/15-customer-histories-contract.md`
 - `api-contracts/16-dashboard-contract.md`
 

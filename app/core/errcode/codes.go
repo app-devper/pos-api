@@ -129,7 +129,7 @@ const (
 	PT_INTERNAL_001    = "PT-500-001" // internal server error
 )
 
-// ─── Dispensing Log (DI) ────────────────────────────────────────────────────
+// ─── Legacy DI Codes ────────────────────────────────────────────────────────
 const (
 	DI_BAD_REQUEST_001 = "DI-400-001" // invalid request body
 	DI_BAD_REQUEST_002 = "DI-400-002" // create failed

@@ -27,7 +27,7 @@
 
 #### Backend Effects
 
-- patient profile พร้อมใช้งานกับ POS, dispensing history และ refill logic
+- patient profile พร้อมใช้งานกับ POS, allergy check และประวัติที่ผูกกับผู้ป่วย
 
 #### Frontend Behavior
 
@@ -65,4 +65,4 @@
 ## ข้อควรระวัง
 
 - ข้อมูลผู้ป่วยเป็นข้อมูลอ่อนไหว ต้องไม่ถูกลบจนทำให้ประวัติการรักษาหรือการจ่ายยาเสียความหมาย
-- การปิดใช้งานผู้ป่วยต้องไม่ทำให้ order history หรือ dispensing history ขาด reference
+- การปิดใช้งานผู้ป่วยต้องไม่ทำให้ order history ขาด reference

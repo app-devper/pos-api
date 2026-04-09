@@ -16,7 +16,7 @@
 - patient list
 - patient detail
 - allergy / chronic disease data
-- dispensing history
+- patient-linked order history
 - refill-related information หากมี
 
 ## องค์ประกอบหลักของ UI
@@ -38,7 +38,7 @@
 
 - ต้องมีการแยก field ข้อมูลทั่วไปกับข้อมูลสุขภาพอย่างชัดเจน
 - ข้อมูลแพ้ยาควรระบุได้ชัดว่าผู้ป่วยแพ้อะไรและระดับใด
-- ถ้าปิด patient feature ต้องไม่ให้เข้าถึง flow นี้
+- ถ้าปิด patient feature ฝั่ง frontend ต้องไม่เปิด flow นี้ให้ผู้ใช้
 
 ## Empty / Loading / Error State
 
@@ -48,5 +48,5 @@
 
 ## ความสัมพันธ์กับ Backend
 
-- Backend ให้ patient CRUD, medical data, dispensing history และ refill-related data
+- Backend ให้ patient CRUD, medical data และประวัติที่ผูกกับผู้ป่วย
 - Frontend รับผิดชอบการจัดวางข้อมูลสุขภาพให้เข้าใจง่ายและปลอดภัยต่อการใช้งาน

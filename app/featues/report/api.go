@@ -31,13 +31,6 @@ func ApplyReportAPI(
 		usecase.GetStockReportExcel(repository.Product),
 	)
 
-	reportRoute.GET("/drug-label/:logId/pdf",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetDrugLabelPDF(repository.DispensingLog, repository.Setting),
-	)
-
 	reportRoute.GET("/pharmacy/khy9/data",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),

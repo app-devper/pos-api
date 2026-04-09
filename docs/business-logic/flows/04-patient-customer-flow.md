@@ -53,7 +53,7 @@
 
 - ผู้ใช้ผูก patient กับการขาย
 - Frontend ใช้ข้อมูลนี้เพื่อเช็ค allergy / interaction / history
-- Backend ใช้ patient reference ในการบันทึก order และ dispensing log ที่เกี่ยวข้อง
+- Backend ใช้ patient reference ในการบันทึก order และข้อมูลที่เกี่ยวข้อง
 
 ## Decision Points
 

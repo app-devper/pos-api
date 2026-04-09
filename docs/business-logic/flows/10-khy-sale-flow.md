@@ -75,9 +75,10 @@
 ### Step 4: Backend สร้าง Order
 
 - Backend สร้าง order record พร้อม compliance data
-- ตัด stock ตาม FEFO
+- ตัด stock ตาม `item.Stocks` ที่ frontend ส่งมา
 - สร้าง product history
 - **compliance data ถูกเก็บใน order entity โดยตรง**
+- Backend ไม่ได้ตรวจ `product.drugRegistrations` ซ้ำเพื่อบังคับ compliance fields ในชั้นนี้ แต่เก็บค่าตาม payload ที่ frontend ส่งมา
 
 ## Flow C: การออกรายงาน ข.ย. (KHY Report)
 
@@ -117,7 +118,7 @@
 - Frontend เรียก data endpoint → ได้ `PharmacyReportResponse`
 - `printPharmacyReport()` สร้าง HTML document ตาม report key:
   - KHY9: ตาราง purchase (12 columns)
-  - KHY10-13: ตาราง dispensing (11 columns)
+  - KHY10-13: ตาราง sales record (11 columns)
 - แสดง totals, signature area, และเปิด browser print dialog
 
 ## Authorization

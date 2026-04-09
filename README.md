@@ -16,32 +16,19 @@ Point of Sale (POS) REST API — ระบบขายหน้าร้าน �
 - **Employees** — linked to UM API, role-based (ADMIN/MANAGER/CASHIER)
 - **Stock Transfers** — transfer stock between branches with approve/reject workflow
 
-### Business Documents
-- **Purchase Orders (PO)** — CRUD with auto sequence
-- **Delivery Orders (DO)** — CRUD with auto sequence
-- **Credit Notes (CN)** — CRUD with stock reversal
-- **Billings** — CRUD, group multiple orders
-- **Quotations** — CRUD with auto sequence
-- **Receives (GR)** — goods receiving with lot creation
+### Inventory Documents
+- **Receives (GR)** — goods receiving with lot creation and stock import
 
 ### Reports & Documents (PDF/Excel)
-- **Receipt PDF** — A4 receipt with configurable footer
-- **Tax Invoice PDF** — full tax invoice
-- **Sales Report** — PDF and Excel
+- **Sales Report** — Excel export
 - **Stock Report** — Excel export
-- **Receive Summary** — PDF aggregate report
-- **Price Report** — PDF with cost/price for all products
-- **Product History** — PDF per product or by date range
-- **Customer History** — PDF per customer
 - **Barcode Labels** — batch barcode/price tag PDF generation
 - **PromptPay QR** — EMVCo payload generation + PDF
 
 ### Pharmacy (ร้านยา)
 - **Drug Info** — drug metadata on products (generic name, type, dosage, contraindications, etc.)
 - **Patients** — patient profiles with drug allergy records
-- **Allergy Check** — verify products against patient allergies before dispensing
-- **Dispensing Logs** — pharmacist dispensing records per order
-- **Drug Labels** — auto-generate drug label stickers (70×35mm)
+- **Allergy Check** — verify products against patient allergies before checkout
 - **KHY.9** — drug purchase record (บัญชีการซื้อยา)
 - **KHY.10** — specially controlled drug sales record (บัญชีการขายยาควบคุมพิเศษ)
 - **KHY.11** — dangerous drug sales record (บัญชีการขายยาอันตราย)
@@ -133,9 +120,6 @@ HTTP_IDLE_TIMEOUT_SEC=120
 /api/pos/v1
 ```
 
-## API Documentation
+## Documentation
 
-Full OpenAPI 3.0 spec available at [`openapi.yaml`](./openapi.yaml). You can view it with:
-- [Swagger Editor](https://editor.swagger.io) — paste or import the file
-- [Swagger UI](https://petstore.swagger.io) — use URL to the raw file
-- VS Code extension: [OpenAPI (Swagger) Editor](https://marketplace.visualstudio.com/items?itemName=42Crunch.vscode-openapi)
+Business logic, workflow, lifecycle, and API contract docs are available under [docs/business-logic](/Users/admin/ProjectPos/devper-pos/pos-api/docs/business-logic/README.md)
