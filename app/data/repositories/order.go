@@ -321,16 +321,57 @@ func (entity *orderEntity) GetOrdersByCustomerCode(customerCode string, branchId
 }
 
 func (entity *orderEntity) populateOrderPayments(items []entities.Order) error {
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	return entity.populateOrderPaymentsWithContext(ctx, items)
+}
+
+func (entity *orderEntity) populateOrderPaymentsWithContext(ctx context.Context, items []entities.Order) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	orderIDs := make([]primitive.ObjectID, 0, len(items))
 	for i := range items {
-		payments, err := entity.GetPaymentsByOrderId(items[i].Id.Hex())
-		if err != nil && err != mongo.ErrNoDocuments {
-			return err
-		}
-		if err == nil {
-			items[i].Payments = payments
-		}
+		orderIDs = append(orderIDs, items[i].Id)
+	}
+
+	paymentMap, err := entity.getPaymentsByOrderIDsWithContext(ctx, orderIDs)
+	if err != nil {
+		return err
+	}
+
+	for i := range items {
+		items[i].Payments = paymentMap[items[i].Id.Hex()]
 	}
 	return nil
+}
+
+func (entity *orderEntity) getPaymentsByOrderIDsWithContext(ctx context.Context, orderIDs []primitive.ObjectID) (map[string][]entities.Payment, error) {
+	paymentMap := make(map[string][]entities.Payment, len(orderIDs))
+	if len(orderIDs) == 0 {
+		return paymentMap, nil
+	}
+
+	cursor, err := entity.paymentRepo.Find(
+		ctx,
+		bson.M{"orderId": bson.M{"$in": orderIDs}},
+		options.Find().SetSort(bson.D{{Key: "createdDate", Value: 1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	payments := []entities.Payment{}
+	if err = cursor.All(ctx, &payments); err != nil {
+		return nil, err
+	}
+
+	for _, payment := range payments {
+		key := payment.OrderId.Hex()
+		paymentMap[key] = append(paymentMap[key], payment)
+	}
+	return paymentMap, nil
 }
 
 func (entity *orderEntity) UpdateTotal() ([]entities.Order, error) {
