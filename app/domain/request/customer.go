@@ -20,6 +20,6 @@ type UpdateCustomer struct {
 }
 
 type UpdateCustomerStatus struct {
-	Status    string `json:"status"`
+	Status    string `json:"status" binding:"required"`
 	UpdatedBy string
 }

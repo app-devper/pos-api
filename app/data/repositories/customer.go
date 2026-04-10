@@ -110,12 +110,20 @@ func (entity *customerEntity) RemoveCustomerById(id string) (*entities.Customer,
 	logrus.Info("RemoveCustomerById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	var data entities.Customer
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	err = entity.customerRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	var data entities.Customer
+	err = entity.customerRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"status":      constant.ARCHIVED,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

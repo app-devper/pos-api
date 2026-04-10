@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
@@ -22,6 +23,10 @@ func UpdateCustomerStatusById(customerEntity repositories.ICustomer) gin.Handler
 		}
 		userId := utils.GetUserId(ctx)
 		req.UpdatedBy = userId
+		if !isValidCustomerStatus(req.Status) {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_001, fmt.Sprintf("invalid customer status: %s", req.Status))
+			return
+		}
 		result, err := customerEntity.UpdateCustomerStatusById(id, req)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
