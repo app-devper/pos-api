@@ -1,7 +1,5 @@
 package request
 
-import "time"
-
 type Order struct {
 	Items          []OrderItem    `json:"items" binding:"required"`
 	Payments       []OrderPayment `json:"payments"`
@@ -46,8 +44,8 @@ type OrderItemStock struct {
 }
 
 type GetOrderRange struct {
-	StartDate time.Time `form:"startDate" binding:"required"`
-	EndDate   time.Time `form:"endDate" binding:"required"`
+	StartDate FlexibleTime `form:"startDate" binding:"required"`
+	EndDate   FlexibleTime `form:"endDate" binding:"required"`
 	BranchId  string
 }
 

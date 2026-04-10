@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/data/repositories"
-	"time"
+	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
 )
 
 type getProductHistoryRangeQuery struct {
-	StartDate time.Time `form:"startDate" binding:"required"`
-	EndDate   time.Time `form:"endDate" binding:"required"`
+	StartDate request.FlexibleTime `form:"startDate" binding:"required"`
+	EndDate   request.FlexibleTime `form:"endDate" binding:"required"`
 }
 
 func GetProductHistoryByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
@@ -35,7 +35,7 @@ func GetProductHistoryByDateRange(productEntity repositories.IProduct) gin.Handl
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetProductHistoryByDateRange(branchId, req.StartDate, req.EndDate)
+		result, err := productEntity.GetProductHistoryByDateRange(branchId, req.StartDate.Time, req.EndDate.Time)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return

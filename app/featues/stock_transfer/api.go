@@ -27,6 +27,7 @@ func ApplyStockTransferAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetStockTransfers(repository.StockTransfer),
 	)
 
@@ -34,6 +35,7 @@ func ApplyStockTransferAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetStockTransferById(repository.StockTransfer),
 	)
 

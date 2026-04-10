@@ -25,12 +25,14 @@ func ApplyBranchAPI(
 	branchRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetBranches(repository.Branch),
 	)
 
 	branchRoute.GET("/:branchId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetBranchById(repository.Branch),
 	)
 

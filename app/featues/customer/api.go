@@ -2,6 +2,7 @@ package customer
 
 import (
 	"github.com/gin-gonic/gin"
+	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/customer/usecase"
 	"pos/middlewares"
@@ -46,6 +47,7 @@ func ApplyCustomerAPI(
 	customerRoute.DELETE("/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteCustomerById(repository.Customer),
 	)
 

@@ -85,7 +85,7 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 				Unit:         product.Unit,
 				Quantity:     item.Quantity,
 				LotNumber:    item.LotNumber,
-				ExpireDate:   time.Time{},
+				ExpireDate:   request.NewFlexibleTime(time.Time{}),
 				ReceiveId:    receiveId,
 				ReceiveCode:  req.Code,
 				CreatedBy:    userId,
@@ -93,9 +93,9 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 			}
 			if item.ExpireDate != "" {
 				if t, tErr := time.Parse(time.RFC3339, item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = t
+					productReq.ExpireDate = request.NewFlexibleTime(t)
 				} else if t, tErr := time.Parse("2006-01-02", item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = t
+					productReq.ExpireDate = request.NewFlexibleTime(t)
 				}
 			}
 

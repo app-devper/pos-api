@@ -145,8 +145,8 @@ func TestBuildExpiringProductStocksPipelineIncludesBranchFilter(t *testing.T) {
 	endDate := time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC)
 
 	pipeline, err := buildExpiringProductStocksPipeline(request.GetProductLotsExpireRange{
-		StartDate: startDate,
-		EndDate:   endDate,
+		StartDate: request.NewFlexibleTime(startDate),
+		EndDate:   request.NewFlexibleTime(endDate),
 	}, branchID.Hex())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

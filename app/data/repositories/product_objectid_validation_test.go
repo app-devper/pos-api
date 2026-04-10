@@ -91,8 +91,8 @@ func TestCreateProductStockWithContextRejectsInvalidIDs(t *testing.T) {
 		BranchId:   "507f1f77bcf86cd799439011",
 		ProductId:  "507f1f77bcf86cd799439012",
 		UnitId:     "507f1f77bcf86cd799439013",
-		ExpireDate: time.Now(),
-		ImportDate: time.Now(),
+		ExpireDate: request.NewFlexibleTime(time.Now()),
+		ImportDate: request.NewFlexibleTime(time.Now()),
 	}
 
 	param.BranchId = "invalid-id"

@@ -87,8 +87,8 @@ func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []
 
 	filter := bson.M{
 		"createdDate": bson.M{
-			"$gt": form.StartDate,
-			"$lt": form.EndDate,
+			"$gt": form.StartDate.Time,
+			"$lt": form.EndDate.Time,
 		},
 	}
 	if form.BranchId != "" {
@@ -386,7 +386,7 @@ func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, produ
 		Quantity:   form.Quantity,
 		CostPrice:  form.CostPrice,
 		LotNumber:  form.LotNumber,
-		ExpireDate: form.ExpireDate,
+		ExpireDate: form.ExpireDate.Time,
 	}
 	_, err = entity.receiveItemsRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -629,8 +629,8 @@ func (entity *receiveEntity) importReceiveToStockWithContext(ctx context.Context
 				Quantity:    item.Quantity,
 				CostPrice:   item.CostPrice,
 				LotNumber:   item.LotNumber,
-				ExpireDate:  item.ExpireDate,
-				ImportDate:  now,
+				ExpireDate:  request.NewFlexibleTime(item.ExpireDate),
+				ImportDate:  request.NewFlexibleTime(now),
 				UpdatedBy:   userId,
 				BranchId:    branchId,
 			}, balance)

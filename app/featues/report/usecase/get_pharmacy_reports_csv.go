@@ -141,8 +141,8 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 
 func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, productEntity repositories.IProduct, branchId string, req pharmacyReportRange, khyKey string, filename string) {
 	orderRange := request.GetOrderRange{
-		StartDate: req.StartDate,
-		EndDate:   req.EndDate,
+		StartDate: request.NewFlexibleTime(req.StartDate.Time),
+		EndDate:   request.NewFlexibleTime(req.EndDate.Time),
 		BranchId:  branchId,
 	}
 	orderMap, err := buildOrderMap(orderEntity, orderRange)

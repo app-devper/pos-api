@@ -93,8 +93,8 @@ func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.Handler
 		startDate := utils.Bod(today)
 		endDate := startDate.Add(24 * time.Hour)
 		req := request.GetProductLotsExpireRange{
-			StartDate: startDate.UTC(),
-			EndDate:   endDate.UTC(),
+			StartDate: request.NewFlexibleTime(startDate.UTC()),
+			EndDate:   request.NewFlexibleTime(endDate.UTC()),
 		}
 		result, err := productEntity.GetExpiringProductStocks(req, ctx.GetString("BranchId"))
 		if err != nil {

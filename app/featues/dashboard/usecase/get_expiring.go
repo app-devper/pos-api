@@ -16,8 +16,8 @@ func GetExpiringProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 		now := time.Now()
 		sixMonthsLater := now.AddDate(0, 6, 0)
 		param := request.GetProductLotsExpireRange{
-			StartDate: now,
-			EndDate:   sixMonthsLater,
+			StartDate: request.NewFlexibleTime(now),
+			EndDate:   request.NewFlexibleTime(sixMonthsLater),
 		}
 		branchId := ctx.GetString("BranchId")
 		result, err := productEntity.GetExpiringProductStocks(param, branchId)

@@ -14,7 +14,7 @@ func GetOrderItemDetailsByProductId(orderEntity repositories.IOrder) gin.Handler
 	return func(ctx *gin.Context) {
 		req := request.GetOrderRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
-			req.EndDate = time.Now()
+			req.EndDate = request.NewFlexibleTime(time.Now())
 		}
 		productId := ctx.Param("productId")
 		result, err := orderEntity.GetOrderItemOrderDetailsByProductId(productId, req)

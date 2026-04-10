@@ -1,9 +1,5 @@
 package request
 
-import (
-	"time"
-)
-
 type GetProduct struct {
 	Category string `json:"category" form:"category"`
 	BranchId string `json:"-"`
@@ -20,7 +16,7 @@ type Product struct {
 	SerialNumber      string           `json:"serialNumber" binding:"required"`
 	Category          string           `json:"category"`
 	LotNumber         string           `json:"lotNumber" binding:"required"`
-	ExpireDate        time.Time        `json:"expireDate" binding:"required"`
+	ExpireDate        FlexibleTime    `json:"expireDate" binding:"required"`
 	ReceiveId         string           `json:"receiveId"`
 	Status            string           `json:"status"`
 	MinStock          int              `json:"minStock"`

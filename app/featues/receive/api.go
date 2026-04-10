@@ -27,6 +27,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetReceivesRange(repository.Receive),
 	)
 
@@ -34,6 +35,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetReceiveById(repository.Receive),
 	)
 

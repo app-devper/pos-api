@@ -266,8 +266,8 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities
 	defer cancel()
 
 	filter := bson.M{"createdDate": bson.M{
-		"$gte": form.StartDate,
-		"$lt":  form.EndDate,
+		"$gte": form.StartDate.Time,
+		"$lt":  form.EndDate.Time,
 	}}
 	if form.BranchId != "" {
 		branchObjId, err := primitive.ObjectIDFromHex(form.BranchId)
@@ -659,8 +659,8 @@ func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]enti
 	defer cancel()
 	matchFilter := bson.M{
 		"createdDate": bson.M{
-			"$gte": form.StartDate,
-			"$lt":  form.EndDate,
+			"$gte": form.StartDate.Time,
+			"$lt":  form.EndDate.Time,
 		},
 	}
 	if form.BranchId != "" {
@@ -1444,7 +1444,7 @@ func (entity *orderEntity) GetOrderSummary(form request.GetOrderRange) (*entitie
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	matchFilter, err := buildActiveOrderAnalyticsMatchFilter(form.StartDate, form.EndDate, form.BranchId)
+	matchFilter, err := buildActiveOrderAnalyticsMatchFilter(form.StartDate.Time, form.EndDate.Time, form.BranchId)
 	if err != nil {
 		return nil, err
 	}
@@ -1481,7 +1481,7 @@ func (entity *orderEntity) GetOrderDailyChart(form request.GetOrderRange) ([]ent
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
-	matchFilter, err := buildActiveOrderAnalyticsMatchFilter(form.StartDate, form.EndDate, form.BranchId)
+	matchFilter, err := buildActiveOrderAnalyticsMatchFilter(form.StartDate.Time, form.EndDate.Time, form.BranchId)
 	if err != nil {
 		return nil, err
 	}

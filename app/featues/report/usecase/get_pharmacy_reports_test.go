@@ -316,8 +316,8 @@ func TestGetSalesReportItemsUsesBatchUnitLookup(t *testing.T) {
 	unitID := primitive.NewObjectID()
 	branchID := primitive.NewObjectID().Hex()
 	req := pharmacyReportRange{
-		StartDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
-		EndDate:   time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+		StartDate: request.NewFlexibleTime(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
+		EndDate:   request.NewFlexibleTime(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
 	}
 
 	orderRepo := &salesOrderStub{

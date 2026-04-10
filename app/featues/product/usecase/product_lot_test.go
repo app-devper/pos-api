@@ -98,14 +98,14 @@ func TestGetProductLotsExpireNotifyUsesBranchScopedStocks(t *testing.T) {
 	if productRepo.lastBranchID != branchID {
 		t.Fatalf("expected branchId %s, got %s", branchID, productRepo.lastBranchID)
 	}
-	if !productRepo.lastParam.StartDate.Before(productRepo.lastParam.EndDate) {
+	if !productRepo.lastParam.StartDate.Time.Before(productRepo.lastParam.EndDate.Time) {
 		t.Fatalf("expected startDate before endDate, got start=%v end=%v", productRepo.lastParam.StartDate, productRepo.lastParam.EndDate)
 	}
-	duration := productRepo.lastParam.EndDate.Sub(productRepo.lastParam.StartDate)
+	duration := productRepo.lastParam.EndDate.Time.Sub(productRepo.lastParam.StartDate.Time)
 	if duration != 24*time.Hour {
 		t.Fatalf("expected 24 hour expire-notify window, got %v", duration)
 	}
-	if productRepo.lastParam.StartDate.Hour() != 17 {
+	if productRepo.lastParam.StartDate.Time.Hour() != 17 {
 		t.Fatalf("expected UTC timestamp aligned with Bangkok day boundary, got %v", productRepo.lastParam.StartDate)
 	}
 }

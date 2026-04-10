@@ -1,7 +1,5 @@
 package request
 
-import "time"
-
 type ProductStock struct {
 	ProductId   string    `json:"productId" binding:"required"`
 	UnitId      string    `json:"unitId" binding:"required"`
@@ -10,8 +8,8 @@ type ProductStock struct {
 	LotNumber   string    `json:"lotNumber"`
 	CostPrice   float64   `json:"costPrice"`
 	Price       float64   `json:"price"`
-	ExpireDate  time.Time `json:"expireDate" binding:"required"`
-	ImportDate  time.Time `json:"importDate" binding:"required"`
+	ExpireDate  FlexibleTime `json:"expireDate" binding:"required"`
+	ImportDate  FlexibleTime `json:"importDate" binding:"required"`
 	UpdatedBy   string
 	BranchId    string
 }
@@ -22,8 +20,8 @@ type UpdateProductStock struct {
 	LotNumber  string    `json:"lotNumber"`
 	CostPrice  float64   `json:"costPrice"`
 	Price      float64   `json:"price"`
-	ExpireDate time.Time `json:"expireDate" binding:"required"`
-	ImportDate time.Time `json:"importDate" binding:"required"`
+	ExpireDate FlexibleTime `json:"expireDate" binding:"required"`
+	ImportDate FlexibleTime `json:"importDate" binding:"required"`
 	UpdatedBy  string
 }
 

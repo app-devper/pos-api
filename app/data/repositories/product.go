@@ -493,9 +493,9 @@ func (entity *productEntity) createProductReceiveWithContext(ctx context.Context
 		Quantity:    param.Quantity,
 		Price:       0,
 		CostPrice:   0,
-		ExpireDate:  param.ExpireDate,
+		ExpireDate:  request.NewFlexibleTime(param.ExpireDate.Time),
 		LotNumber:   param.LotNumber,
-		ImportDate:  time.Now(),
+		ImportDate:  request.NewFlexibleTime(time.Now()),
 		UpdatedBy:   param.CreatedBy,
 		BranchId:    param.BranchId,
 	}
@@ -836,7 +836,7 @@ func (entity *productEntity) CreateProductLotByProductId(productId string, param
 	data.Id = primitive.NewObjectID()
 	data.ProductId = productObjID
 	data.LotNumber = param.LotNumber
-	data.ExpireDate = param.ExpireDate
+	data.ExpireDate = param.ExpireDate.Time
 	data.Quantity = param.Quantity
 	data.CostPrice = param.CostPrice
 	data.CreatedBy = param.CreatedBy
@@ -872,7 +872,7 @@ func (entity *productEntity) CreateProductLot(param request.ProductLot) (*entiti
 	}
 	data.ProductId = productObjID
 	data.LotNumber = param.LotNumber
-	data.ExpireDate = param.ExpireDate
+	data.ExpireDate = param.ExpireDate.Time
 	data.Quantity = param.Quantity
 	data.CostPrice = param.CostPrice
 	data.CreatedBy = param.UpdatedBy
@@ -895,8 +895,8 @@ func (entity *productEntity) GetProductLots(param request.GetProductLotsExpireRa
 	filter := bson.M{}
 	if !param.StartDate.IsZero() && !param.EndDate.IsZero() {
 		filter["expireDate"] = bson.M{
-			"$gt": param.StartDate,
-			"$lt": param.EndDate,
+			"$gt": param.StartDate.Time,
+			"$lt": param.EndDate.Time,
 		}
 	}
 	if branchId != "" {
@@ -1029,8 +1029,8 @@ func (entity *productEntity) GetProductLotsExpireNotify(param request.GetProduct
 		{
 			"$match": bson.M{
 				"expireDate": bson.M{
-					"$gte": param.StartDate,
-					"$lt":  param.EndDate,
+					"$gte": param.StartDate.Time,
+					"$lt":  param.EndDate.Time,
 				},
 				"notify": true,
 			},
@@ -1080,8 +1080,8 @@ func (entity *productEntity) GetExpiringProductStocks(param request.GetProductLo
 func buildExpiringProductStocksPipeline(param request.GetProductLotsExpireRange, branchId string) ([]bson.M, error) {
 	matchFilter := bson.M{
 		"expireDate": bson.M{
-			"$gte": param.StartDate,
-			"$lt":  param.EndDate,
+			"$gte": param.StartDate.Time,
+			"$lt":  param.EndDate.Time,
 		},
 		"quantity": bson.M{"$gt": 0},
 	}
@@ -1204,7 +1204,7 @@ func (entity *productEntity) UpdateProductLotById(id string, param request.Updat
 	var data entities.ProductLot
 	err = entity.productLotsRepo.FindOneAndUpdate(ctx, filter, bson.M{"$set": bson.M{
 		"lotNumber":   param.LotNumber,
-		"expireDate":  param.ExpireDate,
+		"expireDate":  param.ExpireDate.Time,
 		"quantity":    param.Quantity,
 		"costPrice":   param.CostPrice,
 		"updatedDate": time.Now(),
@@ -1335,7 +1335,7 @@ func (entity *productEntity) CreateProductStockByProductAndUnitId(productId stri
 	data.Price = param.Price
 	data.Import = param.Quantity
 	data.Quantity = param.Quantity
-	data.ExpireDate = param.ExpireDate
+	data.ExpireDate = param.ExpireDate.Time
 	data.ImportDate = time.Now()
 	data.ReceiveCode = param.ReceiveCode
 
@@ -2058,8 +2058,8 @@ func (entity *productEntity) createProductStockWithContext(ctx context.Context, 
 	data.Price = param.Price
 	data.Import = param.Quantity
 	data.Quantity = param.Quantity
-	data.ExpireDate = param.ExpireDate
-	data.ImportDate = param.ImportDate
+	data.ExpireDate = param.ExpireDate.Time
+	data.ImportDate = param.ImportDate.Time
 	data.ReceiveCode = param.ReceiveCode
 	_, err = entity.productStockRepo.InsertOne(ctx, data)
 	if err != nil {
@@ -2130,8 +2130,8 @@ func (entity *productEntity) UpdateProductStockById(id string, param request.Upd
 		"lotNumber":  param.LotNumber,
 		"costPrice":  param.CostPrice,
 		"price":      param.Price,
-		"expireDate": param.ExpireDate,
-		"importDate": param.ImportDate,
+		"expireDate": param.ExpireDate.Time,
+		"importDate": param.ImportDate.Time,
 	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -2370,7 +2370,7 @@ func (entity *productEntity) createReceiveItemWithContext(ctx context.Context, r
 		Quantity:   form.Quantity,
 		CostPrice:  form.CostPrice,
 		LotNumber:  form.LotNumber,
-		ExpireDate: form.ExpireDate,
+		ExpireDate: form.ExpireDate.Time,
 	}
 	_, err = entity.receiveItemsRepo.InsertOne(ctx, data)
 	if err != nil {

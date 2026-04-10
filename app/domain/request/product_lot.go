@@ -1,14 +1,10 @@
 package request
 
-import (
-	"time"
-)
-
 type ProductLot struct {
 	ProductId  string    `json:"productId" binding:"required"`
 	Quantity   int       `json:"quantity" binding:"required"`
 	LotNumber  string    `json:"lotNumber" binding:"required"`
-	ExpireDate time.Time `json:"expireDate" binding:"required"`
+	ExpireDate FlexibleTime `json:"expireDate" binding:"required"`
 	CostPrice  float64   `json:"costPrice" binding:"required"`
 	BranchId   string
 	UpdatedBy  string
@@ -17,15 +13,15 @@ type ProductLot struct {
 type UpdateProductLot struct {
 	Quantity   int       `json:"quantity"`
 	LotNumber  string    `json:"lotNumber" binding:"required"`
-	ExpireDate time.Time `json:"expireDate" binding:"required"`
+	ExpireDate FlexibleTime `json:"expireDate" binding:"required"`
 	CostPrice  float64   `json:"costPrice" binding:"required"`
 	BranchId   string
 	UpdatedBy  string
 }
 
 type GetProductLotsExpireRange struct {
-	StartDate time.Time `form:"startDate" binding:"required"`
-	EndDate   time.Time `form:"endDate" binding:"required"`
+	StartDate FlexibleTime `form:"startDate" binding:"required"`
+	EndDate   FlexibleTime `form:"endDate" binding:"required"`
 }
 
 type UpdateProductLotQuantity struct {

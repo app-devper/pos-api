@@ -54,7 +54,7 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 				Unit:         product.Unit,
 				Quantity:     item.Quantity,
 				LotNumber:    item.LotNumber,
-				ExpireDate:   time.Time{},
+				ExpireDate:   request.NewFlexibleTime(time.Time{}),
 				ReceiveId:    id,
 				ReceiveCode:  receive.Code,
 				CreatedBy:    userId,
@@ -62,12 +62,12 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 			}
 			if item.ExpireDate != "" {
 				if t, tErr := time.Parse(time.RFC3339, item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = t
+					productReq.ExpireDate = request.NewFlexibleTime(t)
 				} else if t, tErr := time.Parse("2006-01-02", item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = t
+					productReq.ExpireDate = request.NewFlexibleTime(t)
 				}
 			}
-			item.ExpireDate = productReq.ExpireDate.Format(time.RFC3339)
+			item.ExpireDate = productReq.ExpireDate.Time.Format(time.RFC3339)
 			filteredItems = append(filteredItems, item)
 			totalCost += item.CostPrice * float64(item.Quantity)
 		}

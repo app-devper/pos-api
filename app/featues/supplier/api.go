@@ -2,6 +2,7 @@ package supplier
 
 import (
 	"github.com/gin-gonic/gin"
+	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/supplier/usecase"
 	"pos/middlewares"
@@ -16,6 +17,7 @@ func ApplySupplierAPI(
 	supplierRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreateSupplier(repository.Supplier),
 	)
 
@@ -28,6 +30,7 @@ func ApplySupplierAPI(
 	supplierRoute.PUT("/info",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateSupplierInfo(repository.Supplier),
 	)
 
@@ -46,12 +49,14 @@ func ApplySupplierAPI(
 	supplierRoute.DELETE("/:supplierId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.DeleteSupplierById(repository.Supplier),
 	)
 
 	supplierRoute.PUT("/:supplierId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateSupplierById(repository.Supplier),
 	)
 

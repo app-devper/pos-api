@@ -72,8 +72,8 @@ func getSupplierNameMap(supplierEntity repositories.ISupplier, supplierIds []str
 }
 
 type pharmacyReportRange struct {
-	StartDate time.Time `form:"startDate" binding:"required"`
-	EndDate   time.Time `form:"endDate" binding:"required"`
+	StartDate request.FlexibleTime `form:"startDate" binding:"required"`
+	EndDate   request.FlexibleTime `form:"endDate" binding:"required"`
 }
 
 func containsReg(regs []string, key string) bool {
@@ -114,8 +114,8 @@ type pharmacyReportResponse struct {
 
 func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositories.IProduct, supplierEntity repositories.ISupplier, branchId string, req pharmacyReportRange) ([]pharmacyReportItem, error) {
 	receiveRange := request.GetReceiveRange{
-		StartDate: req.StartDate,
-		EndDate:   req.EndDate,
+		StartDate: request.NewFlexibleTime(req.StartDate.Time),
+		EndDate:   request.NewFlexibleTime(req.EndDate.Time),
 		BranchId:  branchId,
 	}
 	receives, err := receiveEntity.GetReceives(receiveRange)
@@ -205,8 +205,8 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 
 func getSalesReportItems(orderEntity repositories.IOrder, productEntity repositories.IProduct, branchId string, req pharmacyReportRange, khyKey string) ([]pharmacyReportItem, error) {
 	orderRange := request.GetOrderRange{
-		StartDate: req.StartDate,
-		EndDate:   req.EndDate,
+		StartDate: request.NewFlexibleTime(req.StartDate.Time),
+		EndDate:   request.NewFlexibleTime(req.EndDate.Time),
 		BranchId:  branchId,
 	}
 	orderMap, err := buildOrderMap(orderEntity, orderRange)
@@ -273,7 +273,7 @@ func GetKHY9Data(receiveEntity repositories.IReceive, productEntity repositories
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 			return
 		}
-		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: "khy9", Title: "ข.ย.9 บัญชีการซื้อยา", StartDate: req.StartDate, EndDate: req.EndDate, Items: items})
+		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: "khy9", Title: "ข.ย.9 บัญชีการซื้อยา", StartDate: req.StartDate.Time, EndDate: req.EndDate.Time, Items: items})
 	}
 }
 
@@ -297,7 +297,7 @@ func getSalesReportDataHandler(orderEntity repositories.IOrder, productEntity re
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
 			return
 		}
-		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: key, Title: title, StartDate: req.StartDate, EndDate: req.EndDate, Items: items})
+		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: key, Title: title, StartDate: req.StartDate.Time, EndDate: req.EndDate.Time, Items: items})
 	}
 }
 

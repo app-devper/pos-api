@@ -1,7 +1,5 @@
 package request
 
-import "time"
-
 type Promotion struct {
 	Code        string    `json:"code" binding:"required"`
 	Name        string    `json:"name" binding:"required"`
@@ -11,8 +9,8 @@ type Promotion struct {
 	MinPurchase float64   `json:"minPurchase"`
 	MaxDiscount float64   `json:"maxDiscount"`
 	ProductIds  []string  `json:"productIds"`
-	StartDate   time.Time `json:"startDate" binding:"required"`
-	EndDate     time.Time `json:"endDate" binding:"required"`
+	StartDate   FlexibleTime `json:"startDate" binding:"required"`
+	EndDate     FlexibleTime `json:"endDate" binding:"required"`
 	CreatedBy   string
 	BranchId    string
 }
@@ -25,8 +23,8 @@ type UpdatePromotion struct {
 	MinPurchase float64   `json:"minPurchase"`
 	MaxDiscount float64   `json:"maxDiscount"`
 	ProductIds  []string  `json:"productIds"`
-	StartDate   time.Time `json:"startDate"`
-	EndDate     time.Time `json:"endDate"`
+	StartDate   FlexibleTime `json:"startDate"`
+	EndDate     FlexibleTime `json:"endDate"`
 	Status      string    `json:"status"`
 	UpdatedBy   string
 }

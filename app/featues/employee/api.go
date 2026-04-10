@@ -25,12 +25,14 @@ func ApplyEmployeeAPI(
 	employeeRoute.GET("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetEmployees(repository.Employee),
 	)
 
 	employeeRoute.GET("/:employeeId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetEmployeeById(repository.Employee),
 	)
 
@@ -51,6 +53,7 @@ func ApplyEmployeeAPI(
 	employeeRoute.GET("/branch/:branchId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.GetEmployeesByBranchId(repository.Employee),
 	)
 }
