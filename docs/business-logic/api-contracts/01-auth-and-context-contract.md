@@ -41,3 +41,11 @@
 - ไม่มีสิทธิ์เข้าถึง resource
 - ไม่มี branch context ที่ใช้ได้
 - host หรือ config ที่จำเป็นยังไม่พร้อมใช้งาน
+
+## Operational Notes
+
+- Backend ต้องไม่ start แบบพร้อมใช้งาน ถ้า `SECRET_KEY`, `CLIENT_ID`, `SYSTEM`, `MONGO_HOST`, `MONGO_POS_DB_NAME`, หรือ `REDIS_HOST` ยังไม่ถูกตั้งค่า
+- Backend ต้องตรวจ dependency หลักให้พร้อมก่อนรับ traffic โดยเฉพาะ MongoDB และ Redis
+- ถ้า employee lookup ล้มเหลวจากปัญหาระบบ Backend ต้องปฏิเสธ request แทนการ fallback ไป branch `HQ`
+- การ fallback ไป branch `HQ` ใช้ได้เฉพาะกรณีไม่พบ employee record จริงเท่านั้น
+- ถ้า auth config สำคัญหายระหว่าง runtime request ต้องถูกปฏิเสธเป็น internal error ไม่ใช่ตรวจ token ด้วยค่า config ว่าง

@@ -62,13 +62,21 @@ Create `.env` file:
 
 ```env
 PORT=8586
-MONGO_HOST=localhost:27017
+MONGO_HOST=mongodb://localhost:27017
 MONGO_POS_DB_NAME=pos_db
-REDIS_HOST=localhost:6379
+REDIS_HOST=redis://localhost:6379/0
 CLIENT_ID=000
 SYSTEM=POS
 SECRET_KEY=your_secret_key
 ```
+
+Important notes:
+
+- `MONGO_HOST` must be a MongoDB connection string, for example `mongodb://localhost:27017`
+- `REDIS_HOST` must be a Redis URL that `redis.ParseURL` can read, for example `redis://localhost:6379/0`
+- Startup now fails fast when required env vars or database/session dependencies are not ready
+- Auth middleware now rejects requests when auth config is missing instead of accepting empty values
+- Branch fallback to `HQ` happens only when the employee record is genuinely missing, not when the employee lookup fails because of an infrastructure error
 
 ## Run
 
@@ -113,6 +121,16 @@ HTTP_READ_HEADER_TIMEOUT_SEC=5
 HTTP_WRITE_TIMEOUT_SEC=30
 HTTP_IDLE_TIMEOUT_SEC=120
 ```
+
+## Runtime Hardening
+
+การเปลี่ยนแปลงล่าสุดฝั่ง runtime และ auth มีผลดังนี้:
+
+- server จะไม่ start ต่อถ้า `SECRET_KEY`, `CLIENT_ID`, `SYSTEM`, `MONGO_HOST`, `MONGO_POS_DB_NAME`, หรือ `REDIS_HOST` หาย
+- startup จะตรวจ MongoDB และ Redis ด้วย `Ping` ก่อนรับ traffic เพื่อลดกรณี instance ดูเหมือนพร้อมแต่พังที่ request แรก
+- ถ้า auth config หายระหว่าง runtime middleware จะตอบ `500` แทนการตรวจ token ด้วยค่า config ว่าง
+- branch context จะ fallback ไป `HQ` เฉพาะกรณีไม่พบ employee จริงเท่านั้น ถ้า lookup employee ล้มจาก system error request จะถูกปฏิเสธ
+- เพิ่ม regression tests ครอบ startup config validation, auth config validation, และ branch fallback behavior
 
 ## API Base Path
 
