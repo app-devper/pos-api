@@ -101,7 +101,6 @@ type pharmacyReportItem struct {
 	Dosage         string     `json:"dosage,omitempty"`
 	PharmacistName string     `json:"pharmacistName,omitempty"`
 	LicenseNo      string     `json:"licenseNo,omitempty"`
-	DrugType       string     `json:"drugType,omitempty"`
 }
 
 type pharmacyReportResponse struct {
@@ -196,7 +195,6 @@ func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositorie
 				ExpireDate:   expDate,
 				Strength:     getDrugField(*product, func(d *entities.DrugInfo) string { return d.Strength }),
 				DosageForm:   getDrugField(*product, func(d *entities.DrugInfo) string { return d.DosageForm }),
-				DrugType:     getDrugField(*product, func(d *entities.DrugInfo) string { return d.DrugType }),
 			})
 		}
 	}
@@ -254,7 +252,6 @@ func getSalesReportItems(orderEntity repositories.IOrder, productEntity reposito
 			DosageForm:     getDrugField(product, func(d *entities.DrugInfo) string { return d.DosageForm }),
 			PharmacistName: order.PharmacistName,
 			LicenseNo:      order.LicenseNo,
-			DrugType:       getDrugField(product, func(d *entities.DrugInfo) string { return d.DrugType }),
 		})
 	}
 	return items, nil

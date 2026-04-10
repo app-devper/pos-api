@@ -174,7 +174,6 @@ func toEntityDrugInfo(req *request.RequestDrugInfo) *entities.DrugInfo {
 	}
 	return &entities.DrugInfo{
 		GenericName:       req.GenericName,
-		DrugType:          req.DrugType,
 		DosageForm:        req.DosageForm,
 		Strength:          req.Strength,
 		Indication:        req.Indication,

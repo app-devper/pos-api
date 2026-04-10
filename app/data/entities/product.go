@@ -8,7 +8,6 @@ import (
 
 type DrugInfo struct {
 	GenericName       string   `bson:"genericName" json:"genericName"`
-	DrugType          string   `bson:"drugType" json:"drugType"`
 	DosageForm        string   `bson:"dosageForm" json:"dosageForm"`
 	Strength          string   `bson:"strength" json:"strength"`
 	Indication        string   `bson:"indication" json:"indication"`

@@ -16,7 +16,7 @@ type Product struct {
 	SerialNumber      string           `json:"serialNumber" binding:"required"`
 	Category          string           `json:"category"`
 	LotNumber         string           `json:"lotNumber" binding:"required"`
-	ExpireDate        FlexibleTime    `json:"expireDate" binding:"required"`
+	ExpireDate        FlexibleTime     `json:"expireDate" binding:"required"`
 	ReceiveId         string           `json:"receiveId"`
 	Status            string           `json:"status"`
 	MinStock          int              `json:"minStock"`
@@ -57,7 +57,6 @@ type UpdateProduct struct {
 
 type RequestDrugInfo struct {
 	GenericName       string   `json:"genericName"`
-	DrugType          string   `json:"drugType"`
 	DosageForm        string   `json:"dosageForm"`
 	Strength          string   `json:"strength"`
 	Indication        string   `json:"indication"`

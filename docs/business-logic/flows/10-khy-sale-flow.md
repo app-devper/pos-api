@@ -22,18 +22,11 @@
 - **Trigger compliance**: ถ้าตะกร้ามีสินค้าที่ `drugRegistrations` มี KHY10 / KHY11 / KHY12 / KHY13 อย่างน้อย 1 ตัว → เปิด ComplianceDialog
 - KHY9 ไม่ trigger เพราะเป็นรายงานซื้อยา ไม่ใช่ขายยา
 
-### `product.DrugInfo.DrugType` (ข้อมูลเสริม)
-
-- ค่า: `CONTROLLED`, `DANGEROUS`, `PSYCHO`, `NARCOTIC`
-- เป็น metadata ประกอบสินค้า ใช้แสดงในรายงาน
-- **ไม่ได้ใช้ trigger Compliance Dialog**
-
 ## Flow A: การตั้งค่าสินค้า (Product Setup)
 
 ### Step 1: ตั้งค่า DrugInfo
 
-- ผู้ดูแลกำหนด `drugInfo.drugType` (CONTROLLED/DANGEROUS/PSYCHO/NARCOTIC)
-- กำหนดข้อมูลยาอื่น: `genericName`, `strength`, `dosageForm`, `dosage`
+- กำหนดข้อมูลยา: `genericName`, `strength`, `dosageForm`, `dosage`
 
 ### Step 2: ตั้งค่า DrugRegistrations
 
@@ -157,7 +150,7 @@
 ## Sequence Diagram (Simplified)
 
 ```
-ผู้ดูแล → [ตั้งค่า DrugType + DrugRegistrations ใน Product]
+ผู้ดูแล → [ตั้งค่า DrugInfo + DrugRegistrations ใน Product]
                            ↓
 พนักงานขาย → [เพิ่มสินค้าเข้าตะกร้า]
                            ↓

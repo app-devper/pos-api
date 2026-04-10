@@ -12,6 +12,15 @@ func DeleteOrderById(orderEntity repositories.IOrder, _ repositories.IProduct) g
 	return func(ctx *gin.Context) {
 		orderId := ctx.Param("orderId")
 		userId := ctx.GetString("UserId")
+		order, err := orderEntity.GetOrderById(orderId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureOrderBranchAccess(order, ctx.GetString("BranchId")); err != nil {
+			abortOrderBranchMismatch(ctx)
+			return
+		}
 		result, err := orderEntity.CancelOrderById(orderId, userId, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())

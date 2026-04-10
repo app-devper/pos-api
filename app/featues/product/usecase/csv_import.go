@@ -45,7 +45,7 @@ func ImportCSV(productEntity repositories.IProduct) gin.HandlerFunc {
 		result := CSVImportResult{Total: len(records) - 1}
 		var errs []string
 
-		// Expected CSV columns: name, nameEn, serialNumber, unit, price, costPrice, category, description, drugType, drugRegistrations
+		// Expected CSV columns: name, nameEn, serialNumber, unit, price, costPrice, category, description, drugRegistrations
 		for i, row := range records[1:] {
 			rowNum := i + 2
 			if len(row) < 6 {
@@ -71,13 +71,9 @@ func ImportCSV(productEntity repositories.IProduct) gin.HandlerFunc {
 			if len(row) > 7 {
 				description = strings.TrimSpace(row[7])
 			}
-			drugType := ""
-			if len(row) > 8 {
-				drugType = strings.TrimSpace(row[8])
-			}
 			var drugRegistrations []string
-			if len(row) > 9 && strings.TrimSpace(row[9]) != "" {
-				for _, dr := range strings.Split(row[9], "|") {
+			if len(row) > 8 && strings.TrimSpace(row[8]) != "" {
+				for _, dr := range strings.Split(row[8], "|") {
 					drugRegistrations = append(drugRegistrations, strings.TrimSpace(dr))
 				}
 			}
@@ -95,11 +91,6 @@ func ImportCSV(productEntity repositories.IProduct) gin.HandlerFunc {
 				continue
 			}
 
-			var drugInfo *request.RequestDrugInfo
-			if drugType != "" {
-				drugInfo = &request.RequestDrugInfo{DrugType: drugType}
-			}
-
 			_, err := productEntity.CreateProduct(request.Product{
 				Name:              name,
 				NameEn:            nameEn,
@@ -110,7 +101,6 @@ func ImportCSV(productEntity repositories.IProduct) gin.HandlerFunc {
 				Category:          category,
 				Description:       description,
 				Status:            "ACTIVE",
-				DrugInfo:          drugInfo,
 				DrugRegistrations: drugRegistrations,
 				CreatedBy:         userId,
 			})

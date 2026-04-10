@@ -17,6 +17,15 @@ func UpdateCustomerCodeOrderById(orderEntity repositories.IOrder) gin.HandlerFun
 			return
 		}
 		orderId := ctx.Param("orderId")
+		order, err := orderEntity.GetOrderById(orderId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureOrderBranchAccess(order, ctx.GetString("BranchId")); err != nil {
+			abortOrderBranchMismatch(ctx)
+			return
+		}
 		result, err := orderEntity.UpdateCustomerCodeOrderById(orderId, req.CustomerCode)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())

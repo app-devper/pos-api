@@ -17,9 +17,19 @@ import (
 
 type cancelOrderRepoStub struct {
 	repositories.IOrder
+	getOrderByIDFn           func(id string) (*entities.Order, error)
+	getOrderItemByIDFn       func(id string) (*entities.OrderItem, error)
 	cancelOrderByIDFn        func(id string, userId string, branchId string) (*entities.OrderDetail, error)
 	cancelByIDFn             func(id string, userId string, branchId string) (*entities.OrderItemProductDetail, error)
 	cancelByOrderProductIDFn func(orderId string, productId string, userId string, branchId string) (*entities.OrderItemProductDetail, error)
+}
+
+func (s *cancelOrderRepoStub) GetOrderById(id string) (*entities.Order, error) {
+	return s.getOrderByIDFn(id)
+}
+
+func (s *cancelOrderRepoStub) GetOrderItemById(id string) (*entities.OrderItem, error) {
+	return s.getOrderItemByIDFn(id)
 }
 
 func (s *cancelOrderRepoStub) CancelOrderById(id string, userId string, branchId string) (*entities.OrderDetail, error) {
@@ -40,9 +50,17 @@ func TestDeleteOrderItemByIdUsesTransactionalCancel(t *testing.T) {
 	itemID := primitive.NewObjectID().Hex()
 	orderID := primitive.NewObjectID()
 	productID := primitive.NewObjectID()
+	branchID := primitive.NewObjectID()
 	var gotID, gotUser, gotBranch string
 
 	repo := &cancelOrderRepoStub{
+		getOrderByIDFn: func(id string) (*entities.Order, error) {
+			t.Fatal("order lookup should not run for item delete by id")
+			return nil, nil
+		},
+		getOrderItemByIDFn: func(id string) (*entities.OrderItem, error) {
+			return &entities.OrderItem{Id: primitive.NewObjectID(), BranchId: branchID, OrderId: orderID, ProductId: productID}, nil
+		},
 		cancelByIDFn: func(id string, userId string, branchId string) (*entities.OrderItemProductDetail, error) {
 			gotID, gotUser, gotBranch = id, userId, branchId
 			return &entities.OrderItemProductDetail{OrderId: orderID, ProductId: productID}, nil
@@ -55,7 +73,7 @@ func TestDeleteOrderItemByIdUsesTransactionalCancel(t *testing.T) {
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "itemId", Value: itemID}}
 	ctx.Set("UserId", "user-1")
-	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+	ctx.Set("BranchId", branchID.Hex())
 
 	DeleteOrderItemById(repo, nil)(ctx)
 
@@ -71,9 +89,17 @@ func TestDeleteOrderByIdUsesTransactionalCancel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	orderID := primitive.NewObjectID().Hex()
+	branchID := primitive.NewObjectID()
 	var gotID, gotUser, gotBranch string
 
 	repo := &cancelOrderRepoStub{
+		getOrderByIDFn: func(id string) (*entities.Order, error) {
+			return &entities.Order{Id: primitive.NewObjectID(), BranchId: branchID}, nil
+		},
+		getOrderItemByIDFn: func(id string) (*entities.OrderItem, error) {
+			t.Fatal("item lookup should not run for order delete")
+			return nil, nil
+		},
 		cancelOrderByIDFn: func(id string, userId string, branchId string) (*entities.OrderDetail, error) {
 			gotID, gotUser, gotBranch = id, userId, branchId
 			return &entities.OrderDetail{Id: primitive.NewObjectID()}, nil
@@ -86,7 +112,7 @@ func TestDeleteOrderByIdUsesTransactionalCancel(t *testing.T) {
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "orderId", Value: orderID}}
 	ctx.Set("UserId", "user-1")
-	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+	ctx.Set("BranchId", branchID.Hex())
 
 	DeleteOrderById(repo, nil)(ctx)
 
@@ -103,8 +129,16 @@ func TestDeleteOrderItemByOrderProductIdReturnsTransactionalError(t *testing.T) 
 
 	orderID := primitive.NewObjectID().Hex()
 	productID := primitive.NewObjectID().Hex()
+	branchID := primitive.NewObjectID()
 
 	repo := &cancelOrderRepoStub{
+		getOrderByIDFn: func(id string) (*entities.Order, error) {
+			return &entities.Order{Id: primitive.NewObjectID(), BranchId: branchID}, nil
+		},
+		getOrderItemByIDFn: func(id string) (*entities.OrderItem, error) {
+			t.Fatal("item lookup should not run for order/product delete")
+			return nil, nil
+		},
 		cancelByOrderProductIDFn: func(orderId string, productId string, userId string, branchId string) (*entities.OrderItemProductDetail, error) {
 			return nil, errors.New("cancel failed")
 		},
@@ -119,7 +153,7 @@ func TestDeleteOrderItemByOrderProductIdReturnsTransactionalError(t *testing.T) 
 		{Key: "productId", Value: productID},
 	}
 	ctx.Set("UserId", "user-1")
-	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+	ctx.Set("BranchId", branchID.Hex())
 
 	DeleteOrderItemByOrderProductId(repo, nil)(ctx)
 
@@ -135,8 +169,16 @@ func TestDeleteOrderByIdReturnsTransactionalError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	orderID := primitive.NewObjectID().Hex()
+	branchID := primitive.NewObjectID()
 
 	repo := &cancelOrderRepoStub{
+		getOrderByIDFn: func(id string) (*entities.Order, error) {
+			return &entities.Order{Id: primitive.NewObjectID(), BranchId: branchID}, nil
+		},
+		getOrderItemByIDFn: func(id string) (*entities.OrderItem, error) {
+			t.Fatal("item lookup should not run for order delete")
+			return nil, nil
+		},
 		cancelOrderByIDFn: func(id string, userId string, branchId string) (*entities.OrderDetail, error) {
 			return nil, errors.New("cancel failed")
 		},
@@ -148,7 +190,7 @@ func TestDeleteOrderByIdReturnsTransactionalError(t *testing.T) {
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "orderId", Value: orderID}}
 	ctx.Set("UserId", "user-1")
-	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+	ctx.Set("BranchId", branchID.Hex())
 
 	DeleteOrderById(repo, nil)(ctx)
 
