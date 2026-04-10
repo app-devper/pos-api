@@ -24,6 +24,7 @@ import (
 	"pos/db"
 	"pos/middlewares"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -49,7 +50,7 @@ func (app Routes) StartGin() error {
 
 	r.Use(gin.Logger())
 	r.Use(middlewares.NewRecovery())
-	r.Use(middlewares.NewCors([]string{"*"}))
+	r.Use(middlewares.NewCors(getCorsOrigins()))
 
 	resource, err := db.InitResource()
 	if err != nil {
@@ -179,6 +180,13 @@ func lookupBoolEnv(key string) (bool, bool) {
 		return false, false
 	}
 	return result, true
+}
+
+func getCorsOrigins() []string {
+	if value := os.Getenv("CORS_ALLOWED_ORIGINS"); value != "" {
+		return strings.Split(value, ",")
+	}
+	return []string{"*"}
 }
 
 func validateStartupConfig() error {

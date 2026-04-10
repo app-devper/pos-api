@@ -223,8 +223,6 @@ func TestApproveStockTransferReturnsErrorWhenTransactionalApproveFails(t *testin
 			return nil, errors.New("status update failed")
 		},
 	}
-	productRepo := &transferProductStub{}
-
 	req := httptest.NewRequest(http.MethodPatch, "/stock-transfers/"+transferID.Hex()+"/approve", nil)
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
@@ -233,7 +231,7 @@ func TestApproveStockTransferReturnsErrorWhenTransactionalApproveFails(t *testin
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", sourceBranchID.Hex())
 
-	ApproveStockTransfer(repo, productRepo)(ctx)
+	ApproveStockTransfer(repo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)

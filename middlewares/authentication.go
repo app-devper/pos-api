@@ -10,7 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -30,13 +29,9 @@ func RequireBranch(employeeEntity repositories.IEmployee, branchEntity repositor
 			}
 			ctx.Set("BranchId", defaultBranch.Id.Hex())
 			ctx.Set("EmployeeRole", "STAFF")
-			logrus.Info("BranchId: " + defaultBranch.Id.Hex())
-			logrus.Info("EmployeeRole: STAFF")
 		} else {
 			ctx.Set("BranchId", employee.BranchId.Hex())
 			ctx.Set("EmployeeRole", employee.Role)
-			logrus.Info("BranchId: " + employee.BranchId.Hex())
-			logrus.Info("EmployeeRole: " + employee.Role)
 		}
 		ctx.Next()
 	}
@@ -56,10 +51,10 @@ type authConfig struct {
 }
 
 func RequireAuthenticated() gin.HandlerFunc {
+	config, configErr := loadAuthConfig()
 	return func(ctx *gin.Context) {
-		config, err := loadAuthConfig()
-		if err != nil {
-			errcode.Abort(ctx, http.StatusInternalServerError, errcode.SY_INTERNAL_001, err.Error())
+		if configErr != nil {
+			errcode.Abort(ctx, http.StatusInternalServerError, errcode.SY_INTERNAL_001, configErr.Error())
 			return
 		}
 
@@ -98,11 +93,6 @@ func RequireAuthenticated() gin.HandlerFunc {
 		ctx.Set("Role", claims.Role)
 		ctx.Set("System", claims.System)
 		ctx.Set("ClientId", claims.ClientId)
-
-		logrus.Info("SessionId: " + claims.ID)
-		logrus.Info("Role: " + claims.Role)
-		logrus.Info("System: " + claims.System)
-		logrus.Info("ClientId: " + claims.ClientId)
 		ctx.Next()
 	}
 }
@@ -116,7 +106,6 @@ func RequireSession(sessionEntity repositories.ISession) gin.HandlerFunc {
 			return
 		}
 		ctx.Set("UserId", userId)
-		logrus.Info("UserId: " + userId)
 		ctx.Next()
 	}
 }

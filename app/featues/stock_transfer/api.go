@@ -44,7 +44,7 @@ func ApplyStockTransferAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.ApproveStockTransfer(repository.StockTransfer, repository.Product),
+		usecase.ApproveStockTransfer(repository.StockTransfer),
 	)
 
 	stRoute.PATCH("/:id/reject",
@@ -52,6 +52,6 @@ func ApplyStockTransferAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.RejectStockTransfer(repository.StockTransfer, repository.Product),
+		usecase.RejectStockTransfer(repository.StockTransfer),
 	)
 }

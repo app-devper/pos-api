@@ -40,7 +40,7 @@ func GetStockTransferById(entity repositories.IStockTransfer) gin.HandlerFunc {
 	}
 }
 
-func ApproveStockTransfer(entity repositories.IStockTransfer, productEntity repositories.IProduct) gin.HandlerFunc {
+func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		req := request.UpdateStockTransfer{
@@ -74,7 +74,7 @@ func ApproveStockTransfer(entity repositories.IStockTransfer, productEntity repo
 	}
 }
 
-func RejectStockTransfer(entity repositories.IStockTransfer, productEntity repositories.IProduct) gin.HandlerFunc {
+func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		req := request.UpdateStockTransfer{

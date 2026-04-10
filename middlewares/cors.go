@@ -5,8 +5,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewCors return new gin handler fuc to handle CORS request
+// NewCors return new gin handler fuc to handle CORS request.
+// When allowedOrigins contains only "*", AllowCredentials is disabled because
+// browsers reject credentialed requests to a wildcard origin (CORS spec).
 func NewCors(allowedOrigins []string) gin.HandlerFunc {
+	isWildcard := len(allowedOrigins) == 1 && allowedOrigins[0] == "*"
 	return cors.New(cors.Config{
 		AllowOrigins: allowedOrigins,
 		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"},
@@ -17,6 +20,6 @@ func NewCors(allowedOrigins []string) gin.HandlerFunc {
 			"X-CSRF-Token", "Authorization", "X-Requested-With", "X-Access-Token",
 		},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: !isWildcard,
 	})
 }
