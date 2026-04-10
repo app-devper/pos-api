@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
@@ -46,6 +47,12 @@ func InitResource() (*Resource, error) {
 
 	host := os.Getenv("MONGO_HOST")
 	posDbName := os.Getenv("MONGO_POS_DB_NAME")
+	if host == "" {
+		return nil, fmt.Errorf("missing MONGO_HOST")
+	}
+	if posDbName == "" {
+		return nil, fmt.Errorf("missing MONGO_POS_DB_NAME")
+	}
 	mongoOptions := options.Client().
 		ApplyURI(host).
 		SetMaxPoolSize(getEnvUint64("MONGO_MAX_POOL_SIZE", 10)).
@@ -64,10 +71,19 @@ func InitResource() (*Resource, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err = mongoClient.Ping(ctx, nil); err != nil {
+		_ = mongoClient.Disconnect(context.Background())
+		return nil, err
+	}
 
 	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		_ = mongoClient.Disconnect(context.Background())
+		return nil, fmt.Errorf("missing REDIS_HOST")
+	}
 	redisOp, err := redis.ParseURL(redisHost)
 	if err != nil {
+		_ = mongoClient.Disconnect(context.Background())
 		return nil, err
 	}
 	if redisOp.PoolSize == 0 {
@@ -92,6 +108,11 @@ func InitResource() (*Resource, error) {
 		redisOp.IdleTimeout = getEnvDuration("REDIS_IDLE_TIMEOUT_SEC", 120)
 	}
 	rdb := redis.NewClient(redisOp)
+	if err = rdb.Ping(context.Background()).Err(); err != nil {
+		_ = rdb.Close()
+		_ = mongoClient.Disconnect(context.Background())
+		return nil, err
+	}
 
 	return &Resource{
 		Client: mongoClient,

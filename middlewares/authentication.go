@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"pos/app/core/errcode"
@@ -10,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func RequireBranch(employeeEntity repositories.IEmployee, branchEntity repositories.IBranch) gin.HandlerFunc {
@@ -17,6 +19,10 @@ func RequireBranch(employeeEntity repositories.IEmployee, branchEntity repositor
 		userId := ctx.GetString("UserId")
 		employee, err := employeeEntity.GetEmployeeByUserId(userId)
 		if err != nil {
+			if !errors.Is(err, mongo.ErrNoDocuments) {
+				errcode.Abort(ctx, http.StatusForbidden, errcode.AU_FORBIDDEN_001, "employee lookup failed")
+				return
+			}
 			defaultBranch, bErr := branchEntity.GetBranchByCode("HQ")
 			if bErr != nil {
 				errcode.Abort(ctx, http.StatusForbidden, errcode.AU_FORBIDDEN_001, "no branch available")
@@ -43,11 +49,20 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 }
 
+type authConfig struct {
+	jwtKey   []byte
+	clientId string
+	system   string
+}
+
 func RequireAuthenticated() gin.HandlerFunc {
-	jwtKey := []byte(os.Getenv("SECRET_KEY"))
-	clientId := os.Getenv("CLIENT_ID")
-	system := os.Getenv("SYSTEM")
 	return func(ctx *gin.Context) {
+		config, err := loadAuthConfig()
+		if err != nil {
+			errcode.Abort(ctx, http.StatusInternalServerError, errcode.SY_INTERNAL_001, err.Error())
+			return
+		}
+
 		token := ctx.GetHeader("Authorization")
 		if token == "" {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_001, "missing authorization header")
@@ -60,7 +75,7 @@ func RequireAuthenticated() gin.HandlerFunc {
 		}
 		claims := &AccessClaims{}
 		tkn, err := jwt.ParseWithClaims(jwtToken[1], claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return config.jwtKey, nil
 		})
 		if err != nil {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_002, err.Error())
@@ -70,11 +85,11 @@ func RequireAuthenticated() gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_002, "token invalid")
 			return
 		}
-		if system != claims.System {
+		if config.system != claims.System {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_003, "system invalid")
 			return
 		}
-		if clientId != claims.ClientId {
+		if config.clientId != claims.ClientId {
 			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_004, "clientId invalid")
 			return
 		}
@@ -104,4 +119,27 @@ func RequireSession(sessionEntity repositories.ISession) gin.HandlerFunc {
 		logrus.Info("UserId: " + userId)
 		ctx.Next()
 	}
+}
+
+func loadAuthConfig() (*authConfig, error) {
+	secretKey := os.Getenv("SECRET_KEY")
+	if secretKey == "" {
+		return nil, errors.New("missing required env: SECRET_KEY")
+	}
+
+	clientId := os.Getenv("CLIENT_ID")
+	if clientId == "" {
+		return nil, errors.New("missing required env: CLIENT_ID")
+	}
+
+	system := os.Getenv("SYSTEM")
+	if system == "" {
+		return nil, errors.New("missing required env: SYSTEM")
+	}
+
+	return &authConfig{
+		jwtKey:   []byte(secretKey),
+		clientId: clientId,
+		system:   system,
+	}, nil
 }

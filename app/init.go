@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"pos/app/domain"
@@ -32,8 +33,13 @@ import (
 type Routes struct {
 }
 
-func (app Routes) StartGin() {
+func (app Routes) StartGin() error {
 	configureGinMode()
+
+	if err := validateStartupConfig(); err != nil {
+		return err
+	}
+
 	r := gin.New()
 
 	err := r.SetTrustedProxies(nil)
@@ -47,7 +53,7 @@ func (app Routes) StartGin() {
 
 	resource, err := db.InitResource()
 	if err != nil {
-		logrus.Error(err)
+		return fmt.Errorf("init resource: %w", err)
 	}
 	defer resource.Close()
 
@@ -89,10 +95,12 @@ func (app Routes) StartGin() {
 	err = server.ListenAndServe()
 	if err != nil {
 		if err == http.ErrServerClosed {
-			return
+			return nil
 		}
-		logrus.WithError(err).Error("http server failed")
+		return fmt.Errorf("http server failed: %w", err)
 	}
+
+	return nil
 }
 
 func initDefaultBranch(repository *domain.Repository) {
@@ -171,4 +179,23 @@ func lookupBoolEnv(key string) (bool, bool) {
 		return false, false
 	}
 	return result, true
+}
+
+func validateStartupConfig() error {
+	requiredKeys := []string{
+		"SECRET_KEY",
+		"CLIENT_ID",
+		"SYSTEM",
+		"MONGO_HOST",
+		"MONGO_POS_DB_NAME",
+		"REDIS_HOST",
+	}
+
+	for _, key := range requiredKeys {
+		if os.Getenv(key) == "" {
+			return fmt.Errorf("missing required env: %s", key)
+		}
+	}
+
+	return nil
 }
