@@ -17,7 +17,12 @@ import (
 
 type deleteReceiveRepoStub struct {
 	repositories.IReceive
+	getByIDFn    func(id string) (*entities.Receive, error)
 	removeByIDFn func(id string) (*entities.Receive, error)
+}
+
+func (s *deleteReceiveRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
+	return s.getByIDFn(id)
 }
 
 func (s *deleteReceiveRepoStub) RemoveReceiveById(id string) (*entities.Receive, error) {
@@ -28,8 +33,12 @@ func TestDeleteReceiveByIdReturnsDeletedReceive(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	receiveID := primitive.NewObjectID().Hex()
+	branchID := primitive.NewObjectID()
 	var gotID string
 	repo := &deleteReceiveRepoStub{
+		getByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID}, nil
+		},
 		removeByIDFn: func(id string) (*entities.Receive, error) {
 			gotID = id
 			return &entities.Receive{Id: primitive.NewObjectID()}, nil
@@ -41,6 +50,7 @@ func TestDeleteReceiveByIdReturnsDeletedReceive(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "receiveId", Value: receiveID}}
+	ctx.Set("BranchId", branchID.Hex())
 
 	DeleteReceiveById(repo)(ctx)
 
@@ -56,7 +66,11 @@ func TestDeleteReceiveByIdReturnsError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	receiveID := primitive.NewObjectID().Hex()
+	branchID := primitive.NewObjectID()
 	repo := &deleteReceiveRepoStub{
+		getByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID}, nil
+		},
 		removeByIDFn: func(id string) (*entities.Receive, error) {
 			return nil, errors.New("delete failed")
 		},
@@ -67,6 +81,7 @@ func TestDeleteReceiveByIdReturnsError(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "receiveId", Value: receiveID}}
+	ctx.Set("BranchId", branchID.Hex())
 
 	DeleteReceiveById(repo)(ctx)
 

@@ -92,14 +92,11 @@ func (entity *stockTransferEntity) createStockTransferWithReservationContext(ctx
 		if item.StockId == "" {
 			continue
 		}
-		stockID, err := primitive.ObjectIDFromHex(item.StockId)
+		filter, err := buildStockTransferReservationFilter(form.FromBranchId, item)
 		if err != nil {
 			return nil, err
 		}
-		result, err := entity.productStockRepo.UpdateOne(ctx, bson.M{
-			"_id":      stockID,
-			"quantity": bson.M{"$gte": item.Quantity},
-		}, bson.M{
+		result, err := entity.productStockRepo.UpdateOne(ctx, filter, bson.M{
 			"$inc": bson.M{"quantity": -item.Quantity},
 		})
 		if err != nil {
@@ -111,6 +108,28 @@ func (entity *stockTransferEntity) createStockTransferWithReservationContext(ctx
 	}
 
 	return entity.createStockTransferWithContext(ctx, form)
+}
+
+func buildStockTransferReservationFilter(fromBranchID string, item request.StockTransferItem) (bson.M, error) {
+	branchObjID, err := primitive.ObjectIDFromHex(fromBranchID)
+	if err != nil {
+		return nil, err
+	}
+	stockID, err := primitive.ObjectIDFromHex(item.StockId)
+	if err != nil {
+		return nil, err
+	}
+	productID, err := primitive.ObjectIDFromHex(item.ProductId)
+	if err != nil {
+		return nil, err
+	}
+
+	return bson.M{
+		"_id":       stockID,
+		"branchId":  branchObjID,
+		"productId": productID,
+		"quantity":  bson.M{"$gte": item.Quantity},
+	}, nil
 }
 
 func (entity *stockTransferEntity) createStockTransferWithContext(ctx context.Context, form request.StockTransfer) (*entities.StockTransfer, error) {

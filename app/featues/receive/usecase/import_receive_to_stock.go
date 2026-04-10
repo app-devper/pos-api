@@ -15,6 +15,15 @@ func ImportReceiveToStock(receiveEntity repositories.IReceive, _ repositories.IP
 
 		userId := utils.GetUserId(ctx)
 		branchId := utils.GetBranchId(ctx)
+		receive, err := receiveEntity.GetReceiveById(receiveId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureReceiveBranchAccess(receive, branchId); err != nil {
+			abortReceiveBranchMismatch(ctx)
+			return
+		}
 		result, err := receiveEntity.ImportReceiveToStock(receiveId, userId, branchId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())

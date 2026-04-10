@@ -8,7 +8,6 @@ import (
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -85,19 +84,17 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 				Unit:         product.Unit,
 				Quantity:     item.Quantity,
 				LotNumber:    item.LotNumber,
-				ExpireDate:   request.NewFlexibleTime(time.Time{}),
 				ReceiveId:    receiveId,
 				ReceiveCode:  req.Code,
 				CreatedBy:    userId,
 				BranchId:     branchId,
 			}
-			if item.ExpireDate != "" {
-				if t, tErr := time.Parse(time.RFC3339, item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = request.NewFlexibleTime(t)
-				} else if t, tErr := time.Parse("2006-01-02", item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = request.NewFlexibleTime(t)
-				}
+			expireDate, parseErr := parseReceiveExpireDate(item.ExpireDate)
+			if parseErr != nil {
+				rollback(parseErr)
+				return
 			}
+			productReq.ExpireDate = expireDate
 
 			if _, err := receiveEntity.CreateReceiveItem(receiveId, "", item.ProductId, productReq); err != nil {
 				rollback(fmt.Errorf("failed to create receive item for product %s: %w", item.ProductId, err))

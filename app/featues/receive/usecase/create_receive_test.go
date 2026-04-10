@@ -282,6 +282,61 @@ func TestCreateReceiveRollsBackWhenTotalCostUpdateFails(t *testing.T) {
 	}
 }
 
+func TestCreateReceiveFailsWhenExpireDateIsInvalid(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	receiveRepo := &createReceiveRepoStub{
+		createReceiveFn: func(form request.Receive) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID()}, nil
+		},
+		createReceiveItemFn: func(receiveId string, lotId string, productId string, form request.Product) (*entities.ReceiveItem, error) {
+			t.Fatal("create receive item should not be called when expire date is invalid")
+			return nil, nil
+		},
+		updateReceiveTotalCostByIDFn: func(id string, totalCost float64) (*entities.Receive, error) {
+			t.Fatal("update total cost should not be called when expire date is invalid")
+			return nil, nil
+		},
+		removeReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID()}, nil
+		},
+	}
+	productRepo := &createReceiveProductRepoStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			return &entities.Product{
+				Id:           primitive.NewObjectID(),
+				Name:         "Drug A",
+				SerialNumber: "SN001",
+				Price:        10,
+				Unit:         "TAB",
+			}, nil
+		},
+	}
+	sequenceRepo := &receiveSequenceRepoStub{
+		nextSequenceFn: func(name string) (*entities.Sequence, error) {
+			return &entities.Sequence{Field: name, Prefix: "RC", Value: 1, Format: 4}, nil
+		},
+	}
+
+	body := `{"supplierId":"` + primitive.NewObjectID().Hex() + `","items":[{"productId":"` + primitive.NewObjectID().Hex() + `","costPrice":5,"quantity":2,"expireDate":"31/12/2026"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/receives", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	CreateReceive(receiveRepo, sequenceRepo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "invalid expireDate") {
+		t.Fatalf("expected invalid expireDate error, got %s", w.Body.String())
+	}
+}
+
 func TestCreateReceiveRollsBackWhenProductLookupFails(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

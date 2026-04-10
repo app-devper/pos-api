@@ -30,6 +30,10 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
 			return
 		}
+		if err := ensureReceiveBranchAccess(receive, branchId); err != nil {
+			abortReceiveBranchMismatch(ctx)
+			return
+		}
 
 		var totalCost float64
 		filteredItems := make([]request.ReceiveItem, 0, len(req.ReceiveItems))
@@ -54,19 +58,17 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 				Unit:         product.Unit,
 				Quantity:     item.Quantity,
 				LotNumber:    item.LotNumber,
-				ExpireDate:   request.NewFlexibleTime(time.Time{}),
 				ReceiveId:    id,
 				ReceiveCode:  receive.Code,
 				CreatedBy:    userId,
 				BranchId:     branchId,
 			}
-			if item.ExpireDate != "" {
-				if t, tErr := time.Parse(time.RFC3339, item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = request.NewFlexibleTime(t)
-				} else if t, tErr := time.Parse("2006-01-02", item.ExpireDate); tErr == nil {
-					productReq.ExpireDate = request.NewFlexibleTime(t)
-				}
+			expireDate, parseErr := parseReceiveExpireDate(item.ExpireDate)
+			if parseErr != nil {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, parseErr.Error())
+				return
 			}
+			productReq.ExpireDate = expireDate
 			item.ExpireDate = productReq.ExpireDate.Time.Format(time.RFC3339)
 			filteredItems = append(filteredItems, item)
 			totalCost += item.CostPrice * float64(item.Quantity)
@@ -92,6 +94,24 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive) gin.HandlerFunc
 			return
 		}
 		receiveId := ctx.Param("receiveId")
+		receive, err := receiveEntity.GetReceiveById(receiveId)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureReceiveBranchAccess(receive, utils.GetBranchId(ctx)); err != nil {
+			abortReceiveBranchMismatch(ctx)
+			return
+		}
+		req.UpdatedBy = utils.GetUserId(ctx)
+		for i := range req.ReceiveItems {
+			expireDate, parseErr := parseReceiveExpireDate(req.ReceiveItems[i].ExpireDate)
+			if parseErr != nil {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, parseErr.Error())
+				return
+			}
+			req.ReceiveItems[i].ExpireDate = expireDate.Time.Format(time.RFC3339)
+		}
 
 		result, err := receiveEntity.UpdateReceiveItemsById(receiveId, req)
 		if err != nil {
@@ -111,6 +131,15 @@ func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.Handler
 			return
 		}
 		id := ctx.Param("receiveId")
+		receive, err := receiveEntity.GetReceiveById(id)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureReceiveBranchAccess(receive, utils.GetBranchId(ctx)); err != nil {
+			abortReceiveBranchMismatch(ctx)
+			return
+		}
 
 		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCost)
 		if err != nil {

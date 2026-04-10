@@ -17,7 +17,12 @@ import (
 
 type receiveRepoStub struct {
 	repositories.IReceive
+	getReceiveByIDFn       func(id string) (*entities.Receive, error)
 	importReceiveToStockFn func(receiveId string, userId string, branchId string) (*entities.Receive, error)
+}
+
+func (s *receiveRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
+	return s.getReceiveByIDFn(id)
 }
 
 func (s *receiveRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
@@ -28,8 +33,12 @@ func TestImportReceiveToStockReturnsErrorWhenTransactionalImportFails(t *testing
 	gin.SetMode(gin.TestMode)
 
 	receiveID := primitive.NewObjectID()
+	branchID := primitive.NewObjectID()
 
 	receiveRepo := &receiveRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: receiveID, BranchId: branchID}, nil
+		},
 		importReceiveToStockFn: func(receiveId string, userId string, branchId string) (*entities.Receive, error) {
 			return nil, errors.New("status failed")
 		},
@@ -41,7 +50,7 @@ func TestImportReceiveToStockReturnsErrorWhenTransactionalImportFails(t *testing
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "receiveId", Value: receiveID.Hex()}}
 	ctx.Set("UserId", "user-1")
-	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+	ctx.Set("BranchId", branchID.Hex())
 
 	ImportReceiveToStock(receiveRepo, nil)(ctx)
 
