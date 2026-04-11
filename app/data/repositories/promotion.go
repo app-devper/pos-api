@@ -22,10 +22,10 @@ type promotionEntity struct {
 type IPromotion interface {
 	CreatePromotion(form request.Promotion) (*entities.Promotion, error)
 	GetPromotions(branchId string) ([]entities.Promotion, error)
-	GetPromotionById(id string) (*entities.Promotion, error)
+	GetPromotionById(id string, branchId string) (*entities.Promotion, error)
 	GetPromotionByCode(code string, branchId string) (*entities.Promotion, error)
-	UpdatePromotionById(id string, form request.UpdatePromotion) (*entities.Promotion, error)
-	RemovePromotionById(id string) (*entities.Promotion, error)
+	UpdatePromotionById(id string, branchId string, form request.UpdatePromotion) (*entities.Promotion, error)
+	RemovePromotionById(id string, branchId string, updatedBy string) (*entities.Promotion, error)
 }
 
 func NewPromotionEntity(resource *db.Resource) IPromotion {
@@ -117,7 +117,7 @@ func (entity *promotionEntity) GetPromotions(branchId string) ([]entities.Promot
 	return results, nil
 }
 
-func (entity *promotionEntity) GetPromotionById(id string) (*entities.Promotion, error) {
+func (entity *promotionEntity) GetPromotionById(id string, branchId string) (*entities.Promotion, error) {
 	logrus.Info("GetPromotionById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -125,8 +125,16 @@ func (entity *promotionEntity) GetPromotionById(id string) (*entities.Promotion,
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjId
+	}
 	data := entities.Promotion{}
-	err = entity.repo.FindOne(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.repo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -162,13 +170,22 @@ func (entity *promotionEntity) GetPromotionByCode(code string, branchId string) 
 	return &data, nil
 }
 
-func (entity *promotionEntity) UpdatePromotionById(id string, form request.UpdatePromotion) (*entities.Promotion, error) {
+func (entity *promotionEntity) UpdatePromotionById(id string, branchId string, form request.UpdatePromotion) (*entities.Promotion, error) {
 	logrus.Info("UpdatePromotionById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	objectId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
+	}
+
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjId
 	}
 
 	productIds := make([]primitive.ObjectID, len(form.ProductIds))
@@ -200,14 +217,14 @@ func (entity *promotionEntity) UpdatePromotionById(id string, form request.Updat
 	}
 
 	data := entities.Promotion{}
-	err = entity.repo.FindOneAndUpdate(ctx, bson.M{"_id": objectId}, bson.M{"$set": update}, opts).Decode(&data)
+	err = entity.repo.FindOneAndUpdate(ctx, filter, bson.M{"$set": update}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
 	return &data, nil
 }
 
-func (entity *promotionEntity) RemovePromotionById(id string) (*entities.Promotion, error) {
+func (entity *promotionEntity) RemovePromotionById(id string, branchId string, updatedBy string) (*entities.Promotion, error) {
 	logrus.Info("RemovePromotionById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -215,8 +232,22 @@ func (entity *promotionEntity) RemovePromotionById(id string) (*entities.Promoti
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"_id": objectId}
+	if branchId != "" {
+		branchObjId, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjId
+	}
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
 	data := entities.Promotion{}
-	err = entity.repo.FindOneAndDelete(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.repo.FindOneAndUpdate(ctx, filter, bson.M{"$set": bson.M{
+		"status":      constant.INACTIVE,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

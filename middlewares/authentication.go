@@ -6,6 +6,7 @@ import (
 	"os"
 	"pos/app/core/errcode"
 	"pos/app/data/repositories"
+	"pos/app/domain/constant"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,10 @@ func RequireBranch(employeeEntity repositories.IEmployee, branchEntity repositor
 			ctx.Set("BranchId", defaultBranch.Id.Hex())
 			ctx.Set("EmployeeRole", "STAFF")
 		} else {
+			if employee.Status != "" && employee.Status != constant.ACTIVE {
+				errcode.Abort(ctx, http.StatusForbidden, errcode.AU_FORBIDDEN_001, "employee inactive")
+				return
+			}
 			ctx.Set("BranchId", employee.BranchId.Hex())
 			ctx.Set("EmployeeRole", employee.Role)
 		}

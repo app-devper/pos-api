@@ -27,9 +27,13 @@ func GetPromotions(entity repositories.IPromotion) gin.HandlerFunc {
 func GetPromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := entity.GetPromotionById(id)
+		branchId := ctx.GetString("BranchId")
+		result, err := entity.GetPromotionById(id, branchId)
 		if err != nil {
-			logrus.WithError(err).WithField("id", id).Error("get promotion by id failed")
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"id":       id,
+				"branchId": branchId,
+			}).Error("get promotion by id failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
 			return
 		}
@@ -40,6 +44,7 @@ func GetPromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 func UpdatePromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
+		branchId := ctx.GetString("BranchId")
 		req := request.UpdatePromotion{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			logrus.WithError(err).WithField("id", id).Error("bind update promotion request failed")
@@ -47,10 +52,11 @@ func UpdatePromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 			return
 		}
 		req.UpdatedBy = utils.GetUserId(ctx)
-		result, err := entity.UpdatePromotionById(id, req)
+		result, err := entity.UpdatePromotionById(id, branchId, req)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"id":        id,
+				"branchId":  branchId,
 				"updatedBy": req.UpdatedBy,
 			}).Error("update promotion failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
@@ -63,9 +69,15 @@ func UpdatePromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 func DeletePromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := entity.RemovePromotionById(id)
+		branchId := ctx.GetString("BranchId")
+		userId := utils.GetUserId(ctx)
+		result, err := entity.RemovePromotionById(id, branchId, userId)
 		if err != nil {
-			logrus.WithError(err).WithField("id", id).Error("delete promotion failed")
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"id":       id,
+				"branchId": branchId,
+				"userId":   userId,
+			}).Error("delete promotion failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
 			return
 		}

@@ -11,6 +11,7 @@ type Employee struct {
 	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
 	UserId      string             `bson:"userId" json:"userId"`
 	Role        string             `bson:"role" json:"role"`
+	Status      string             `bson:"status" json:"status"`
 	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy   string             `bson:"updatedBy" json:"-"`
@@ -22,6 +23,7 @@ type EmployeeDetail struct {
 	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
 	UserId      string             `bson:"userId" json:"userId"`
 	Role        string             `bson:"role" json:"role"`
+	Status      string             `bson:"status" json:"status"`
 	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy   string             `bson:"updatedBy" json:"-"`

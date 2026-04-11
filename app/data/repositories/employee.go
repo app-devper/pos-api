@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -25,7 +26,7 @@ type IEmployee interface {
 	GetEmployeeById(id string) (*entities.Employee, error)
 	GetEmployeeByUserId(userId string) (*entities.Employee, error)
 	UpdateEmployeeById(id string, form request.UpdateEmployee) (*entities.Employee, error)
-	RemoveEmployeeById(id string) (*entities.Employee, error)
+	RemoveEmployeeById(id string, updatedBy string) (*entities.Employee, error)
 }
 
 func NewEmployeeEntity(resource *db.Resource) IEmployee {
@@ -60,6 +61,7 @@ func (entity *employeeEntity) CreateEmployee(form request.Employee) (*entities.E
 		BranchId:    branchId,
 		UserId:      form.UserId,
 		Role:        form.Role,
+		Status:      constant.ACTIVE,
 		CreatedBy:   form.CreatedBy,
 		CreatedDate: time.Now(),
 		UpdatedBy:   form.CreatedBy,
@@ -178,7 +180,7 @@ func (entity *employeeEntity) UpdateEmployeeById(id string, form request.UpdateE
 	return &data, nil
 }
 
-func (entity *employeeEntity) RemoveEmployeeById(id string) (*entities.Employee, error) {
+func (entity *employeeEntity) RemoveEmployeeById(id string, updatedBy string) (*entities.Employee, error) {
 	logrus.Info("RemoveEmployeeById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -188,8 +190,17 @@ func (entity *employeeEntity) RemoveEmployeeById(id string) (*entities.Employee,
 		return nil, err
 	}
 
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+
 	data := entities.Employee{}
-	err = entity.employeeRepo.FindOneAndDelete(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.employeeRepo.FindOneAndUpdate(ctx, bson.M{"_id": objectId}, bson.M{"$set": bson.M{
+		"status":      constant.ARCHIVED,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
