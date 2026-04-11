@@ -30,7 +30,7 @@
 
 ## Business Rules
 
-- order analytics ต้องอิงเฉพาะ order ที่ `ACTIVE`
+- order analytics ต้องอิงเฉพาะ order ที่ถือเป็นยอดขายจริง เช่น `CONFIRMED` และยังรองรับข้อมูลย้อนหลังที่เป็น `ACTIVE`
 - branch scope ต้องตรงกับ branch ปัจจุบันเสมอ
 - inventory widgets ต้องไม่รวมข้าม unit แบบผิดความหมาย
 - dashboard เป็น derived data จึงไม่มี persisted state ของตัวเองแบบ entity อื่น

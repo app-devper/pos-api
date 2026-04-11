@@ -2,7 +2,7 @@
 
 ## เป้าหมาย
 
-แสดงตัวชี้วัดรายสาขาจากข้อมูลจริงที่ผ่านกฎ active-status และ branch scope เดียวกับรายงานทางธุรกิจ
+แสดงตัวชี้วัดรายสาขาจากข้อมูลจริงที่ผ่านกฎ order sale-status และ branch scope เดียวกับรายงานทางธุรกิจ
 
 ## Actors
 
@@ -21,7 +21,7 @@
 1. Frontend เปิด dashboard พร้อม branch ปัจจุบัน
 2. Frontend เรียก summary, daily chart, monthly chart, stock report, low stock, dead stock, expiring และ refill reminders
 3. Backend query เฉพาะข้อมูลของ branch ปัจจุบัน
-4. Query ฝั่ง order analytics ใช้เฉพาะ order ที่ `ACTIVE`
+4. Query ฝั่ง order analytics ใช้เฉพาะ order ที่ถือเป็นยอดขายจริง เช่น `CONFIRMED` และยังรองรับข้อมูลย้อนหลังที่เป็น `ACTIVE`
 5. Query ฝั่ง inventory แยกผลตามหน่วยที่แท้จริงเมื่อข้อมูล stock อยู่หลาย unit
 6. Frontend render KPI และ charts จากชุดข้อมูลเดียวกันกับกฎใน reports
 

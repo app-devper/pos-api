@@ -39,7 +39,7 @@
 - แหล่งข้อมูลหลักคือ orders (order_items joined with products)
 - คัดกรองโดยใช้ `product.DrugRegistrations` array (ค่า: KHY10, KHY11, KHY12, KHY13)
 - ต้องแสดงข้อมูลเภสัชกร (`pharmacistName`) และเลขใบอนุญาต (`licenseNo`) ซึ่งดึงจาก order entity
-- รายงานต้องดึงเฉพาะรายการที่ order มีสถานะ ACTIVE ในช่วงวันที่และสาขาที่กำหนด
+- รายงานต้องดึงเฉพาะรายการที่ order อยู่ในสถานะขายจริง เช่น `CONFIRMED` และต้องยังรองรับข้อมูลย้อนหลังที่เคยใช้ `ACTIVE`
 
 ## Business Rules สำหรับเอกสารเชิงพาณิชย์
 

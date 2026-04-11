@@ -85,7 +85,7 @@
 ### ข.ย.10 — บัญชีการขายยาควบคุมพิเศษ
 
 - **Data Source**: `orders` (order_items joined with products)
-- **Filter**: `product.DrugRegistrations` contains "KHY10", order status = ACTIVE
+- **Filter**: `product.DrugRegistrations` contains "KHY10", order status เป็นสถานะขายจริง (`CONFIRMED` และรองรับ legacy `ACTIVE`)
 - **Endpoint**: `GET /reports/pharmacy/khy10/data?startDate=...&endDate=...`
 - **ข้อมูลที่แสดง**: วันที่ขาย, ชื่อยา, ชื่อสามัญ, ความแรง, รูปแบบยา, จำนวน, หน่วย, วิธีใช้, เภสัชกรผู้จ่ายยา, เลขใบอนุญาต
 - **PharmacistName / LicenseNo**: ดึงจาก `order.pharmacistName`, `order.licenseNo`
@@ -139,7 +139,7 @@
 
 ### 4. Order ที่ถูกยกเลิก
 
-- รายงาน ข.ย.10-13 กรองเฉพาะ order ที่มี status = `ACTIVE`
+- รายงาน ข.ย.10-13 กรองเฉพาะ order ที่มี status เป็นสถานะขายจริง เช่น `CONFIRMED` และรองรับข้อมูลย้อนหลังที่ยังเป็น `ACTIVE`
 - Order ที่ถูก void/cancel จะไม่ปรากฏในรายงาน
 
 ### 5. Compliance data ถูกแชร์ทั้ง order
