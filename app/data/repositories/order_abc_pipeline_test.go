@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestBuildABCAnalysisPipelineFiltersActiveOrdersByBranch(t *testing.T) {
+func TestBuildABCAnalysisPipelineFiltersConfirmedOrdersByBranch(t *testing.T) {
 	branchID := primitive.NewObjectID()
 	startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -59,12 +59,16 @@ func TestBuildABCAnalysisPipelineFiltersActiveOrdersByBranch(t *testing.T) {
 		if !ok {
 			continue
 		}
+		inItems, ok := condition["$in"].(bson.A)
+		if ok && len(inItems) == 2 && inItems[0] == "$status" {
+			statusList, ok := inItems[1].(bson.A)
+			if ok && len(statusList) == 2 && statusList[0] == constant.ACTIVE && statusList[1] == constant.CONFIRMED {
+				foundStatus = true
+			}
+		}
 		eqItems, ok := condition["$eq"].(bson.A)
 		if !ok || len(eqItems) != 2 {
 			continue
-		}
-		if eqItems[0] == "$status" && eqItems[1] == constant.ACTIVE {
-			foundStatus = true
 		}
 		if eqItems[0] == "$branchId" && eqItems[1] == branchID {
 			foundBranch = true
@@ -72,7 +76,7 @@ func TestBuildABCAnalysisPipelineFiltersActiveOrdersByBranch(t *testing.T) {
 	}
 
 	if !foundStatus {
-		t.Fatal("expected ACTIVE order filter in ABC lookup")
+		t.Fatal("expected confirmed-order status filter in ABC lookup")
 	}
 	if !foundBranch {
 		t.Fatal("expected branch filter in ABC lookup")

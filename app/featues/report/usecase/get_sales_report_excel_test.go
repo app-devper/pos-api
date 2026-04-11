@@ -25,7 +25,7 @@ func (s *salesExcelOrderStub) GetOrderRange(form request.GetOrderRange) ([]entit
 	return s.getOrderRangeFn(form)
 }
 
-func TestGetSalesReportExcelSkipsInactiveOrders(t *testing.T) {
+func TestGetSalesReportExcelSkipsCancelledOrders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	orderRepo := &salesExcelOrderStub{
@@ -38,7 +38,7 @@ func TestGetSalesReportExcelSkipsInactiveOrders(t *testing.T) {
 					CustomerCode: "C001",
 					CustomerName: "Active Customer",
 					Type:         "cash",
-					Status:       constant.ACTIVE,
+					Status:       constant.CONFIRMED,
 					Total:        100,
 					TotalCost:    60,
 				},

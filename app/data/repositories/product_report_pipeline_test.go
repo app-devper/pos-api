@@ -119,23 +119,23 @@ func TestBuildDeadStockPipelineRequiresActiveOrdersForLastSale(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected $and in orders $expr, got %+v", expr)
 	}
-	foundActiveStatus := false
+	foundConfirmedStatuses := false
 	for _, item := range andExpr {
 		cond, ok := item.(bson.M)
 		if !ok {
 			continue
 		}
-		eqExpr, ok := cond["$eq"].(bson.A)
-		if !ok || len(eqExpr) != 2 {
-			continue
-		}
-		if eqExpr[0] == "$status" && eqExpr[1] == constant.ACTIVE {
-			foundActiveStatus = true
-			break
+		inExpr, ok := cond["$in"].(bson.A)
+		if ok && len(inExpr) == 2 && inExpr[0] == "$status" {
+			statusList, ok := inExpr[1].(bson.A)
+			if ok && len(statusList) == 2 && statusList[0] == constant.ACTIVE && statusList[1] == constant.CONFIRMED {
+				foundConfirmedStatuses = true
+				break
+			}
 		}
 	}
-	if !foundActiveStatus {
-		t.Fatalf("expected dead stock pipeline to require ACTIVE order status in nested lookup, got %+v", andExpr)
+	if !foundConfirmedStatuses {
+		t.Fatalf("expected dead stock pipeline to require confirmed-order statuses in nested lookup, got %+v", andExpr)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
@@ -324,7 +325,7 @@ func TestGetSalesReportItemsUsesBatchUnitLookup(t *testing.T) {
 		getOrderRangeFn: func(form request.GetOrderRange) ([]entities.Order, error) {
 			return []entities.Order{{
 				Id:             orderID,
-				Status:         "ACTIVE",
+				Status:         constant.CONFIRMED,
 				PharmacistName: "เภสัชกร A",
 				LicenseNo:      "1234",
 			}}, nil

@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func TestBuildActiveOrderAnalyticsMatchFilterIncludesActiveStatusAndBranch(t *testing.T) {
+func TestBuildActiveOrderAnalyticsMatchFilterIncludesConfirmedStatusesAndBranch(t *testing.T) {
 	branchID := primitive.NewObjectID()
 	startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -20,8 +20,16 @@ func TestBuildActiveOrderAnalyticsMatchFilterIncludesActiveStatusAndBranch(t *te
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if filter["status"] != constant.ACTIVE {
-		t.Fatalf("expected ACTIVE status filter, got %+v", filter["status"])
+	statusFilter, ok := filter["status"].(bson.M)
+	if !ok {
+		t.Fatalf("expected status bson.M, got %+v", filter["status"])
+	}
+	statuses, ok := statusFilter["$in"].([]string)
+	if !ok {
+		t.Fatalf("expected status $in []string, got %+v", statusFilter["$in"])
+	}
+	if len(statuses) != 2 || statuses[0] != constant.ACTIVE || statuses[1] != constant.CONFIRMED {
+		t.Fatalf("unexpected confirmed statuses: %+v", statuses)
 	}
 	if filter["branchId"] != branchID {
 		t.Fatalf("expected branchId %s, got %+v", branchID.Hex(), filter["branchId"])
@@ -36,7 +44,7 @@ func TestBuildActiveOrderAnalyticsMatchFilterIncludesActiveStatusAndBranch(t *te
 	}
 }
 
-func TestBuildMonthlyActiveOrderAnalyticsMatchFilterIncludesActiveStatusAndBranch(t *testing.T) {
+func TestBuildMonthlyActiveOrderAnalyticsMatchFilterIncludesConfirmedStatusesAndBranch(t *testing.T) {
 	branchID := primitive.NewObjectID()
 	startDate := time.Date(2025, 4, 1, 0, 0, 0, 0, time.UTC)
 
@@ -45,8 +53,16 @@ func TestBuildMonthlyActiveOrderAnalyticsMatchFilterIncludesActiveStatusAndBranc
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if filter["status"] != constant.ACTIVE {
-		t.Fatalf("expected ACTIVE status filter, got %+v", filter["status"])
+	statusFilter, ok := filter["status"].(bson.M)
+	if !ok {
+		t.Fatalf("expected status bson.M, got %+v", filter["status"])
+	}
+	statuses, ok := statusFilter["$in"].([]string)
+	if !ok {
+		t.Fatalf("expected status $in []string, got %+v", statusFilter["$in"])
+	}
+	if len(statuses) != 2 || statuses[0] != constant.ACTIVE || statuses[1] != constant.CONFIRMED {
+		t.Fatalf("unexpected confirmed statuses: %+v", statuses)
 	}
 	if filter["branchId"] != branchID {
 		t.Fatalf("expected branchId %s, got %+v", branchID.Hex(), filter["branchId"])
