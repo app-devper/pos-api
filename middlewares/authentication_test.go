@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"pos/app/domain/constant"
 	"strings"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestRequireBranchUsesEmployeeBranchAndRole(t *testing.T) {
 	branchID := primitive.NewObjectID()
 	employeeRepo := &employeeRepoStub{
 		getByUserIDFn: func(userId string) (*entities.Employee, error) {
-			return &entities.Employee{BranchId: branchID, Role: "ADMIN"}, nil
+			return &entities.Employee{BranchId: branchID, Role: "ADMIN", Status: constant.ACTIVE}, nil
 		},
 	}
 	branchRepo := &branchRepoStub{
@@ -167,6 +168,40 @@ func TestRequireBranchFailsWhenEmployeeLookupReturnsSystemError(t *testing.T) {
 	}
 	if body := w.Body.String(); !strings.Contains(body, "employee lookup failed") {
 		t.Fatalf("expected employee lookup failure response, got %s", body)
+	}
+}
+
+func TestRequireBranchRejectsInactiveEmployee(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	employeeRepo := &employeeRepoStub{
+		getByUserIDFn: func(userId string) (*entities.Employee, error) {
+			return &entities.Employee{
+				BranchId: primitive.NewObjectID(),
+				Role:     "ADMIN",
+				Status:   constant.ARCHIVED,
+			}, nil
+		},
+	}
+	branchRepo := &branchRepoStub{
+		getByCodeFn: func(code string) (*entities.Branch, error) {
+			t.Fatalf("did not expect HQ fallback lookup")
+			return nil, nil
+		},
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx.Set("UserId", "user-1")
+
+	RequireBranch(employeeRepo, branchRepo)(ctx)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	}
+	if body := w.Body.String(); !strings.Contains(body, "employee inactive") {
+		t.Fatalf("expected employee inactive response, got %s", body)
 	}
 }
 

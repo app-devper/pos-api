@@ -16,11 +16,26 @@ import (
 
 type promotionRepoStub struct {
 	repositories.IPromotion
-	createPromotionFn func(form request.Promotion) (*entities.Promotion, error)
+	createPromotionFn  func(form request.Promotion) (*entities.Promotion, error)
+	getPromotionByIDFn func(id string, branchId string) (*entities.Promotion, error)
+	updatePromotionFn  func(id string, branchId string, form request.UpdatePromotion) (*entities.Promotion, error)
+	removePromotionFn  func(id string, branchId string, updatedBy string) (*entities.Promotion, error)
 }
 
 func (s *promotionRepoStub) CreatePromotion(form request.Promotion) (*entities.Promotion, error) {
 	return s.createPromotionFn(form)
+}
+
+func (s *promotionRepoStub) GetPromotionById(id string, branchId string) (*entities.Promotion, error) {
+	return s.getPromotionByIDFn(id, branchId)
+}
+
+func (s *promotionRepoStub) UpdatePromotionById(id string, branchId string, form request.UpdatePromotion) (*entities.Promotion, error) {
+	return s.updatePromotionFn(id, branchId, form)
+}
+
+func (s *promotionRepoStub) RemovePromotionById(id string, branchId string, updatedBy string) (*entities.Promotion, error) {
+	return s.removePromotionFn(id, branchId, updatedBy)
 }
 
 func TestCreatePromotionPassesBranchAndCreatedBy(t *testing.T) {
@@ -57,5 +72,123 @@ func TestCreatePromotionPassesBranchAndCreatedBy(t *testing.T) {
 	}
 	if gotForm.BranchId != branchID {
 		t.Fatalf("expected BranchId %s, got %s", branchID, gotForm.BranchId)
+	}
+}
+
+func TestGetPromotionByIdPassesBranchId(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	promotionID := "507f1f77bcf86cd799439011"
+	branchID := "507f1f77bcf86cd799439012"
+	var gotID string
+	var gotBranchID string
+	repo := &promotionRepoStub{
+		getPromotionByIDFn: func(id string, branchId string) (*entities.Promotion, error) {
+			gotID = id
+			gotBranchID = branchId
+			return &entities.Promotion{}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/promotions/"+promotionID, nil)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "id", Value: promotionID}}
+	ctx.Set("BranchId", branchID)
+
+	GetPromotionById(repo)(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if gotID != promotionID {
+		t.Fatalf("expected promotion id %s, got %s", promotionID, gotID)
+	}
+	if gotBranchID != branchID {
+		t.Fatalf("expected branch id %s, got %s", branchID, gotBranchID)
+	}
+}
+
+func TestUpdatePromotionByIdPassesBranchIdAndUpdatedBy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	promotionID := "507f1f77bcf86cd799439011"
+	branchID := "507f1f77bcf86cd799439012"
+	var gotID string
+	var gotBranchID string
+	var gotForm request.UpdatePromotion
+	repo := &promotionRepoStub{
+		updatePromotionFn: func(id string, branchId string, form request.UpdatePromotion) (*entities.Promotion, error) {
+			gotID = id
+			gotBranchID = branchId
+			gotForm = form
+			return &entities.Promotion{}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/promotions/"+promotionID, strings.NewReader(`{"name":"Promo B"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "id", Value: promotionID}}
+	ctx.Set("BranchId", branchID)
+	ctx.Set("UserId", "admin-1")
+
+	UpdatePromotionById(repo)(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if gotID != promotionID {
+		t.Fatalf("expected promotion id %s, got %s", promotionID, gotID)
+	}
+	if gotBranchID != branchID {
+		t.Fatalf("expected branch id %s, got %s", branchID, gotBranchID)
+	}
+	if gotForm.UpdatedBy != "admin-1" {
+		t.Fatalf("expected UpdatedBy admin-1, got %s", gotForm.UpdatedBy)
+	}
+}
+
+func TestDeletePromotionByIdPassesBranchIdAndUpdatedBy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	promotionID := "507f1f77bcf86cd799439011"
+	branchID := "507f1f77bcf86cd799439012"
+	var gotID string
+	var gotBranchID string
+	var gotUpdatedBy string
+	repo := &promotionRepoStub{
+		removePromotionFn: func(id string, branchId string, updatedBy string) (*entities.Promotion, error) {
+			gotID = id
+			gotBranchID = branchId
+			gotUpdatedBy = updatedBy
+			return &entities.Promotion{}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/promotions/"+promotionID, nil)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "id", Value: promotionID}}
+	ctx.Set("BranchId", branchID)
+	ctx.Set("UserId", "admin-1")
+
+	DeletePromotionById(repo)(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if gotID != promotionID {
+		t.Fatalf("expected promotion id %s, got %s", promotionID, gotID)
+	}
+	if gotBranchID != branchID {
+		t.Fatalf("expected branch id %s, got %s", branchID, gotBranchID)
+	}
+	if gotUpdatedBy != "admin-1" {
+		t.Fatalf("expected UpdatedBy admin-1, got %s", gotUpdatedBy)
 	}
 }

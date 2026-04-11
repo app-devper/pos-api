@@ -21,7 +21,7 @@ type employeeRepoStub struct {
 	getByBranchFn func(branchId string) ([]entities.Employee, error)
 	getByIDFn     func(id string) (*entities.Employee, error)
 	updateByIDFn  func(id string, form request.UpdateEmployee) (*entities.Employee, error)
-	removeByIDFn  func(id string) (*entities.Employee, error)
+	removeByIDFn  func(id string, updatedBy string) (*entities.Employee, error)
 }
 
 func (s *employeeRepoStub) CreateEmployee(form request.Employee) (*entities.Employee, error) {
@@ -44,8 +44,8 @@ func (s *employeeRepoStub) UpdateEmployeeById(id string, form request.UpdateEmpl
 	return s.updateByIDFn(id, form)
 }
 
-func (s *employeeRepoStub) RemoveEmployeeById(id string) (*entities.Employee, error) {
-	return s.removeByIDFn(id)
+func (s *employeeRepoStub) RemoveEmployeeById(id string, updatedBy string) (*entities.Employee, error) {
+	return s.removeByIDFn(id, updatedBy)
 }
 
 func TestCreateEmployeePassesCreatedBy(t *testing.T) {
@@ -172,9 +172,11 @@ func TestDeleteEmployeeByIdPassesParam(t *testing.T) {
 
 	employeeID := primitive.NewObjectID().Hex()
 	var gotID string
+	var gotUpdatedBy string
 	repo := &employeeRepoStub{
-		removeByIDFn: func(id string) (*entities.Employee, error) {
+		removeByIDFn: func(id string, updatedBy string) (*entities.Employee, error) {
 			gotID = id
+			gotUpdatedBy = updatedBy
 			return &entities.Employee{Id: primitive.NewObjectID()}, nil
 		},
 	}
@@ -184,6 +186,7 @@ func TestDeleteEmployeeByIdPassesParam(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "employeeId", Value: employeeID}}
+	ctx.Set("UserId", "admin-1")
 
 	DeleteEmployeeById(repo)(ctx)
 
@@ -192,6 +195,9 @@ func TestDeleteEmployeeByIdPassesParam(t *testing.T) {
 	}
 	if gotID != employeeID {
 		t.Fatalf("expected employee id %s, got %s", employeeID, gotID)
+	}
+	if gotUpdatedBy != "admin-1" {
+		t.Fatalf("expected UpdatedBy admin-1, got %s", gotUpdatedBy)
 	}
 }
 
