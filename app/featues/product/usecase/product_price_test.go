@@ -44,6 +44,15 @@ func (s *productPriceRepoStub) CreateProductHistory(param request.ProductHistory
 	return s.createHistoryFn(param)
 }
 
+type productPriceStockStub struct {
+	repositories.IProductStock
+	createHistoryFn func(param request.ProductHistory) (*entities.ProductHistory, error)
+}
+
+func (s *productPriceStockStub) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
+	return s.createHistoryFn(param)
+}
+
 func TestCreateProductPriceUsesTransactionalCascadeMethod(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -161,7 +170,11 @@ func TestUpdateProductPriceByIdSkipsHistoryWhenUnitLookupFails(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	UpdateProductPriceById(repo)(ctx)
+	stockRepo := &productPriceStockStub{
+		createHistoryFn: repo.createHistoryFn,
+	}
+
+	UpdateProductPriceById(repo, stockRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)

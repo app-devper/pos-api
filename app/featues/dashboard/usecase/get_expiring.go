@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetExpiringProducts(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetExpiringProducts(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		now := time.Now()
 		sixMonthsLater := now.AddDate(0, 6, 0)
@@ -20,7 +20,7 @@ func GetExpiringProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 			EndDate:   request.NewFlexibleTime(sixMonthsLater),
 		}
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetExpiringProductStocks(param, branchId)
+		result, err := productStock.GetExpiringProductStocks(param, branchId)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"branchId":  branchId,

@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"pos/app/core/errcode"
@@ -75,6 +76,9 @@ func RequireAuthenticated() gin.HandlerFunc {
 		}
 		claims := &AccessClaims{}
 		tkn, err := jwt.ParseWithClaims(jwtToken[1], claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
 			return config.jwtKey, nil
 		})
 		if err != nil {

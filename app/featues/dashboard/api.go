@@ -32,14 +32,14 @@ func ApplyDashboardAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetLowStockProducts(repository.Product),
+		usecase.GetLowStockProducts(repository.ProductStock),
 	)
 
 	dashboardRoute.GET("/stock-report",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetStockReport(repository.Product),
+		usecase.GetStockReport(repository.ProductStock),
 	)
 
 	dashboardRoute.GET("/monthly-chart",
@@ -53,7 +53,7 @@ func ApplyDashboardAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetExpiringProducts(repository.Product),
+		usecase.GetExpiringProducts(repository.ProductStock),
 	)
 
 	dashboardRoute.GET("/refill-reminders",
@@ -74,6 +74,6 @@ func ApplyDashboardAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.GetDeadStockProducts(repository.Product),
+		usecase.GetDeadStockProducts(repository.ProductStock),
 	)
 }

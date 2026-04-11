@@ -15,7 +15,7 @@ import (
 )
 
 type expiringProductStub struct {
-	repositories.IProduct
+	repositories.IProductStock
 	getExpiringProductStocksFn func(param request.GetProductLotsExpireRange, branchId string) ([]entities.ProductLotDetail, error)
 	getProductLotsExpireFn     func(param request.GetProductLotsExpireRange) ([]entities.ProductLotDetail, error)
 	expiringStocksCalls        int

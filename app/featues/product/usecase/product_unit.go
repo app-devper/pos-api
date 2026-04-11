@@ -41,7 +41,7 @@ func GetProductUnitsByProductId(productEntity repositories.IProduct) gin.Handler
 	}
 }
 
-func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductUnitById(productEntity repositories.IProduct, productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductUnit{}
 		id := ctx.Param("unitId")
@@ -58,7 +58,7 @@ func UpdateProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 			return
 		}
 
-		appendProductUnitHistory(ctx.GetString("BranchId"), productEntity, func(branchId string) request.ProductHistory {
+		appendProductUnitHistory(ctx.GetString("BranchId"), productStock, func(branchId string) request.ProductHistory {
 			updUnitHistory := request.UpdateProductUnitHistory(req.ProductId, req)
 			updUnitHistory.BranchId = branchId
 			return updUnitHistory
@@ -81,9 +81,9 @@ func RemoveProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 	}
 }
 
-func appendProductUnitHistory(branchId string, productEntity repositories.IProduct, buildHistory func(branchId string) request.ProductHistory) {
+func appendProductUnitHistory(branchId string, productStock repositories.IProductStock, buildHistory func(branchId string) request.ProductHistory) {
 	history := buildHistory(branchId)
-	if _, err := productEntity.CreateProductHistory(history); err != nil {
+	if _, err := productStock.CreateProductHistory(history); err != nil {
 		logrus.WithError(err).WithField("branchId", branchId).Error("failed to create product unit history")
 	}
 }

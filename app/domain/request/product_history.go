@@ -43,7 +43,7 @@ func AddProductUnitHistory(productId string, unit ProductUnit) ProductHistory {
 	return ProductHistory{
 		ProductId:   productId,
 		Type:        constant.HistoryTypeAddProductUnit,
-		Description: "เพิ่มหน่วยสินค้า " + unit.Unit + " ขนาด " + strconv.Itoa(unit.Size) + "Barcode: " + unit.Barcode,
+		Description: "เพิ่มหน่วยสินค้า " + unit.Unit + " ขนาด " + strconv.Itoa(unit.Size) + " Barcode: " + unit.Barcode,
 		Unit:        unit.Unit,
 		CreatedBy:   unit.UpdatedBy,
 	}
@@ -63,7 +63,7 @@ func RemoveProductUnitHistory(productId string, unit *entities.ProductUnit, crea
 	return ProductHistory{
 		ProductId:   productId,
 		Type:        constant.HistoryTypeRemoveProductUnit,
-		Description: "ลบหน่วยสินค้า " + unit.Unit + " ขนาด " + strconv.Itoa(unit.Size) + "Barcode: " + unit.Barcode,
+		Description: "ลบหน่วยสินค้า " + unit.Unit + " ขนาด " + strconv.Itoa(unit.Size) + " Barcode: " + unit.Barcode,
 		Unit:        unit.Unit,
 		CreatedBy:   createdBy,
 	}

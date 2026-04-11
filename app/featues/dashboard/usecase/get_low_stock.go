@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetLowStockProducts(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetLowStockProducts(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		thresholdStr := ctx.DefaultQuery("threshold", "10")
 		threshold, err := strconv.Atoi(thresholdStr)
@@ -20,7 +20,7 @@ func GetLowStockProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetLowStockProducts(threshold, branchId)
+		result, err := productStock.GetLowStockProducts(threshold, branchId)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"branchId":  branchId,

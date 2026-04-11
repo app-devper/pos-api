@@ -39,7 +39,7 @@ func TestBuildActiveOrderAnalyticsMatchFilterIncludesConfirmedStatusesAndBranch(
 	if !ok {
 		t.Fatalf("expected createdDate bson.M, got %+v", filter["createdDate"])
 	}
-	if dateFilter["$gt"] != startDate || dateFilter["$lt"] != endDate {
+	if dateFilter["$gte"] != startDate || dateFilter["$lt"] != endDate {
 		t.Fatalf("unexpected date filter: %+v", dateFilter)
 	}
 }

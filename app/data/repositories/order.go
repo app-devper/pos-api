@@ -397,7 +397,11 @@ func (entity *orderEntity) UpdateTotal() ([]entities.Order, error) {
 				opts := &options.FindOneAndUpdateOptions{
 					ReturnDocument: &isReturnNewDoc,
 				}
-				err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": data}, opts).Decode(&data)
+				err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": bson.M{
+					"total":       data.Total,
+					"totalCost":   data.TotalCost,
+					"updatedDate": time.Now(),
+				}}, opts).Decode(&data)
 				if err != nil {
 					return nil, err
 				}
@@ -623,8 +627,8 @@ func (entity *orderEntity) getOrderTotals(orderId string) (total float64, totalC
 		{"$match": bson.M{"orderId": objId, "$or": confirmedOrderItemStatusMatchClauses()}},
 		{"$group": bson.M{
 			"_id":       nil,
-			"total":     bson.M{"$sum": "$price"},
-			"totalCost": bson.M{"$sum": "$costPrice"},
+			"total":     bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}},
+			"totalCost": bson.M{"$sum": bson.M{"$multiply": bson.A{"$costPrice", "$quantity"}}},
 		}},
 	}
 	var result []bson.M
@@ -952,8 +956,8 @@ func (entity *orderEntity) GetOrderItemOrderDetailsByProductId(productId string,
 	matchFilter := bson.M{
 		"productId": productObjId,
 		"createdDate": bson.M{
-			"$gt": form.StartDate,
-			"$lt": form.EndDate,
+			"$gte": form.StartDate,
+			"$lt":  form.EndDate,
 		},
 		"$or": confirmedOrderItemStatusMatchClauses(),
 	}
@@ -1462,7 +1466,7 @@ func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderI
 	}
 	pipeline := []bson.M{
 		{"$match": bson.M{"orderId": objId, "$or": confirmedOrderItemStatusMatchClauses()}},
-		{"$group": bson.M{"_id": nil, "total": bson.M{"$sum": "$price"}, "totalCost": bson.M{"$sum": "$costPrice"}}},
+		{"$group": bson.M{"_id": nil, "total": bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}}, "totalCost": bson.M{"$sum": bson.M{"$multiply": bson.A{"$costPrice", "$quantity"}}}}},
 	}
 	var result []bson.M
 	cursor, err := entity.orderItemRepo.Aggregate(ctx, pipeline)
@@ -1666,8 +1670,8 @@ func buildMonthlyActiveOrderAnalyticsMatchFilter(startDate time.Time, branchId s
 func buildActiveOrderAnalyticsMatchFilter(startDate time.Time, endDate time.Time, branchId string) (bson.M, error) {
 	matchFilter := bson.M{
 		"createdDate": bson.M{
-			"$gt": startDate,
-			"$lt": endDate,
+			"$gte": startDate,
+			"$lt":  endDate,
 		},
 		"status": bson.M{"$in": constant.ConfirmedOrderStatuses()},
 	}

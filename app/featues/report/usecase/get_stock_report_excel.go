@@ -11,11 +11,11 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func GetStockReportExcel(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetStockReportExcel(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		branchId := ctx.GetString("BranchId")
 
-		stocks, err := productEntity.GetStockReport(branchId)
+		stocks, err := productStock.GetStockReport(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get stock report data failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())

@@ -32,38 +32,13 @@ func (s *orderRepoStub) RemoveOrderById(id string) (*entities.OrderDetail, error
 
 type productStub struct {
 	repositories.IProduct
-	removeStockFn     func(stockId string, quantity int) (*entities.ProductStock, error)
-	addStockFn        func(stockId string, quantity int) (*entities.ProductStock, error)
 	getUnitByIDFn     func(id string) (*entities.ProductUnit, error)
-	getBalanceFn      func(productId string, unitId string, branchId string) int
-	createHistoryFn   func(param request.ProductHistory) (*entities.ProductHistory, error)
-	removeHistoryFn   func(id string) (*entities.ProductHistory, error)
 	removeSoldFirstFn func(productId string, quantity int) (*entities.Product, error)
 	addSoldFirstFn    func(productId string, quantity int) (*entities.Product, error)
 }
 
-func (s *productStub) RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return s.removeStockFn(stockId, quantity)
-}
-
-func (s *productStub) AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return s.addStockFn(stockId, quantity)
-}
-
 func (s *productStub) GetProductUnitById(id string) (*entities.ProductUnit, error) {
 	return s.getUnitByIDFn(id)
-}
-
-func (s *productStub) GetProductStockBalance(productId string, unitId string, branchId string) int {
-	return s.getBalanceFn(productId, unitId, branchId)
-}
-
-func (s *productStub) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
-	return s.createHistoryFn(param)
-}
-
-func (s *productStub) RemoveProductHistoryById(id string) (*entities.ProductHistory, error) {
-	return s.removeHistoryFn(id)
 }
 
 func (s *productStub) RemoveQuantitySoldFirstById(productId string, quantity int) (*entities.Product, error) {
@@ -72,6 +47,35 @@ func (s *productStub) RemoveQuantitySoldFirstById(productId string, quantity int
 
 func (s *productStub) AddQuantitySoldFirstById(productId string, quantity int) (*entities.Product, error) {
 	return s.addSoldFirstFn(productId, quantity)
+}
+
+type productStockStub struct {
+	repositories.IProductStock
+	removeStockFn   func(stockId string, quantity int) (*entities.ProductStock, error)
+	addStockFn      func(stockId string, quantity int) (*entities.ProductStock, error)
+	getBalanceFn    func(productId string, unitId string, branchId string) int
+	createHistoryFn func(param request.ProductHistory) (*entities.ProductHistory, error)
+	removeHistoryFn func(id string) (*entities.ProductHistory, error)
+}
+
+func (s *productStockStub) RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
+	return s.removeStockFn(stockId, quantity)
+}
+
+func (s *productStockStub) AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
+	return s.addStockFn(stockId, quantity)
+}
+
+func (s *productStockStub) GetProductStockBalance(productId string, unitId string, branchId string) int {
+	return s.getBalanceFn(productId, unitId, branchId)
+}
+
+func (s *productStockStub) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
+	return s.createHistoryFn(param)
+}
+
+func (s *productStockStub) RemoveProductHistoryById(id string) (*entities.ProductHistory, error) {
+	return s.removeHistoryFn(id)
 }
 
 type sequenceStub struct {
@@ -106,6 +110,13 @@ func TestCreateOrderRollsBackWhenHistoryCreationFails(t *testing.T) {
 	}
 
 	productRepo := &productStub{
+		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
+			return &entities.ProductUnit{Id: unitID, Unit: "TAB"}, nil
+		},
+		removeSoldFirstFn: func(productId string, quantity int) (*entities.Product, error) { return &entities.Product{}, nil },
+		addSoldFirstFn:    func(productId string, quantity int) (*entities.Product, error) { return &entities.Product{}, nil },
+	}
+	productStockRepo := &productStockStub{
 		removeStockFn: func(stockId string, quantity int) (*entities.ProductStock, error) {
 			return &entities.ProductStock{Id: stockID}, nil
 		},
@@ -114,16 +125,11 @@ func TestCreateOrderRollsBackWhenHistoryCreationFails(t *testing.T) {
 			restoredStockQty = quantity
 			return &entities.ProductStock{}, nil
 		},
-		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
-			return &entities.ProductUnit{Id: unitID, Unit: "TAB"}, nil
-		},
 		getBalanceFn: func(productId string, unitId string, branchId string) int { return 5 },
 		createHistoryFn: func(param request.ProductHistory) (*entities.ProductHistory, error) {
 			return nil, errors.New("history failed")
 		},
-		removeHistoryFn:   func(id string) (*entities.ProductHistory, error) { return &entities.ProductHistory{}, nil },
-		removeSoldFirstFn: func(productId string, quantity int) (*entities.Product, error) { return &entities.Product{}, nil },
-		addSoldFirstFn:    func(productId string, quantity int) (*entities.Product, error) { return &entities.Product{}, nil },
+		removeHistoryFn: func(id string) (*entities.ProductHistory, error) { return &entities.ProductHistory{}, nil },
 	}
 
 	sequenceRepo := &sequenceStub{
@@ -141,7 +147,7 @@ func TestCreateOrderRollsBackWhenHistoryCreationFails(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	CreateOrder(orderRepo, productRepo, sequenceRepo)(ctx)
+	CreateOrder(orderRepo, productRepo, productStockRepo, sequenceRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
@@ -170,6 +176,7 @@ func TestCreateOrderFailsWhenSequenceLookupFails(t *testing.T) {
 		},
 	}
 	productRepo := &productStub{}
+	productStockRepo := &productStockStub{}
 	sequenceRepo := &sequenceStub{
 		nextFn: func(field string) (*entities.Sequence, error) {
 			return nil, errors.New("sequence failed")
@@ -184,7 +191,7 @@ func TestCreateOrderFailsWhenSequenceLookupFails(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	CreateOrder(orderRepo, productRepo, sequenceRepo)(ctx)
+	CreateOrder(orderRepo, productRepo, productStockRepo, sequenceRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
@@ -207,6 +214,7 @@ func TestCreateOrderFailsWhenSequenceIsMissing(t *testing.T) {
 		},
 	}
 	productRepo := &productStub{}
+	productStockRepo := &productStockStub{}
 	sequenceRepo := &sequenceStub{
 		nextFn: func(field string) (*entities.Sequence, error) { return nil, nil },
 	}
@@ -219,7 +227,7 @@ func TestCreateOrderFailsWhenSequenceIsMissing(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	CreateOrder(orderRepo, productRepo, sequenceRepo)(ctx)
+	CreateOrder(orderRepo, productRepo, productStockRepo, sequenceRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)

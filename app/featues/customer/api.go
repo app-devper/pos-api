@@ -1,11 +1,12 @@
 package customer
 
 import (
-	"github.com/gin-gonic/gin"
 	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/customer/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplyCustomerAPI(
@@ -17,6 +18,7 @@ func ApplyCustomerAPI(
 	customerRoute.POST("",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.CreateCustomer(repository.Customer, repository.Sequence),
 	)
 
@@ -35,12 +37,14 @@ func ApplyCustomerAPI(
 	customerRoute.PUT("/:customerId",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateCustomerById(repository.Customer),
 	)
 
 	customerRoute.PATCH("/:customerId/status",
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
+		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
 		usecase.UpdateCustomerStatusById(repository.Customer),
 	)
 

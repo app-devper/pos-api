@@ -186,6 +186,9 @@ func getCorsOrigins() []string {
 	if value := os.Getenv("CORS_ALLOWED_ORIGINS"); value != "" {
 		return strings.Split(value, ",")
 	}
+	if isCloudRun() {
+		logrus.Warn("CORS_ALLOWED_ORIGINS not set in production — defaulting to wildcard '*'. Set explicit origins for better security.")
+	}
 	return []string{"*"}
 }
 

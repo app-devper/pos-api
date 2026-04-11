@@ -9,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetStockReport(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetStockReport(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetStockReport(branchId)
+		result, err := productStock.GetStockReport(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get dashboard stock report failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())

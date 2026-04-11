@@ -28,7 +28,7 @@ func ApplyReportAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.GetStockReportExcel(repository.Product),
+		usecase.GetStockReportExcel(repository.ProductStock),
 	)
 
 	reportRoute.GET("/pharmacy/khy9/data",

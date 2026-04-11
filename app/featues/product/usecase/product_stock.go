@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
+func CreateProductStock(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductStock{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -21,14 +21,14 @@ func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 		req.BranchId = ctx.GetString("BranchId")
-		stock, err := productEntity.CreateProductStock(req)
+		stock, err := productStock.CreateProductStock(req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
 
-		appendProductStockHistory(req.BranchId, productEntity, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex(), branchId)
+		appendProductStockHistory(req.BranchId, productEntity, productStock, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+			balance := productStock.GetProductStockBalance(req.ProductId, unit.Id.Hex(), branchId)
 			history := request.AddProductStockHistory(req.ProductId, unit.Unit, req, balance)
 			history.BranchId = branchId
 			return history
@@ -38,11 +38,11 @@ func CreateProductStock(productEntity repositories.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductStocksByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetProductStocksByProductId(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetProductStocksByProductId(productId, branchId)
+		result, err := productStock.GetProductStocksByProductId(productId, branchId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -52,7 +52,7 @@ func GetProductStocksByProductId(productEntity repositories.IProduct) gin.Handle
 
 }
 
-func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductStockById(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStock{}
 		id := ctx.Param("stockId")
@@ -61,7 +61,7 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
-		stock, err := productEntity.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -73,13 +73,13 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 
-		stock, err = productEntity.UpdateProductStockById(id, req)
+		stock, err = productStock.UpdateProductStockById(id, req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		appendProductStockHistory(branchId, productEntity, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex(), branchId)
+		appendProductStockHistory(branchId, productEntity, productStock, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+			balance := productStock.GetProductStockBalance(req.ProductId, unit.Id.Hex(), branchId)
 			updateHistory := request.UpdateProductStockHistory(req.ProductId, unit.Unit, req, balance)
 			updateHistory.BranchId = branchId
 			return updateHistory
@@ -89,7 +89,7 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 	}
 }
 
-func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductStockQuantityById(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockQuantity{}
 		id := ctx.Param("stockId")
@@ -98,7 +98,7 @@ func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.Han
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
-		stock, err := productEntity.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -110,13 +110,13 @@ func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.Han
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 
-		stock, err = productEntity.UpdateProductStockQuantityById(id, req.Quantity)
+		stock, err = productStock.UpdateProductStockQuantityById(id, req.Quantity)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		appendProductStockHistory(branchId, productEntity, stock.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex(), branchId)
+		appendProductStockHistory(branchId, productEntity, productStock, stock.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+			balance := productStock.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex(), branchId)
 			qtyHistory := request.UpdateProductStockQuantityHistory(stock.ProductId.Hex(), unit.Unit, req, balance)
 			qtyHistory.BranchId = branchId
 			return qtyHistory
@@ -126,12 +126,12 @@ func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.Han
 	}
 }
 
-func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc {
+func RemoveProductStockById(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("stockId")
 		userId := ctx.GetString("UserId")
 		branchId := ctx.GetString("BranchId")
-		stock, err := productEntity.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -141,14 +141,14 @@ func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 			return
 		}
 
-		result, err := productEntity.RemoveProductStockById(id)
+		result, err := productStock.RemoveProductStockById(id)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
 
-		appendProductStockHistory(branchId, productEntity, result.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex(), branchId)
+		appendProductStockHistory(branchId, productEntity, productStock, result.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+			balance := productStock.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex(), branchId)
 			removeHistory := request.RemoveProductStockHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId)
 			removeHistory.BranchId = branchId
 			return removeHistory
@@ -158,7 +158,7 @@ func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 	}
 }
 
-func UpdateProductStockSequence(productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductStockSequence(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockSequence{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -166,7 +166,7 @@ func UpdateProductStockSequence(productEntity repositories.IProduct) gin.Handler
 			return
 		}
 		req.BranchId = ctx.GetString("BranchId")
-		stocks, err := productEntity.UpdateProductStockSequence(req)
+		stocks, err := productStock.UpdateProductStockSequence(req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -175,7 +175,7 @@ func UpdateProductStockSequence(productEntity repositories.IProduct) gin.Handler
 	}
 }
 
-func appendProductStockHistory(branchId string, productEntity repositories.IProduct, unitId string, buildHistory func(unit *entities.ProductUnit, branchId string) request.ProductHistory) {
+func appendProductStockHistory(branchId string, productEntity repositories.IProduct, productStock repositories.IProductStock, unitId string, buildHistory func(unit *entities.ProductUnit, branchId string) request.ProductHistory) {
 	unit, err := productEntity.GetProductUnitById(unitId)
 	if err != nil {
 		logrus.WithError(err).WithField("unitId", unitId).Error("failed to load product unit for stock history")
@@ -187,7 +187,7 @@ func appendProductStockHistory(branchId string, productEntity repositories.IProd
 	}
 
 	history := buildHistory(unit, branchId)
-	if _, err = productEntity.CreateProductHistory(history); err != nil {
+	if _, err = productStock.CreateProductHistory(history); err != nil {
 		logrus.WithError(err).WithField("unitId", unitId).Error("failed to create product stock history")
 	}
 }

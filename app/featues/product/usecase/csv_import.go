@@ -103,6 +103,7 @@ func ImportCSV(productEntity repositories.IProduct) gin.HandlerFunc {
 				Status:            "ACTIVE",
 				DrugRegistrations: drugRegistrations,
 				CreatedBy:         userId,
+				BranchId:          ctx.GetString("BranchId"),
 			})
 			if err != nil {
 				errs = append(errs, "แถว "+strconv.Itoa(rowNum)+": "+err.Error())

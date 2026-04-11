@@ -125,7 +125,7 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive) gin.HandlerFunc
 
 func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		req := request.UpdateReceiveTotalCode{}
+		req := request.UpdateReceiveTotalCost{}
 		if err := ctx.ShouldBind(&req); err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_001, err.Error())
 			return

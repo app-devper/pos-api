@@ -19,7 +19,7 @@ func ApplyOrderAPI(
 		middlewares.RequireAuthenticated(),
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.CreateOrder(repository.Order, repository.Product, repository.Sequence),
+		usecase.CreateOrder(repository.Order, repository.Product, repository.ProductStock, repository.Sequence),
 	)
 
 	orderRoute.GET("",

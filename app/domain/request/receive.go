@@ -23,7 +23,7 @@ type UpdateReceive struct {
 	UpdatedBy    string
 }
 
-type UpdateReceiveTotalCode struct {
+type UpdateReceiveTotalCost struct {
 	TotalCost float64 `json:"totalCost"`
 }
 

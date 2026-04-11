@@ -64,8 +64,18 @@ func (s *productReceiveRepoStub) GetProductStocksByProductId(productId string, b
 	return s.getStocksByProductIDFn(productId, branchId)
 }
 
-type receiveNoopStub struct {
-	repositories.IReceive
+type productTestStockStub struct {
+	repositories.IProductStock
+	createHistoryFn        func(param request.ProductHistory) (*entities.ProductHistory, error)
+	getStocksByProductIDFn func(productId string, branchId string) ([]entities.ProductStock, error)
+}
+
+func (s *productTestStockStub) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
+	return s.createHistoryFn(param)
+}
+
+func (s *productTestStockStub) GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error) {
+	return s.getStocksByProductIDFn(productId, branchId)
 }
 
 func TestCreateProductReceiveUsesTransactionalRepositoryMethod(t *testing.T) {
@@ -92,7 +102,7 @@ func TestCreateProductReceiveUsesTransactionalRepositoryMethod(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID)
 
-	CreateProductReceive(productRepo, &receiveNoopStub{})(ctx)
+	CreateProductReceive(productRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
@@ -180,7 +190,11 @@ func TestUpdateProductByIdLogsHistoryFailureButReturnsSuccess(t *testing.T) {
 	ctx.Set("UserId", "user-2")
 	ctx.Set("BranchId", branchID)
 
-	UpdateProductById(productRepo)(ctx)
+	stockRepo := &productTestStockStub{
+		createHistoryFn: productRepo.createHistoryFn,
+	}
+
+	UpdateProductById(productRepo, stockRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
@@ -244,11 +258,6 @@ func TestGetProductByIdUsesBranchScopedStocks(t *testing.T) {
 		getPricesByProductIDFn: func(productId string) ([]entities.ProductPrice, error) {
 			return []entities.ProductPrice{{Id: primitive.NewObjectID(), ProductId: productID, Price: 10}}, nil
 		},
-		getStocksByProductIDFn: func(productId string, branchId string) ([]entities.ProductStock, error) {
-			gotStockProductID = productId
-			gotStockBranchID = branchId
-			return []entities.ProductStock{{Id: primitive.NewObjectID(), ProductId: productID}}, nil
-		},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/products/"+productID.Hex(), nil)
@@ -258,7 +267,18 @@ func TestGetProductByIdUsesBranchScopedStocks(t *testing.T) {
 	ctx.Params = gin.Params{{Key: "productId", Value: productID.Hex()}}
 	ctx.Set("BranchId", branchID)
 
-	GetProductById(productRepo)(ctx)
+	stockRepo := &productTestStockStub{
+		createHistoryFn: func(param request.ProductHistory) (*entities.ProductHistory, error) {
+			return nil, nil
+		},
+		getStocksByProductIDFn: func(productId string, branchId string) ([]entities.ProductStock, error) {
+			gotStockProductID = productId
+			gotStockBranchID = branchId
+			return []entities.ProductStock{{Id: primitive.NewObjectID(), ProductId: productID}}, nil
+		},
+	}
+
+	GetProductById(productRepo, stockRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)

@@ -15,7 +15,10 @@ func ToFormatDate(date time.Time) string {
 }
 
 func GetLocation() *time.Location {
-	location, _ := time.LoadLocation("Asia/Bangkok")
+	location, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil || location == nil {
+		return time.FixedZone("ICT", 7*60*60)
+	}
 	return location
 }
 

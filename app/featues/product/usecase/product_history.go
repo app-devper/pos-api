@@ -14,11 +14,11 @@ type getProductHistoryRangeQuery struct {
 	EndDate   request.FlexibleTime `form:"endDate" binding:"required"`
 }
 
-func GetProductHistoryByProductId(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetProductHistoryByProductId(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetProductHistoryByProductId(productId, branchId)
+		result, err := productStock.GetProductHistoryByProductId(productId, branchId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -27,7 +27,7 @@ func GetProductHistoryByProductId(productEntity repositories.IProduct) gin.Handl
 	}
 }
 
-func GetProductHistoryByDateRange(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetProductHistoryByDateRange(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := getProductHistoryRangeQuery{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {
@@ -35,7 +35,7 @@ func GetProductHistoryByDateRange(productEntity repositories.IProduct) gin.Handl
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetProductHistoryByDateRange(branchId, req.StartDate.Time, req.EndDate.Time)
+		result, err := productStock.GetProductHistoryByDateRange(branchId, req.StartDate.Time, req.EndDate.Time)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return

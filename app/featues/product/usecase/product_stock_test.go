@@ -17,16 +17,20 @@ import (
 )
 
 type productStockRepoStub struct {
-	repositories.IProduct
+	repositories.IProductStock
 	createStockFn    func(param request.ProductStock) (*entities.ProductStock, error)
 	getStockByIDFn   func(id string) (*entities.ProductStock, error)
-	getUnitByIDFn    func(id string) (*entities.ProductUnit, error)
 	getBalanceFn     func(productId string, unitId string, branchId string) int
 	createHistoryFn  func(param request.ProductHistory) (*entities.ProductHistory, error)
 	updateStockFn    func(id string, param request.UpdateProductStock) (*entities.ProductStock, error)
 	updateQtyFn      func(id string, quantity int) (*entities.ProductStock, error)
 	removeStockFn    func(id string) (*entities.ProductStock, error)
 	updateSequenceFn func(param request.UpdateProductStockSequence) ([]entities.ProductStock, error)
+}
+
+type productStockProductStub struct {
+	repositories.IProduct
+	getUnitByIDFn func(id string) (*entities.ProductUnit, error)
 }
 
 func (s *productStockRepoStub) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
@@ -37,7 +41,7 @@ func (s *productStockRepoStub) GetProductStockById(id string) (*entities.Product
 	return s.getStockByIDFn(id)
 }
 
-func (s *productStockRepoStub) GetProductUnitById(id string) (*entities.ProductUnit, error) {
+func (s *productStockProductStub) GetProductUnitById(id string) (*entities.ProductUnit, error) {
 	return s.getUnitByIDFn(id)
 }
 
@@ -74,16 +78,13 @@ func TestCreateProductStockUsesBranchScopedBalance(t *testing.T) {
 	var gotBalanceBranchID string
 	var gotHistoryBranchID string
 
-	repo := &productStockRepoStub{
+	stockRepo := &productStockRepoStub{
 		createStockFn: func(param request.ProductStock) (*entities.ProductStock, error) {
 			return &entities.ProductStock{
 				Id:        primitive.NewObjectID(),
 				ProductId: productID,
 				UnitId:    unitID,
 			}, nil
-		},
-		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
-			return &entities.ProductUnit{Id: unitID, Unit: "TAB"}, nil
 		},
 		getBalanceFn: func(productId string, unitId string, branchId string) int {
 			gotBalanceBranchID = branchId
@@ -92,6 +93,11 @@ func TestCreateProductStockUsesBranchScopedBalance(t *testing.T) {
 		createHistoryFn: func(param request.ProductHistory) (*entities.ProductHistory, error) {
 			gotHistoryBranchID = param.BranchId
 			return &entities.ProductHistory{}, nil
+		},
+	}
+	productRepo := &productStockProductStub{
+		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
+			return &entities.ProductUnit{Id: unitID, Unit: "TAB"}, nil
 		},
 	}
 
@@ -104,7 +110,7 @@ func TestCreateProductStockUsesBranchScopedBalance(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID)
 
-	CreateProductStock(repo)(ctx)
+	CreateProductStock(stockRepo, productRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
@@ -126,16 +132,13 @@ func TestCreateProductStockSkipsHistoryWhenUnitLookupFails(t *testing.T) {
 	balanceCalled := false
 	historyCalled := false
 
-	repo := &productStockRepoStub{
+	stockRepo := &productStockRepoStub{
 		createStockFn: func(param request.ProductStock) (*entities.ProductStock, error) {
 			return &entities.ProductStock{
 				Id:        primitive.NewObjectID(),
 				ProductId: productID,
 				UnitId:    unitID,
 			}, nil
-		},
-		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
-			return nil, errors.New("unit lookup failed")
 		},
 		getBalanceFn: func(productId string, unitId string, branchId string) int {
 			balanceCalled = true
@@ -144,6 +147,11 @@ func TestCreateProductStockSkipsHistoryWhenUnitLookupFails(t *testing.T) {
 		createHistoryFn: func(param request.ProductHistory) (*entities.ProductHistory, error) {
 			historyCalled = true
 			return &entities.ProductHistory{}, nil
+		},
+	}
+	productRepo := &productStockProductStub{
+		getUnitByIDFn: func(id string) (*entities.ProductUnit, error) {
+			return nil, errors.New("unit lookup failed")
 		},
 	}
 
@@ -156,7 +164,7 @@ func TestCreateProductStockSkipsHistoryWhenUnitLookupFails(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID)
 
-	CreateProductStock(repo)(ctx)
+	CreateProductStock(stockRepo, productRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
@@ -212,7 +220,7 @@ func TestUpdateProductStockByIdRejectsForeignBranch(t *testing.T) {
 	stockID := primitive.NewObjectID().Hex()
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	repo := &productStockRepoStub{
+	stockRepo := &productStockRepoStub{
 		getStockByIDFn: func(id string) (*entities.ProductStock, error) {
 			return &entities.ProductStock{Id: primitive.NewObjectID(), BranchId: primitive.NewObjectID()}, nil
 		},
@@ -221,6 +229,7 @@ func TestUpdateProductStockByIdRejectsForeignBranch(t *testing.T) {
 			return nil, nil
 		},
 	}
+	productRepo := &productStockProductStub{}
 
 	body := `{"productId":"` + productID + `","unitId":"` + unitID + `","expireDate":"` + now + `","importDate":"` + now + `"}`
 	req := httptest.NewRequest(http.MethodPut, "/products/stocks/"+stockID, strings.NewReader(body))
@@ -232,7 +241,7 @@ func TestUpdateProductStockByIdRejectsForeignBranch(t *testing.T) {
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 	ctx.Set("UserId", "user-1")
 
-	UpdateProductStockById(repo)(ctx)
+	UpdateProductStockById(stockRepo, productRepo)(ctx)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
@@ -242,7 +251,7 @@ func TestUpdateProductStockByIdRejectsForeignBranch(t *testing.T) {
 func TestUpdateProductStockQuantityByIdRejectsForeignBranch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	repo := &productStockRepoStub{
+	stockRepo := &productStockRepoStub{
 		getStockByIDFn: func(id string) (*entities.ProductStock, error) {
 			return &entities.ProductStock{Id: primitive.NewObjectID(), BranchId: primitive.NewObjectID()}, nil
 		},
@@ -251,6 +260,7 @@ func TestUpdateProductStockQuantityByIdRejectsForeignBranch(t *testing.T) {
 			return nil, nil
 		},
 	}
+	productRepo := &productStockProductStub{}
 
 	req := httptest.NewRequest(http.MethodPatch, "/products/stocks/"+primitive.NewObjectID().Hex()+"/quantity", strings.NewReader(`{"quantity":2}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -261,7 +271,7 @@ func TestUpdateProductStockQuantityByIdRejectsForeignBranch(t *testing.T) {
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 	ctx.Set("UserId", "user-1")
 
-	UpdateProductStockQuantityById(repo)(ctx)
+	UpdateProductStockQuantityById(stockRepo, productRepo)(ctx)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
@@ -271,7 +281,7 @@ func TestUpdateProductStockQuantityByIdRejectsForeignBranch(t *testing.T) {
 func TestRemoveProductStockByIdRejectsForeignBranch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	repo := &productStockRepoStub{
+	stockRepo := &productStockRepoStub{
 		getStockByIDFn: func(id string) (*entities.ProductStock, error) {
 			return &entities.ProductStock{Id: primitive.NewObjectID(), BranchId: primitive.NewObjectID()}, nil
 		},
@@ -280,6 +290,7 @@ func TestRemoveProductStockByIdRejectsForeignBranch(t *testing.T) {
 			return nil, nil
 		},
 	}
+	productRepo := &productStockProductStub{}
 
 	req := httptest.NewRequest(http.MethodDelete, "/products/stocks/"+primitive.NewObjectID().Hex(), nil)
 	w := httptest.NewRecorder()
@@ -289,7 +300,7 @@ func TestRemoveProductStockByIdRejectsForeignBranch(t *testing.T) {
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 	ctx.Set("UserId", "user-1")
 
-	RemoveProductStockById(repo)(ctx)
+	RemoveProductStockById(stockRepo, productRepo)(ctx)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)

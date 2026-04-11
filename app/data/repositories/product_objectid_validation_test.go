@@ -40,25 +40,6 @@ func TestCreateProductUnitByProductIdRejectsInvalidProductID(t *testing.T) {
 	}
 }
 
-func TestCreateProductStockByProductAndUnitIdRejectsInvalidIDs(t *testing.T) {
-	entity := &productEntity{}
-	param := request.Product{
-		BranchId: "507f1f77bcf86cd799439011",
-	}
-
-	if _, err := entity.CreateProductStockByProductAndUnitId("invalid-id", "507f1f77bcf86cd799439012", param); err == nil {
-		t.Fatal("expected invalid product id error")
-	}
-	if _, err := entity.CreateProductStockByProductAndUnitId("507f1f77bcf86cd799439011", "invalid-id", param); err == nil {
-		t.Fatal("expected invalid unit id error")
-	}
-
-	param.BranchId = "invalid-id"
-	if _, err := entity.CreateProductStockByProductAndUnitId("507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012", param); err == nil {
-		t.Fatal("expected invalid branch id error")
-	}
-}
-
 func TestCreateProductPriceWithContextRejectsInvalidIDs(t *testing.T) {
 	entity := &productEntity{}
 
@@ -86,7 +67,7 @@ func TestCreateProductUnitWithContextRejectsInvalidProductID(t *testing.T) {
 }
 
 func TestCreateProductStockWithContextRejectsInvalidIDs(t *testing.T) {
-	entity := &productEntity{}
+	entity := &productStockEntity{}
 	param := request.ProductStock{
 		BranchId:   "507f1f77bcf86cd799439011",
 		ProductId:  "507f1f77bcf86cd799439012",
@@ -114,7 +95,7 @@ func TestCreateProductStockWithContextRejectsInvalidIDs(t *testing.T) {
 }
 
 func TestGetProductStockByIdRejectsInvalidObjectID(t *testing.T) {
-	entity := &productEntity{}
+	entity := &productStockEntity{}
 
 	if _, err := entity.GetProductStockById("invalid-id"); err == nil {
 		t.Fatal("expected invalid object id error")
@@ -122,7 +103,7 @@ func TestGetProductStockByIdRejectsInvalidObjectID(t *testing.T) {
 }
 
 func TestGetProductStocksByProductIdRejectsInvalidIDs(t *testing.T) {
-	entity := &productEntity{}
+	entity := &productStockEntity{}
 
 	if _, err := entity.GetProductStocksByProductId("invalid-id", ""); err == nil {
 		t.Fatal("expected invalid product id error")
@@ -134,7 +115,7 @@ func TestGetProductStocksByProductIdRejectsInvalidIDs(t *testing.T) {
 }
 
 func TestCreateProductHistoryWithContextRejectsInvalidIDs(t *testing.T) {
-	entity := &productEntity{}
+	entity := &productStockEntity{}
 
 	if _, err := entity.createProductHistoryWithContext(context.Background(), request.ProductHistory{
 		BranchId:  "invalid-id",
@@ -152,7 +133,7 @@ func TestCreateProductHistoryWithContextRejectsInvalidIDs(t *testing.T) {
 }
 
 func TestGetProductStockBalanceWithContextRejectsInvalidIDs(t *testing.T) {
-	entity := &productEntity{}
+	entity := &productStockEntity{}
 
 	if _, err := entity.getProductStockBalanceWithContext(context.Background(), "invalid-id", "507f1f77bcf86cd799439011", ""); err == nil {
 		t.Fatal("expected invalid product id error")

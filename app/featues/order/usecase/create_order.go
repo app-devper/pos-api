@@ -27,6 +27,7 @@ type soldFirstAdjustment struct {
 func CreateOrder(
 	orderEntity repositories.IOrder,
 	productEntity repositories.IProduct,
+	productStock repositories.IProductStock,
 	sequenceEntity repositories.ISequence,
 ) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
@@ -64,10 +65,10 @@ func CreateOrder(
 		var createdHistoryIDs []string
 		rollback := func(cause error) {
 			for i := len(createdHistoryIDs) - 1; i >= 0; i-- {
-				_, _ = productEntity.RemoveProductHistoryById(createdHistoryIDs[i])
+				_, _ = productStock.RemoveProductHistoryById(createdHistoryIDs[i])
 			}
 			for i := len(stockAdjustments) - 1; i >= 0; i-- {
-				_, _ = productEntity.AddProductStockQuantityById(stockAdjustments[i].stockId, stockAdjustments[i].quantity)
+				_, _ = productStock.AddProductStockQuantityById(stockAdjustments[i].stockId, stockAdjustments[i].quantity)
 			}
 			for i := len(soldFirstAdjustments) - 1; i >= 0; i-- {
 				_, _ = productEntity.AddQuantitySoldFirstById(soldFirstAdjustments[i].productId, soldFirstAdjustments[i].quantity)
@@ -92,7 +93,7 @@ func CreateOrder(
 				// Update stock quantity
 				for _, itemStock := range item.Stocks {
 					if itemStock.StockId != "" {
-						stock, err := productEntity.RemoveProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+						stock, err := productStock.RemoveProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
 						if err != nil {
 							rollback(fmt.Errorf("failed to update stock for product %s: %w", item.ProductId, err))
 							return
@@ -127,10 +128,10 @@ func CreateOrder(
 					rollback(fmt.Errorf("failed to load unit for product %s: %w", item.ProductId, err))
 					return
 				}
-				balance := productEntity.GetProductStockBalance(item.ProductId, unit.Id.Hex(), req.BranchId)
+				balance := productStock.GetProductStockBalance(item.ProductId, unit.Id.Hex(), req.BranchId)
 				history := request.AddOrderItemProductHistory(item.ProductId, unit.Unit, item, balance, req.CreatedBy)
 				history.BranchId = req.BranchId
-				createdHistory, err := productEntity.CreateProductHistory(history)
+				createdHistory, err := productStock.CreateProductHistory(history)
 				if err != nil {
 					rollback(fmt.Errorf("failed to create product history for product %s: %w", item.ProductId, err))
 					return

@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetDeadStockProducts(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetDeadStockProducts(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		daysStr := ctx.DefaultQuery("days", "90")
 		days, err := strconv.Atoi(daysStr)
@@ -20,7 +20,7 @@ func GetDeadStockProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 			return
 		}
 		branchId := ctx.GetString("BranchId")
-		result, err := productEntity.GetDeadStockProducts(days, branchId)
+		result, err := productStock.GetDeadStockProducts(days, branchId)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"branchId": branchId,

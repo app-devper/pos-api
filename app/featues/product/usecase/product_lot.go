@@ -86,7 +86,7 @@ func DeleteLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetProductLotsExpireNotify(productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		location := utils.GetLocation()
 		today := time.Now().In(location)
@@ -96,7 +96,7 @@ func GetProductLotsExpireNotify(productEntity repositories.IProduct) gin.Handler
 			StartDate: request.NewFlexibleTime(startDate.UTC()),
 			EndDate:   request.NewFlexibleTime(endDate.UTC()),
 		}
-		result, err := productEntity.GetExpiringProductStocks(req, ctx.GetString("BranchId"))
+		result, err := productStock.GetExpiringProductStocks(req, ctx.GetString("BranchId"))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return

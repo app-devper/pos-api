@@ -60,7 +60,7 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 	}
 }
 
-func CreateProductReceive(productEntity repositories.IProduct, receiveEntity repositories.IReceive) gin.HandlerFunc {
+func CreateProductReceive(productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.Product{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -70,7 +70,6 @@ func CreateProductReceive(productEntity repositories.IProduct, receiveEntity rep
 		userId := ctx.GetString("UserId")
 		req.CreatedBy = userId
 		req.BranchId = ctx.GetString("BranchId")
-		_ = receiveEntity
 		product, err := productEntity.CreateProductReceive(req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
@@ -124,7 +123,7 @@ func DeleteProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 	}
 }
 
-func GetProductById(productEntity repositories.IProduct) gin.HandlerFunc {
+func GetProductById(productEntity repositories.IProduct, productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
 		product, err := productEntity.GetProductById(id)
@@ -145,7 +144,7 @@ func GetProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		stocks, err := productEntity.GetProductStocksByProductId(id, branchId)
+		stocks, err := productStock.GetProductStocksByProductId(id, branchId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
@@ -179,7 +178,7 @@ func GetProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 	}
 }
 
-func UpdateProductById(productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductById(productEntity repositories.IProduct, productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
 		req := request.UpdateProduct{}
@@ -195,7 +194,7 @@ func UpdateProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 			return
 		}
 
-		appendProductMasterHistory(ctx.GetString("BranchId"), productEntity, func(branchId string) request.ProductHistory {
+		appendProductMasterHistory(ctx.GetString("BranchId"), productStock, func(branchId string) request.ProductHistory {
 			updProdHistory := request.UpdateProductHistory(id, req)
 			updProdHistory.BranchId = branchId
 			return updProdHistory
@@ -217,9 +216,9 @@ func ClearQuantitySoldFirstById(productEntity repositories.IProduct) gin.Handler
 	}
 }
 
-func appendProductMasterHistory(branchId string, productEntity repositories.IProduct, buildHistory func(branchId string) request.ProductHistory) {
+func appendProductMasterHistory(branchId string, productStock repositories.IProductStock, buildHistory func(branchId string) request.ProductHistory) {
 	history := buildHistory(branchId)
-	if _, err := productEntity.CreateProductHistory(history); err != nil {
+	if _, err := productStock.CreateProductHistory(history); err != nil {
 		logrus.WithError(err).WithField("branchId", branchId).Error("failed to create product history")
 	}
 }

@@ -11,6 +11,7 @@ type Repository struct {
 	Category        repositories.ICategory
 	Order           repositories.IOrder
 	Product         repositories.IProduct
+	ProductStock    repositories.IProductStock
 	Customer        repositories.ICustomer
 	Supplier        repositories.ISupplier
 	Receive         repositories.IReceive
@@ -31,6 +32,7 @@ func InitRepository(resource *db.Resource) *Repository {
 		Sequence:        repositories.NewSequenceEntity(resource),
 		Customer:        repositories.NewCustomerEntity(resource),
 		Product:         repositories.NewProductEntity(resource),
+		ProductStock:    repositories.NewProductStockEntity(resource),
 		Supplier:        repositories.NewSupplierEntity(resource),
 		Receive:         repositories.NewReceiveEntity(resource),
 		Branch:          repositories.NewBranchEntity(resource),

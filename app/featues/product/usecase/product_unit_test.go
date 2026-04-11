@@ -39,6 +39,15 @@ func (s *productUnitRepoStub) CreateProductHistory(param request.ProductHistory)
 	return s.createHistoryFn(param)
 }
 
+type productUnitStockStub struct {
+	repositories.IProductStock
+	createHistoryFn func(param request.ProductHistory) (*entities.ProductHistory, error)
+}
+
+func (s *productUnitStockStub) CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error) {
+	return s.createHistoryFn(param)
+}
+
 func TestCreateProductUnitUsesTransactionalCascadeMethod(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -154,7 +163,11 @@ func TestUpdateProductUnitByIdLogsHistoryFailureButReturnsSuccess(t *testing.T) 
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID)
 
-	UpdateProductUnitById(repo)(ctx)
+	stockRepo := &productUnitStockStub{
+		createHistoryFn: repo.createHistoryFn,
+	}
+
+	UpdateProductUnitById(repo, stockRepo)(ctx)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)

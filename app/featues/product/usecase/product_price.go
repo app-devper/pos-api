@@ -52,7 +52,7 @@ func GetProductPricesByProductId(productEntity repositories.IProduct) gin.Handle
 	}
 }
 
-func UpdateProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductPriceById(productEntity repositories.IProduct, productStock repositories.IProductStock) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductPrice{}
 		id := ctx.Param("priceId")
@@ -75,7 +75,7 @@ func UpdateProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		appendProductPriceHistory(ctx.GetString("BranchId"), productEntity, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+		appendProductPriceHistory(ctx.GetString("BranchId"), productEntity, productStock, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
 			updPriceHistory := request.UpdateProductPriceHistory(req.ProductId, unit.Unit, req)
 			updPriceHistory.BranchId = branchId
 			return updPriceHistory
@@ -100,7 +100,7 @@ func RemoveProductPriceById(productEntity repositories.IProduct) gin.HandlerFunc
 	}
 }
 
-func appendProductPriceHistory(branchId string, productEntity repositories.IProduct, unitId string, buildHistory func(unit *entities.ProductUnit, branchId string) request.ProductHistory) {
+func appendProductPriceHistory(branchId string, productEntity repositories.IProduct, productStock repositories.IProductStock, unitId string, buildHistory func(unit *entities.ProductUnit, branchId string) request.ProductHistory) {
 	unit, err := productEntity.GetProductUnitById(unitId)
 	if err != nil {
 		logrus.WithError(err).WithField("unitId", unitId).Error("failed to load product unit for price history")
@@ -112,7 +112,7 @@ func appendProductPriceHistory(branchId string, productEntity repositories.IProd
 	}
 
 	history := buildHistory(unit, branchId)
-	if _, err = productEntity.CreateProductHistory(history); err != nil {
+	if _, err = productStock.CreateProductHistory(history); err != nil {
 		logrus.WithError(err).WithField("unitId", unitId).Error("failed to create product price history")
 	}
 }
