@@ -25,6 +25,8 @@
 
 - Frontend คาดหวังสถานะ active/inactive ที่สะท้อนตรงกับสิทธิ์ใช้งานจริง
 - Backend ต้องป้องกันการใช้งาน employee ที่ไม่พร้อมใช้งานใน flow ที่จำเป็น
+- การลบ employee ควรเก็บ record ไว้ในเชิงประวัติ (`ARCHIVED`) แทน hard delete
+- Middleware ที่ resolve employee context ต้อง reject employee ที่ inactive หรือ archived
 
 ## Error Cases
 
@@ -32,3 +34,4 @@
 - duplicate identifier ตามที่ธุรกิจกำหนด
 - employee not found
 - invalid state transition or unsupported action
+- inactive or archived employee used in protected flow

@@ -15,6 +15,7 @@
 
 - Frontend คาดหวังรายการโปรโมชันที่ filter ตามสถานะหรือช่วงเวลาได้
 - Detail ต้องมีข้อมูล code, name, type, value, date range, status และเงื่อนไขที่เกี่ยวข้อง
+- Promotion detail/read-update-delete ต้องถูกจำกัดตาม `branchId` ของ session
 
 ### 2. Create / Update Promotion
 
@@ -26,6 +27,7 @@
 
 - Frontend คาดหวังการเปลี่ยนสถานะที่สะท้อนผลกับ POS ได้ตรง
 - Backend ต้องเป็น source of truth ของสถานะจริงและการหมดอายุ
+- การลบจากหน้า manage ควรตีความเป็นการปิดใช้งาน (`INACTIVE`) มากกว่า hard delete
 
 ### 4. POS Consumption
 
@@ -38,3 +40,4 @@
 - invalid date range
 - invalid discount configuration
 - apply promotion not allowed for current cart
+- cross-branch promotion access
