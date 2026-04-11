@@ -238,7 +238,7 @@ func getSalesReportItems(orderEntity repositories.IOrder, productEntity reposito
 			continue
 		}
 		order := orderMap[oi.OrderId.Hex()]
-		if order == nil || order.Status != constant.ACTIVE {
+		if order == nil || !constant.IsConfirmedOrderStatus(order.Status) {
 			continue
 		}
 		items = append(items, pharmacyReportItem{

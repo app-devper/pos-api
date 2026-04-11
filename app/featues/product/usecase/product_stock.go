@@ -56,19 +56,29 @@ func UpdateProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStock{}
 		id := ctx.Param("stockId")
+		branchId := ctx.GetString("BranchId")
 		if err := ctx.ShouldBind(&req); err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
+			return
+		}
+		stock, err := productEntity.GetProductStockById(id)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
+			abortProductBranchMismatch(ctx)
 			return
 		}
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 
-		stock, err := productEntity.UpdateProductStockById(id, req)
+		stock, err = productEntity.UpdateProductStockById(id, req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		appendProductStockHistory(ctx.GetString("BranchId"), productEntity, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+		appendProductStockHistory(branchId, productEntity, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
 			balance := productEntity.GetProductStockBalance(req.ProductId, unit.Id.Hex(), branchId)
 			updateHistory := request.UpdateProductStockHistory(req.ProductId, unit.Unit, req, balance)
 			updateHistory.BranchId = branchId
@@ -83,19 +93,29 @@ func UpdateProductStockQuantityById(productEntity repositories.IProduct) gin.Han
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockQuantity{}
 		id := ctx.Param("stockId")
+		branchId := ctx.GetString("BranchId")
 		if err := ctx.ShouldBind(&req); err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
+			return
+		}
+		stock, err := productEntity.GetProductStockById(id)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
+			abortProductBranchMismatch(ctx)
 			return
 		}
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 
-		stock, err := productEntity.UpdateProductStockQuantityById(id, req.Quantity)
+		stock, err = productEntity.UpdateProductStockQuantityById(id, req.Quantity)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
 			return
 		}
-		appendProductStockHistory(ctx.GetString("BranchId"), productEntity, stock.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+		appendProductStockHistory(branchId, productEntity, stock.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
 			balance := productEntity.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex(), branchId)
 			qtyHistory := request.UpdateProductStockQuantityHistory(stock.ProductId.Hex(), unit.Unit, req, balance)
 			qtyHistory.BranchId = branchId
@@ -110,6 +130,16 @@ func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 	return func(ctx *gin.Context) {
 		id := ctx.Param("stockId")
 		userId := ctx.GetString("UserId")
+		branchId := ctx.GetString("BranchId")
+		stock, err := productEntity.GetProductStockById(id)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			return
+		}
+		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
+			abortProductBranchMismatch(ctx)
+			return
+		}
 
 		result, err := productEntity.RemoveProductStockById(id)
 		if err != nil {
@@ -117,7 +147,7 @@ func RemoveProductStockById(productEntity repositories.IProduct) gin.HandlerFunc
 			return
 		}
 
-		appendProductStockHistory(ctx.GetString("BranchId"), productEntity, result.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
+		appendProductStockHistory(branchId, productEntity, result.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
 			balance := productEntity.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex(), branchId)
 			removeHistory := request.RemoveProductStockHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId)
 			removeHistory.BranchId = branchId

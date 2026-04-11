@@ -12,6 +12,7 @@ type Supplier struct {
 	Address     string             `bson:"address" json:"address"`
 	Phone       string             `bson:"phone" json:"phone"`
 	TaxId       string             `bson:"taxId" json:"taxId"`
+	Status      string             `bson:"status" json:"status"`
 	CreatedBy   string             `bson:"createdBy" json:"-"`
 	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy   string             `bson:"updatedBy" json:"-"`

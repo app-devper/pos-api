@@ -26,7 +26,7 @@ type IBranch interface {
 	GetBranchByCode(code string) (*entities.Branch, error)
 	UpdateBranchById(id string, form request.UpdateBranch) (*entities.Branch, error)
 	UpdateBranchStatusById(id string, form request.UpdateBranchStatus) (*entities.Branch, error)
-	RemoveBranchById(id string) (*entities.Branch, error)
+	RemoveBranchById(id string, updatedBy string) (*entities.Branch, error)
 }
 
 func NewBranchEntity(resource *db.Resource) IBranch {
@@ -173,7 +173,7 @@ func (entity *branchEntity) UpdateBranchStatusById(id string, form request.Updat
 	return &data, nil
 }
 
-func (entity *branchEntity) RemoveBranchById(id string) (*entities.Branch, error) {
+func (entity *branchEntity) RemoveBranchById(id string, updatedBy string) (*entities.Branch, error) {
 	logrus.Info("RemoveBranchById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -183,8 +183,17 @@ func (entity *branchEntity) RemoveBranchById(id string) (*entities.Branch, error
 		return nil, err
 	}
 
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+
 	data := entities.Branch{}
-	err = entity.branchRepo.FindOneAndDelete(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.branchRepo.FindOneAndUpdate(ctx, bson.M{"_id": objectId}, bson.M{"$set": bson.M{
+		"status":      constant.INACTIVE,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

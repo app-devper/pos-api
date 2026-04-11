@@ -17,7 +17,7 @@ func GetOrderItemDetailsByProductId(orderEntity repositories.IOrder) gin.Handler
 			req.EndDate = request.NewFlexibleTime(time.Now())
 		}
 		productId := ctx.Param("productId")
-		result, err := orderEntity.GetOrderItemOrderDetailsByProductId(productId, req)
+		result, err := orderEntity.GetOrderItemOrderDetailsByProductId(productId, ctx.GetString("BranchId"), req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return

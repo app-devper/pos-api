@@ -185,7 +185,7 @@ func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, product
 			continue
 		}
 		order := orderMap[oi.OrderId.Hex()]
-		if order == nil || order.Status != constant.ACTIVE {
+		if order == nil || !constant.IsConfirmedOrderStatus(order.Status) {
 			continue
 		}
 		w.Write([]string{

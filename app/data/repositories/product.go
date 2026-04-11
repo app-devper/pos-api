@@ -2663,7 +2663,7 @@ func buildDeadStockProductsPipeline(cutoff time.Time, branchId string) ([]bson.M
 					"pipeline": bson.A{
 						bson.M{"$match": bson.M{"$expr": bson.M{"$and": bson.A{
 							bson.M{"$eq": bson.A{"$_id", "$$oid"}},
-							bson.M{"$eq": bson.A{"$status", constant.ACTIVE}},
+							bson.M{"$in": bson.A{"$status", bson.A{constant.ACTIVE, constant.CONFIRMED}}},
 						}}}},
 						bson.M{"$project": bson.M{"_id": 1}},
 					},

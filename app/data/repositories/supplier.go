@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -22,7 +23,7 @@ type ISupplier interface {
 	GetSupplierByClientId(id string) (*entities.Supplier, error)
 	GetSupplierById(id string) (*entities.Supplier, error)
 	GetSuppliersByIds(ids []string) ([]entities.Supplier, error)
-	RemoveSupplierById(id string) (*entities.Supplier, error)
+	RemoveSupplierById(id string, updatedBy string) (*entities.Supplier, error)
 	GetSuppliers() ([]entities.Supplier, error)
 	CreateOrUpdateSupplierByClientId(id string, form request.Supplier) (*entities.Supplier, error)
 	CreateSupplier(form request.Supplier) (*entities.Supplier, error)
@@ -98,16 +99,25 @@ func (entity *supplierEntity) GetSuppliersByIds(ids []string) ([]entities.Suppli
 	return items, nil
 }
 
-func (entity *supplierEntity) RemoveSupplierById(id string) (*entities.Supplier, error) {
+func (entity *supplierEntity) RemoveSupplierById(id string, updatedBy string) (*entities.Supplier, error) {
 	logrus.Info("RemoveSupplierById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	data := entities.Supplier{}
 	obId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	err = entity.supplierRepo.FindOneAndDelete(ctx, bson.M{"_id": obId}).Decode(&data)
+
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	data := entities.Supplier{}
+	err = entity.supplierRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+		"status":      constant.INACTIVE,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +164,7 @@ func (entity *supplierEntity) CreateOrUpdateSupplierByClientId(id string, form r
 		"$setOnInsert": bson.M{
 			"_id":         primitive.NewObjectID(),
 			"clientId":    id,
+			"status":      constant.ACTIVE,
 			"createdBy":   form.UpdatedBy,
 			"createdDate": now,
 		},
@@ -174,6 +185,7 @@ func (entity *supplierEntity) CreateSupplier(form request.Supplier) (*entities.S
 	data.Address = form.Address
 	data.Phone = form.Phone
 	data.TaxId = form.TaxId
+	data.Status = constant.ACTIVE
 	data.CreatedBy = form.UpdatedBy
 	data.CreatedDate = time.Now()
 	data.UpdatedBy = form.UpdatedBy

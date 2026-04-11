@@ -3,6 +3,7 @@ package usecase
 import (
 	"net/http"
 	"pos/app/core/errcode"
+	"pos/app/core/utils"
 	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,7 @@ import (
 func DeleteSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("supplierId")
-		result, err := supplierEntity.RemoveSupplierById(id)
+		result, err := supplierEntity.RemoveSupplierById(id, utils.GetUserId(ctx))
 		if err != nil {
 			logrus.WithError(err).WithField("supplierId", id).Error("delete supplier failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())

@@ -53,7 +53,7 @@ func GetSalesReportExcel(orderEntity repositories.IOrder) gin.HandlerFunc {
 
 		rowIndex := 0
 		for _, order := range orders {
-			if order.Status != constant.ACTIVE {
+			if !constant.IsConfirmedOrderStatus(order.Status) {
 				continue
 			}
 			totalOrders++

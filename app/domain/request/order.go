@@ -52,3 +52,7 @@ type GetOrderRange struct {
 type UpdateCustomerCode struct {
 	CustomerCode string `json:"customerCode"`
 }
+
+type CancelOrderAction struct {
+	Reason string `json:"reason"`
+}

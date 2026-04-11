@@ -20,6 +20,7 @@ type Order struct {
 	BuyerName      string             `bson:"buyerName,omitempty" json:"buyerName,omitempty"`
 	BuyerIdCard    string             `bson:"buyerIdCard,omitempty" json:"buyerIdCard,omitempty"`
 	Status         string             `bson:"status" json:"status"`
+	CancelReason   string             `bson:"cancelReason,omitempty" json:"cancelReason,omitempty"`
 	CreatedBy      string             `bson:"createdBy" json:"-"`
 	CreatedDate    time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy      string             `bson:"updatedBy" json:"-"`
@@ -44,6 +45,7 @@ type OrderDetail struct {
 	BuyerName      string                   `bson:"buyerName,omitempty" json:"buyerName,omitempty"`
 	BuyerIdCard    string                   `bson:"buyerIdCard,omitempty" json:"buyerIdCard,omitempty"`
 	Status         string                   `bson:"status" json:"status"`
+	CancelReason   string                   `bson:"cancelReason,omitempty" json:"cancelReason,omitempty"`
 	CreatedBy      string                   `bson:"createdBy" json:"-"`
 	CreatedDate    time.Time                `bson:"createdDate" json:"createdDate"`
 	UpdatedBy      string                   `bson:"updatedBy" json:"-"`
@@ -63,56 +65,62 @@ type OrderItemStock struct {
 }
 
 type OrderItem struct {
-	Id          primitive.ObjectID `bson:"_id" json:"id"`
-	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
-	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
-	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
-	Stocks      []OrderItemStock   `bson:"stocks" json:"stocks"`
-	Quantity    int                `bson:"quantity" json:"quantity"`
-	Price       float64            `bson:"price" json:"price"`
-	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
-	Discount    float64            `bson:"discount" json:"discount"`
-	CreatedBy   string             `bson:"createdBy" json:"-"`
-	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"-"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
+	Id           primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId     primitive.ObjectID `bson:"branchId" json:"branchId"`
+	OrderId      primitive.ObjectID `bson:"orderId" json:"orderId"`
+	ProductId    primitive.ObjectID `bson:"productId" json:"productId"`
+	UnitId       primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Status       string             `bson:"status,omitempty" json:"status,omitempty"`
+	CancelReason string             `bson:"cancelReason,omitempty" json:"cancelReason,omitempty"`
+	Stocks       []OrderItemStock   `bson:"stocks" json:"stocks"`
+	Quantity     int                `bson:"quantity" json:"quantity"`
+	Price        float64            `bson:"price" json:"price"`
+	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
+	Discount     float64            `bson:"discount" json:"discount"`
+	CreatedBy    string             `bson:"createdBy" json:"-"`
+	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy    string             `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
 }
 
 type OrderItemProductDetail struct {
-	Id          primitive.ObjectID `bson:"_id" json:"id"`
-	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
-	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
-	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
-	Stocks      []OrderItemStock   `bson:"stocks" json:"stocks"`
-	Quantity    int                `bson:"quantity" json:"quantity"`
-	Price       float64            `bson:"price" json:"price"`
-	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
-	Discount    float64            `bson:"discount" json:"discount"`
-	CreatedBy   string             `bson:"createdBy" json:"-"`
-	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"-"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
-	Product     Product            `bson:"product" json:"product"`
+	Id           primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId     primitive.ObjectID `bson:"branchId" json:"branchId"`
+	OrderId      primitive.ObjectID `bson:"orderId" json:"orderId"`
+	ProductId    primitive.ObjectID `bson:"productId" json:"productId"`
+	UnitId       primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Status       string             `bson:"status,omitempty" json:"status,omitempty"`
+	CancelReason string             `bson:"cancelReason,omitempty" json:"cancelReason,omitempty"`
+	Stocks       []OrderItemStock   `bson:"stocks" json:"stocks"`
+	Quantity     int                `bson:"quantity" json:"quantity"`
+	Price        float64            `bson:"price" json:"price"`
+	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
+	Discount     float64            `bson:"discount" json:"discount"`
+	CreatedBy    string             `bson:"createdBy" json:"-"`
+	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy    string             `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
+	Product      Product            `bson:"product" json:"product"`
 }
 
 type OrderItemOrderDetail struct {
-	Id          primitive.ObjectID `bson:"_id" json:"id"`
-	BranchId    primitive.ObjectID `bson:"branchId" json:"branchId"`
-	OrderId     primitive.ObjectID `bson:"orderId" json:"orderId"`
-	ProductId   primitive.ObjectID `bson:"productId" json:"productId"`
-	UnitId      primitive.ObjectID `bson:"unitId" json:"unitId"`
-	Stocks      []OrderItemStock   `bson:"stocks" json:"stocks"`
-	Quantity    int                `bson:"quantity" json:"quantity"`
-	Price       float64            `bson:"price" json:"price"`
-	CostPrice   float64            `bson:"costPrice" json:"costPrice"`
-	Discount    float64            `bson:"discount" json:"discount"`
-	CreatedBy   string             `bson:"createdBy" json:"-"`
-	CreatedDate time.Time          `bson:"createdDate" json:"createdDate"`
-	UpdatedBy   string             `bson:"updatedBy" json:"-"`
-	UpdatedDate time.Time          `bson:"updatedDate" json:"-"`
-	Order       Order              `bson:"order" json:"order"`
+	Id           primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId     primitive.ObjectID `bson:"branchId" json:"branchId"`
+	OrderId      primitive.ObjectID `bson:"orderId" json:"orderId"`
+	ProductId    primitive.ObjectID `bson:"productId" json:"productId"`
+	UnitId       primitive.ObjectID `bson:"unitId" json:"unitId"`
+	Status       string             `bson:"status,omitempty" json:"status,omitempty"`
+	CancelReason string             `bson:"cancelReason,omitempty" json:"cancelReason,omitempty"`
+	Stocks       []OrderItemStock   `bson:"stocks" json:"stocks"`
+	Quantity     int                `bson:"quantity" json:"quantity"`
+	Price        float64            `bson:"price" json:"price"`
+	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
+	Discount     float64            `bson:"discount" json:"discount"`
+	CreatedBy    string             `bson:"createdBy" json:"-"`
+	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy    string             `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
+	Order        Order              `bson:"order" json:"order"`
 }
 
 type OrderSummary struct {
