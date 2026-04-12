@@ -10,6 +10,7 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
@@ -265,5 +266,44 @@ func TestUpdateReceiveByIdFailsWhenExpireDateIsInvalid(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "invalid expireDate") {
 		t.Fatalf("expected invalid expireDate error, got %s", w.Body.String())
+	}
+}
+
+func TestUpdateReceiveByIdRejectsImportedReceive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	receiveRepo := &updateReceiveRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Code: "RC-001", Status: constant.IMPORTED}, nil
+		},
+		updateByIDFn: func(id string, form request.UpdateReceive) (*entities.Receive, error) {
+			t.Fatal("update receive should not be called for imported receive")
+			return nil, nil
+		},
+	}
+	productRepo := &updateReceiveProductStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			t.Fatal("product lookup should not be called for imported receive")
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/receives/"+primitive.NewObjectID().Hex(), strings.NewReader(`{"supplierId":"`+primitive.NewObjectID().Hex()+`","items":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveById(receiveRepo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
+		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }

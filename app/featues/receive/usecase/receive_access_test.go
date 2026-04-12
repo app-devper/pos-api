@@ -9,6 +9,7 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
@@ -187,5 +188,70 @@ func TestUpdateReceiveTotalCostByIdRejectsForeignBranch(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	}
+}
+
+func TestUpdateReceiveItemsByIdRejectsImportedReceive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	repo := &receiveAccessRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.IMPORTED}, nil
+		},
+		updateReceiveItemsByIDFn: func(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
+			t.Fatal("update items should not be called for imported receive")
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPatch, "/receives/1/items", strings.NewReader(`{"items":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveItemsById(repo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
+		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
+	}
+}
+
+func TestUpdateReceiveTotalCostByIdRejectsImportedReceive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	repo := &receiveAccessRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.IMPORTED}, nil
+		},
+		updateReceiveTotalCostFn: func(id string, totalCost float64) (*entities.Receive, error) {
+			t.Fatal("update total cost should not be called for imported receive")
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPatch, "/receives/1/total-cost", strings.NewReader(`{"totalCost":10}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveTotalCostById(repo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
+		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }
