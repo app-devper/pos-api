@@ -21,7 +21,7 @@ type categoryRepoStub struct {
 	getByIDFn       func(id string) (*entities.Category, error)
 	updateByIDFn    func(id string, form request.Category) (*entities.Category, error)
 	updateDefaultFn func(id string) (*entities.Category, error)
-	removeByIDFn    func(id string) (*entities.Category, error)
+	removeByIDFn    func(id string, updatedBy string) (*entities.Category, error)
 }
 
 func (s *categoryRepoStub) CreateCategory(form request.Category) (*entities.Category, error) {
@@ -44,8 +44,8 @@ func (s *categoryRepoStub) UpdateDefaultCategoryById(id string) (*entities.Categ
 	return s.updateDefaultFn(id)
 }
 
-func (s *categoryRepoStub) RemoveCategoryById(id string) (*entities.Category, error) {
-	return s.removeByIDFn(id)
+func (s *categoryRepoStub) RemoveCategoryById(id string, updatedBy string) (*entities.Category, error) {
+	return s.removeByIDFn(id, updatedBy)
 }
 
 func TestCreateCategoryPassesPayload(t *testing.T) {
@@ -196,9 +196,11 @@ func TestDeleteCategoryByIdPassesParam(t *testing.T) {
 
 	categoryID := primitive.NewObjectID().Hex()
 	var gotID string
+	var gotUpdatedBy string
 	repo := &categoryRepoStub{
-		removeByIDFn: func(id string) (*entities.Category, error) {
+		removeByIDFn: func(id string, updatedBy string) (*entities.Category, error) {
 			gotID = id
+			gotUpdatedBy = updatedBy
 			return &entities.Category{Id: primitive.NewObjectID()}, nil
 		},
 	}
@@ -208,6 +210,7 @@ func TestDeleteCategoryByIdPassesParam(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "categoryId", Value: categoryID}}
+	ctx.Set("UserId", "admin-1")
 
 	DeleteCategoryById(repo)(ctx)
 
@@ -216,5 +219,8 @@ func TestDeleteCategoryByIdPassesParam(t *testing.T) {
 	}
 	if gotID != categoryID {
 		t.Fatalf("expected category id %s, got %s", categoryID, gotID)
+	}
+	if gotUpdatedBy != "admin-1" {
+		t.Fatalf("expected UpdatedBy admin-1, got %s", gotUpdatedBy)
 	}
 }

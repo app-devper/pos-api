@@ -18,7 +18,7 @@ type patientRepoStub struct {
 	repositories.IPatient
 	getByIDFn    func(id string, branchId string) (*entities.Patient, error)
 	updateByIDFn func(id string, form request.UpdatePatient, branchId string) (*entities.Patient, error)
-	removeByIDFn func(id string, branchId string) (*entities.Patient, error)
+	removeByIDFn func(id string, branchId string, updatedBy string) (*entities.Patient, error)
 }
 
 func (s *patientRepoStub) GetPatientById(id string, branchId string) (*entities.Patient, error) {
@@ -29,8 +29,8 @@ func (s *patientRepoStub) UpdatePatientById(id string, form request.UpdatePatien
 	return s.updateByIDFn(id, form, branchId)
 }
 
-func (s *patientRepoStub) RemovePatientById(id string, branchId string) (*entities.Patient, error) {
-	return s.removeByIDFn(id, branchId)
+func (s *patientRepoStub) RemovePatientById(id string, branchId string, updatedBy string) (*entities.Patient, error) {
+	return s.removeByIDFn(id, branchId, updatedBy)
 }
 
 func TestGetPatientByIdPassesBranchId(t *testing.T) {
@@ -114,11 +114,13 @@ func TestDeletePatientByIdPassesBranchId(t *testing.T) {
 	branchID := primitive.NewObjectID().Hex()
 	var gotID string
 	var gotBranchID string
+	var gotUpdatedBy string
 
 	repo := &patientRepoStub{
-		removeByIDFn: func(id string, branchId string) (*entities.Patient, error) {
+		removeByIDFn: func(id string, branchId string, updatedBy string) (*entities.Patient, error) {
 			gotID = id
 			gotBranchID = branchId
+			gotUpdatedBy = updatedBy
 			return &entities.Patient{Id: primitive.NewObjectID()}, nil
 		},
 	}
@@ -129,6 +131,7 @@ func TestDeletePatientByIdPassesBranchId(t *testing.T) {
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "id", Value: patientID}}
 	ctx.Set("BranchId", branchID)
+	ctx.Set("UserId", "user-1")
 
 	DeletePatientById(repo)(ctx)
 
@@ -140,5 +143,8 @@ func TestDeletePatientByIdPassesBranchId(t *testing.T) {
 	}
 	if gotBranchID != branchID {
 		t.Fatalf("expected branch id %s, got %s", branchID, gotBranchID)
+	}
+	if gotUpdatedBy != "user-1" {
+		t.Fatalf("expected UpdatedBy user-1, got %s", gotUpdatedBy)
 	}
 }
