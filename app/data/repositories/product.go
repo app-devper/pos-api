@@ -571,15 +571,12 @@ func (entity *productEntity) GetProductsByIds(ids []string) ([]entities.Product,
 	logrus.Info("GetProductsByIds")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objIds := make([]primitive.ObjectID, 0, len(ids))
-	for _, id := range ids {
-		objId, err := primitive.ObjectIDFromHex(id)
-		if err == nil {
-			objIds = append(objIds, objId)
-		}
+	filter, err := buildGetProductsByIDsFilter(ids)
+	if err != nil {
+		return nil, err
 	}
 	var items []entities.Product
-	cursor, err := entity.productsRepo.Find(ctx, bson.M{"_id": bson.M{"$in": objIds}})
+	cursor, err := entity.productsRepo.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -588,6 +585,20 @@ func (entity *productEntity) GetProductsByIds(ids []string) ([]entities.Product,
 		return nil, err
 	}
 	return items, nil
+}
+
+func buildGetProductsByIDsFilter(ids []string) (bson.M, error) {
+	objIds := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		objId, err := primitive.ObjectIDFromHex(id)
+		if err == nil {
+			objIds = append(objIds, objId)
+		}
+	}
+	return bson.M{
+		"_id":         bson.M{"$in": objIds},
+		"deletedDate": bson.M{"$exists": false},
+	}, nil
 }
 
 func (entity *productEntity) RemoveProductById(id string) (*entities.Product, error) {
