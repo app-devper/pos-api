@@ -87,11 +87,13 @@ func DeletePatientById(entity repositories.IPatient) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		branchId := ctx.GetString("BranchId")
-		result, err := entity.RemovePatientById(id, branchId)
+		userId := utils.GetUserId(ctx)
+		result, err := entity.RemovePatientById(id, branchId, userId)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"id":       id,
 				"branchId": branchId,
+				"userId":   userId,
 			}).Error("delete patient failed")
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
 			return

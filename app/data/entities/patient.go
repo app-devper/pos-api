@@ -16,6 +16,7 @@ type Patient struct {
 	Id                 primitive.ObjectID `bson:"_id" json:"id"`
 	BranchId           primitive.ObjectID `bson:"branchId" json:"branchId"`
 	CustomerCode       string             `bson:"customerCode" json:"customerCode"`
+	Status             string             `bson:"status" json:"status"`
 	FirstName          string             `bson:"firstName" json:"firstName"`
 	LastName           string             `bson:"lastName" json:"lastName"`
 	IdCard             string             `bson:"idCard" json:"idCard"`

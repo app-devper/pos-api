@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
 	"strings"
@@ -24,7 +25,7 @@ type ICategory interface {
 	GetCategoryAll() ([]entities.Category, error)
 	CreateCategory(form request.Category) (*entities.Category, error)
 	GetCategoryById(id string) (*entities.Category, error)
-	RemoveCategoryById(id string) (*entities.Category, error)
+	RemoveCategoryById(id string, updatedBy string) (*entities.Category, error)
 	UpdateCategoryById(id string, form request.Category) (*entities.Category, error)
 	UpdateDefaultCategoryById(id string) (*entities.Category, error)
 }
@@ -73,7 +74,14 @@ func (entity *categoryEntity) GetCategoryAll() ([]entities.Category, error) {
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	var items []entities.Category
-	cursor, err := entity.categoryRepo.Find(ctx, bson.M{})
+	cursor, err := entity.categoryRepo.Find(ctx, bson.M{
+		"$or": []bson.M{
+			{"status": bson.M{"$exists": false}},
+			{"status": ""},
+			{"status": constant.ACTIVE},
+			{"status": constant.INACTIVE},
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +100,7 @@ func (entity *categoryEntity) CreateCategory(form request.Category) (*entities.C
 		Id:          primitive.NewObjectID(),
 		Name:        form.Name,
 		Value:       strings.ToUpper(form.Value),
+		Status:      constant.ACTIVE,
 		CreatedDate: time.Now(),
 		UpdatedDate: time.Now(),
 	}
@@ -118,7 +127,7 @@ func (entity *categoryEntity) GetCategoryById(id string) (*entities.Category, er
 	return &data, nil
 }
 
-func (entity *categoryEntity) RemoveCategoryById(id string) (*entities.Category, error) {
+func (entity *categoryEntity) RemoveCategoryById(id string, updatedBy string) (*entities.Category, error) {
 	logrus.Info("RemoveCategoryById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -127,7 +136,15 @@ func (entity *categoryEntity) RemoveCategoryById(id string) (*entities.Category,
 	if err != nil {
 		return nil, err
 	}
-	err = entity.categoryRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	err = entity.categoryRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
+		"status":      constant.ARCHIVED,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

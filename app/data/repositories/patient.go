@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -24,7 +25,7 @@ type IPatient interface {
 	GetPatientById(id string, branchId string) (*entities.Patient, error)
 	GetPatientByCustomerCode(customerCode string, branchId string) (*entities.Patient, error)
 	UpdatePatientById(id string, form request.UpdatePatient, branchId string) (*entities.Patient, error)
-	RemovePatientById(id string, branchId string) (*entities.Patient, error)
+	RemovePatientById(id string, branchId string, updatedBy string) (*entities.Patient, error)
 }
 
 func NewPatientEntity(resource *db.Resource) IPatient {
@@ -66,6 +67,7 @@ func (entity *patientEntity) CreatePatient(form request.Patient) (*entities.Pati
 		Id:                 primitive.NewObjectID(),
 		BranchId:           branchId,
 		CustomerCode:       form.CustomerCode,
+		Status:             constant.ACTIVE,
 		IdCard:             form.IdCard,
 		DateOfBirth:        form.DateOfBirth,
 		Gender:             form.Gender,
@@ -108,6 +110,12 @@ func (entity *patientEntity) GetPatients(branchId string) ([]entities.Patient, e
 			return nil, err
 		}
 		filter["branchId"] = objId
+	}
+	filter["$or"] = []bson.M{
+		{"status": bson.M{"$exists": false}},
+		{"status": ""},
+		{"status": constant.ACTIVE},
+		{"status": constant.INACTIVE},
 	}
 	opts := options.Find().SetSort(bson.M{"createdDate": -1})
 	cursor, err := entity.repo.Find(ctx, filter, opts)
@@ -161,6 +169,12 @@ func (entity *patientEntity) GetPatientByCustomerCode(customerCode string, branc
 		}
 		filter["branchId"] = objId
 	}
+	filter["$or"] = []bson.M{
+		{"status": bson.M{"$exists": false}},
+		{"status": ""},
+		{"status": constant.ACTIVE},
+		{"status": constant.INACTIVE},
+	}
 	data := entities.Patient{}
 	err := entity.repo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
@@ -209,7 +223,7 @@ func (entity *patientEntity) UpdatePatientById(id string, form request.UpdatePat
 	return &data, nil
 }
 
-func (entity *patientEntity) RemovePatientById(id string, branchId string) (*entities.Patient, error) {
+func (entity *patientEntity) RemovePatientById(id string, branchId string, updatedBy string) (*entities.Patient, error) {
 	logrus.Info("RemovePatientById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -225,8 +239,14 @@ func (entity *patientEntity) RemovePatientById(id string, branchId string) (*ent
 		}
 		filter["branchId"] = branchObjID
 	}
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
 	data := entities.Patient{}
-	err = entity.repo.FindOneAndDelete(ctx, filter).Decode(&data)
+	err = entity.repo.FindOneAndUpdate(ctx, filter, bson.M{"$set": bson.M{
+		"status":      constant.ARCHIVED,
+		"updatedBy":   updatedBy,
+		"updatedDate": time.Now(),
+	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
