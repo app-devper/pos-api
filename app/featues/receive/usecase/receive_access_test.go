@@ -17,12 +17,12 @@ import (
 
 type receiveAccessRepoStub struct {
 	repositories.IReceive
-	getReceiveByIDFn         func(id string) (*entities.Receive, error)
-	getReceiveItemsByIDFn    func(receiveId string) ([]entities.ReceiveItem, error)
-	removeReceiveByIDFn      func(id string) (*entities.Receive, error)
-	importReceiveToStockFn   func(receiveId string, userId string, branchId string) (*entities.Receive, error)
-	updateReceiveItemsByIDFn func(id string, form request.UpdateReceiveItems) (*entities.Receive, error)
-	updateReceiveTotalCostFn func(id string, totalCost float64) (*entities.Receive, error)
+	getReceiveByIDFn          func(id string) (*entities.Receive, error)
+	getReceiveItemsByIDFn     func(receiveId string) ([]entities.ReceiveItem, error)
+	updateReceiveStatusByIDFn func(id string, status string, updatedBy string) (*entities.Receive, error)
+	importReceiveToStockFn    func(receiveId string, userId string, branchId string) (*entities.Receive, error)
+	updateReceiveItemsByIDFn  func(id string, form request.UpdateReceiveItems) (*entities.Receive, error)
+	updateReceiveTotalCostFn  func(id string, totalCost float64) (*entities.Receive, error)
 }
 
 func (s *receiveAccessRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
@@ -36,8 +36,8 @@ func (s *receiveAccessRepoStub) GetReceiveItemsByReceiveId(receiveId string) ([]
 	return nil, nil
 }
 
-func (s *receiveAccessRepoStub) RemoveReceiveById(id string) (*entities.Receive, error) {
-	return s.removeReceiveByIDFn(id)
+func (s *receiveAccessRepoStub) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
+	return s.updateReceiveStatusByIDFn(id, status, updatedBy)
 }
 
 func (s *receiveAccessRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
@@ -85,7 +85,7 @@ func TestDeleteReceiveByIdRejectsForeignBranch(t *testing.T) {
 		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
 			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: primitive.NewObjectID()}, nil
 		},
-		removeReceiveByIDFn: func(id string) (*entities.Receive, error) {
+		updateReceiveStatusByIDFn: func(id string, status string, updatedBy string) (*entities.Receive, error) {
 			t.Fatal("delete should not be called for foreign branch")
 			return nil, nil
 		},
