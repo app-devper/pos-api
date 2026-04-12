@@ -64,6 +64,7 @@
 
 - reverse stock / lot / history หากธุรกิจอนุญาต
 - รายงานที่อิง receive ต้องตีความสถานะนี้ให้ถูก
+- หากระบบยังไม่รองรับ reversal ครบถ้วน ต้องปฏิเสธการ cancel เอกสารที่ถูก import เข้า stock แล้ว แทนการลบเอกสารทิ้ง
 
 #### Frontend Behavior
 

@@ -25,6 +25,7 @@
 ### 3. Update and Partial Update
 
 - `PUT /receives/:receiveId` — แก้ไขเอกสารรับสินค้าทั้งชุด
+- `DELETE /receives/:receiveId` — cancel เอกสารรับสินค้าแบบเก็บเอกสารไว้ ไม่ใช่ hard delete
 - `PATCH /receives/:receiveId/total-cost` — อัปเดตต้นทุนรวมของเอกสาร
 - `PATCH /receives/:receiveId/items` — อัปเดตรายการสินค้าในเอกสาร
 - `PATCH /receives/:receiveId/import` — นำเข้าข้อมูลรับสินค้าเข้าสู่ stock (trigger stock/lot/history update)
@@ -42,7 +43,7 @@
 | GET | /receives | ดูรายการเอกสารรับสินค้า |
 | GET | /receives/:receiveId | ดูรายละเอียดเอกสาร |
 | PUT | /receives/:receiveId | แก้ไขเอกสาร |
-| DELETE | /receives/:receiveId | ลบเอกสาร |
+| DELETE | /receives/:receiveId | ยกเลิกเอกสารที่ยังไม่ถูก import |
 | PATCH | /receives/:receiveId/total-cost | อัปเดตต้นทุนรวม |
 | PATCH | /receives/:receiveId/items | อัปเดตรายการสินค้า |
 | PATCH | /receives/:receiveId/import | นำเข้าสู่ stock |
@@ -55,3 +56,4 @@
 - branch context ไม่ถูกต้อง
 - receive not found
 - import ซ้ำ (ถ้ามีการป้องกัน)
+- cancel imported receive not allowed
