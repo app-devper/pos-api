@@ -224,6 +224,44 @@ func TestUpdateReceiveItemsByIdRejectsImportedReceive(t *testing.T) {
 	}
 }
 
+func TestUpdateReceiveItemsByIdFiltersInvalidItemsBeforeRepositoryUpdate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	var gotForm request.UpdateReceiveItems
+	repo := &receiveAccessRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.ACTIVE}, nil
+		},
+		updateReceiveItemsByIDFn: func(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
+			gotForm = form
+			return &entities.Receive{}, nil
+		},
+	}
+
+	body := `{"items":[{"productId":"","costPrice":1,"quantity":1},{"productId":"` + primitive.NewObjectID().Hex() + `","costPrice":5,"quantity":2,"expireDate":"2026-12-31"}]}`
+	req := httptest.NewRequest(http.MethodPatch, "/receives/1/items", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveItemsById(repo)(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if len(gotForm.ReceiveItems) != 1 {
+		t.Fatalf("expected only 1 valid item sent to repository, got %d", len(gotForm.ReceiveItems))
+	}
+	if gotForm.UpdatedBy != "user-1" {
+		t.Fatalf("expected UpdatedBy user-1, got %s", gotForm.UpdatedBy)
+	}
+}
+
 func TestUpdateReceiveTotalCostByIdRejectsImportedReceive(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

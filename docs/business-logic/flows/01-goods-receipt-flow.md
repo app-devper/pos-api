@@ -50,6 +50,7 @@
 - Backend สร้าง product history สำหรับแต่ละรายการ
 - Backend คำนวณ total cost ระดับเอกสาร
 - หากมีการแก้รายการสินค้าในภายหลัง Backend ต้อง sync ทั้ง `receive.items` และ `receive_items` collection เพื่อให้ import/report ใช้ข้อมูลชุดเดียวกัน
+- หากมีการแก้รายการสินค้าในภายหลัง Backend ต้อง recalc `totalCost` จากรายการล่าสุดใน transaction เดียวกันด้วย
 
 ### Step 6: Response and Refresh
 
@@ -76,3 +77,4 @@
 - stock และ lot balance ถูกอัปเดตถูกต้อง
 - มี product history สำหรับการตรวจสอบย้อนหลัง
 - ข้อมูลที่ KHY9/report/import อ่านจาก `receive_items` ต้องตรงกับรายการล่าสุดของเอกสาร
+- `totalCost` ของเอกสารต้องตรงกับ receive items ล่าสุดหลังการแก้ไข

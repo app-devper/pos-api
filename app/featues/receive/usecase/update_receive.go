@@ -113,14 +113,20 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive) gin.HandlerFunc
 			return
 		}
 		req.UpdatedBy = utils.GetUserId(ctx)
+		filteredItems := make([]request.ReceiveItem, 0, len(req.ReceiveItems))
 		for i := range req.ReceiveItems {
+			if req.ReceiveItems[i].ProductId == "" || req.ReceiveItems[i].Quantity <= 0 {
+				continue
+			}
 			expireDate, parseErr := parseReceiveExpireDate(req.ReceiveItems[i].ExpireDate)
 			if parseErr != nil {
 				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, parseErr.Error())
 				return
 			}
 			req.ReceiveItems[i].ExpireDate = expireDate.Time.Format(time.RFC3339)
+			filteredItems = append(filteredItems, req.ReceiveItems[i])
 		}
+		req.ReceiveItems = filteredItems
 
 		result, err := receiveEntity.UpdateReceiveItemsById(receiveId, req)
 		if err != nil {

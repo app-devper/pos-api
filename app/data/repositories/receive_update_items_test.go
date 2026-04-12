@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"pos/app/data/entities"
 	"pos/app/domain/request"
 )
 
@@ -44,5 +45,15 @@ func TestBuildReceiveItemsReturnsErrorForInvalidProductId(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected invalid product id to return an error")
+	}
+}
+
+func TestCalculateReceiveItemsTotalCostSumsCostAndQuantity(t *testing.T) {
+	totalCost := calculateReceiveItemsTotalCost([]entities.ReceiveItem{
+		{CostPrice: 10, Quantity: 2},
+		{CostPrice: 7.5, Quantity: 4},
+	})
+	if totalCost != 50 {
+		t.Fatalf("expected total cost 50, got %f", totalCost)
 	}
 }

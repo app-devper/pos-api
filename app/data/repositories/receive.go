@@ -344,6 +344,7 @@ func (entity *receiveEntity) updateReceiveItemsByIdWithContext(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
+	totalCost := calculateReceiveItemsTotalCost(items)
 
 	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
 		return nil, err
@@ -366,6 +367,7 @@ func (entity *receiveEntity) updateReceiveItemsByIdWithContext(ctx context.Conte
 	data := entities.Receive{}
 	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
 		"items":       items,
+		"totalCost":   totalCost,
 		"updatedBy":   form.UpdatedBy,
 		"updatedDate": time.Now(),
 	}}, opts).Decode(&data)
@@ -398,6 +400,14 @@ func buildReceiveItems(items []request.ReceiveItem) ([]entities.ReceiveItem, err
 		result = append(result, receiveItem)
 	}
 	return result, nil
+}
+
+func calculateReceiveItemsTotalCost(items []entities.ReceiveItem) float64 {
+	var totalCost float64
+	for _, item := range items {
+		totalCost += item.CostPrice * float64(item.Quantity)
+	}
+	return totalCost
 }
 
 func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, productId string, form request.Product) (*entities.ReceiveItem, error) {
