@@ -21,11 +21,13 @@
 - Frontend คาดหวังข้อมูลผู้ป่วยที่แยกส่วนข้อมูลทั่วไปกับข้อมูลสุขภาพได้
 - Backend ต้อง enforce สิทธิ์เข้าถึงข้อมูลสุขภาพ
 - Response ควรมีข้อมูลพอสำหรับ allergy checks, order history และ patient context ใน POS
+- patient record ที่ถูก archive ไม่ควรถูกคืนใน list และ customer-code lookup ปกติ แต่ยังต้องคงอยู่เชิงประวัติ
 
 ### 3. Create / Update Flows
 
 - Request ต้อง map กับ form state ได้ตรง
 - Validation error ควรระบุ field หรือเหตุผลที่นำกลับไปแสดงใน form ได้
+- การลบ patient จากหน้าจัดการควรเก็บเป็น archive semantics แทน hard delete เพื่อไม่ทำลาย clinical history
 
 ## Error Cases
 
@@ -33,3 +35,4 @@
 - insufficient permission for medical data
 - patient flow not available in current frontend feature configuration
 - record not found
+- archived patient omitted from normal lookup
