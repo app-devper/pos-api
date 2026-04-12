@@ -6,6 +6,7 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	"pos/app/data/repositories"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"time"
 
@@ -32,6 +33,10 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 		}
 		if err := ensureReceiveBranchAccess(receive, branchId); err != nil {
 			abortReceiveBranchMismatch(ctx)
+			return
+		}
+		if receive.Status == constant.IMPORTED {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot modify imported receive")
 			return
 		}
 
@@ -103,6 +108,10 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive) gin.HandlerFunc
 			abortReceiveBranchMismatch(ctx)
 			return
 		}
+		if receive.Status == constant.IMPORTED {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot modify imported receive")
+			return
+		}
 		req.UpdatedBy = utils.GetUserId(ctx)
 		for i := range req.ReceiveItems {
 			expireDate, parseErr := parseReceiveExpireDate(req.ReceiveItems[i].ExpireDate)
@@ -138,6 +147,10 @@ func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.Handler
 		}
 		if err := ensureReceiveBranchAccess(receive, utils.GetBranchId(ctx)); err != nil {
 			abortReceiveBranchMismatch(ctx)
+			return
+		}
+		if receive.Status == constant.IMPORTED {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot modify imported receive")
 			return
 		}
 
