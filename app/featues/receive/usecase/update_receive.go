@@ -91,7 +91,7 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 	}
 }
 
-func UpdateReceiveItemsById(receiveEntity repositories.IReceive) gin.HandlerFunc {
+func UpdateReceiveItemsById(receiveEntity repositories.IReceive, productEntity repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateReceiveItems{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -117,6 +117,15 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive) gin.HandlerFunc
 		for i := range req.ReceiveItems {
 			if req.ReceiveItems[i].ProductId == "" || req.ReceiveItems[i].Quantity <= 0 {
 				continue
+			}
+			product, pErr := productEntity.GetProductById(req.ReceiveItems[i].ProductId)
+			if pErr != nil {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Errorf("failed to load product %s: %w", req.ReceiveItems[i].ProductId, pErr).Error())
+				return
+			}
+			if product == nil {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Sprintf("product %s not found", req.ReceiveItems[i].ProductId))
+				return
 			}
 			expireDate, parseErr := parseReceiveExpireDate(req.ReceiveItems[i].ExpireDate)
 			if parseErr != nil {
