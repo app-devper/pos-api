@@ -29,11 +29,13 @@
 - `PATCH /receives/:receiveId/total-cost` — อัปเดตต้นทุนรวมของเอกสาร
 - `PATCH /receives/:receiveId/items` — อัปเดตรายการสินค้าในเอกสาร
 - `PATCH /receives/:receiveId/import` — นำเข้าข้อมูลรับสินค้าเข้าสู่ stock (trigger stock/lot/history update)
+- เมื่อแก้ `items` backend ต้อง sync ทั้ง field `receive.items` และ collection `receive_items` ให้ตรงกัน เพราะ import flow และรายงาน ข.ย.9 อ่านจาก `receive_items`
 
 ### 4. Data Integrity
 
 - ถ้า item ใด item หนึ่งผิด ต้องไม่สร้าง receive ครึ่งทาง
 - Backend ต้องรับประกันความสอดคล้องของ stock, lot และ history เมื่อ create หรือ import สำเร็จ
+- Backend ต้องไม่ปล่อยให้ receive document กับ `receive_items` collection ถือข้อมูลคนละชุดหลังจาก update items
 
 ## Endpoints
 
@@ -57,3 +59,4 @@
 - receive not found
 - import ซ้ำ (ถ้ามีการป้องกัน)
 - cancel imported receive not allowed
+- receive items out of sync with document state ต้องไม่เกิดขึ้นใน flow ปกติ

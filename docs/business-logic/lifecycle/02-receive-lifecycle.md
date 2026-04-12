@@ -28,6 +28,7 @@
 #### Backend Effects
 
 - สร้าง receive document
+- สร้าง receive items records ที่สอดคล้องกับรายการในเอกสาร
 - เพิ่ม stock ตาม base quantity
 - สร้างหรืออัปเดต lot
 - สร้าง product history
@@ -65,6 +66,7 @@
 - reverse stock / lot / history หากธุรกิจอนุญาต
 - รายงานที่อิง receive ต้องตีความสถานะนี้ให้ถูก
 - หากระบบยังไม่รองรับ reversal ครบถ้วน ต้องปฏิเสธการ cancel เอกสารที่ถูก import เข้า stock แล้ว แทนการลบเอกสารทิ้ง
+- หากแก้ไขรายการสินค้าในช่วงที่ยังแก้ได้ ต้อง sync ทั้ง document และ receive items records ก่อนเข้าสู่ downstream flows
 
 #### Frontend Behavior
 
@@ -75,3 +77,4 @@
 
 - ห้ามเพิ่ม stock บางรายการสำเร็จแต่บางรายการล้มเหลวภายใต้เอกสารเดียวกัน
 - เอกสารรับเข้าที่ `CONFIRMED` ต้องเป็นแหล่งอ้างอิงของ stock movement ที่ตรวจสอบย้อนกลับได้
+- รายการสินค้าในเอกสารกับ `receive_items` collection ต้องไม่แยกคนละสถานะ เพราะรายงานและ import flow พึ่งพา collection นี้

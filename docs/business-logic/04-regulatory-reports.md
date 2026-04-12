@@ -66,6 +66,7 @@
 - buyer / pharmacist / licenseNo / prescriber data ต้องครบเมื่อสินค้าอยู่ในกลุ่มควบคุม
 - เลขบัตรประชาชนผู้ซื้อต้องเป็นรูปแบบ X-XXXX-XXXXX-XX-X
 - report data ต้องถูกกรองตาม branch context
+- รายงาน ข.ย.9 ที่ดึงจาก receive / receive items ต้องอาศัยข้อมูล item ที่ sync ตรงกับเอกสารล่าสุดเสมอ
 - หากข้อมูลไม่พอสร้างเอกสาร ต้องแสดงสถานะไม่มีข้อมูล ไม่ใช่สร้างเอกสารผิดรูปแบบ
 
 ## Edge Cases
