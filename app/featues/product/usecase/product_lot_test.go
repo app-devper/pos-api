@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -246,4 +247,31 @@ func TestProductLotHandlersPassBranchId(t *testing.T) {
 			t.Fatalf("expected branchId %s, got %s", branchID, productRepo.lastBranchID)
 		}
 	})
+}
+
+func TestDeleteLotByIdReturnsErrorWhenLotHasRemainingQuantity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	lotID := primitive.NewObjectID().Hex()
+	productRepo := &productLotRepoStub{
+		removeProductLotByIDFn: func(id string, branchId string) (*entities.ProductLot, error) {
+			return nil, errors.New("cannot remove lot with remaining quantity")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/products/lots/"+lotID, nil)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "lotId", Value: lotID}}
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	DeleteLotById(productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "cannot remove lot with remaining quantity") {
+		t.Fatalf("expected remaining quantity error, got %s", w.Body.String())
+	}
 }

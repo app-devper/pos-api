@@ -176,3 +176,33 @@ func TestUpdateProductUnitByIdLogsHistoryFailureButReturnsSuccess(t *testing.T) 
 		t.Fatal("expected history creation to be attempted")
 	}
 }
+
+func TestRemoveProductUnitByIdReturnsErrorWhenUnitHasStockHistory(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	unitID := primitive.NewObjectID().Hex()
+	branchID := primitive.NewObjectID().Hex()
+
+	repo := &productUnitRepoStub{
+		removeUnitCascadeFn: func(id string, branchId string, userId string) (*entities.ProductUnit, error) {
+			return nil, errors.New("cannot remove unit with stock history")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/product-units/"+unitID, nil)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "unitId", Value: unitID}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID)
+
+	RemoveProductUnitById(repo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "cannot remove unit with stock history") {
+		t.Fatalf("expected stock history error, got %s", w.Body.String())
+	}
+}

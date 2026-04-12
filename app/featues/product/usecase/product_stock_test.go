@@ -306,3 +306,38 @@ func TestRemoveProductStockByIdRejectsForeignBranch(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
 	}
 }
+
+func TestRemoveProductStockByIdReturnsErrorWhenQuantityRemains(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	stockRepo := &productStockRepoStub{
+		getStockByIDFn: func(id string) (*entities.ProductStock, error) {
+			return &entities.ProductStock{
+				Id:       primitive.NewObjectID(),
+				BranchId: branchID,
+			}, nil
+		},
+		removeStockFn: func(id string) (*entities.ProductStock, error) {
+			return nil, errors.New("cannot remove stock with remaining quantity")
+		},
+	}
+	productRepo := &productStockProductStub{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/products/stocks/"+primitive.NewObjectID().Hex(), nil)
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "stockId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("BranchId", branchID.Hex())
+	ctx.Set("UserId", "user-1")
+
+	RemoveProductStockById(stockRepo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "cannot remove stock with remaining quantity") {
+		t.Fatalf("expected remaining quantity error, got %s", w.Body.String())
+	}
+}

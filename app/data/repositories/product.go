@@ -936,6 +936,12 @@ func (entity *productEntity) RemoveProductLotById(id string, branchId string) (*
 			filter[key] = value
 		}
 	}
+	if err = entity.productLotsRepo.FindOne(ctx, filter).Decode(&data); err != nil {
+		return nil, err
+	}
+	if data.Quantity > 0 {
+		return nil, errors.New("cannot remove lot with remaining quantity")
+	}
 	err = entity.productLotsRepo.FindOneAndDelete(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
@@ -1667,6 +1673,13 @@ func (entity *productEntity) removeProductUnitByIDWithContext(ctx context.Contex
 	}
 	if data.Size == 1 {
 		return nil, errors.New("can not remove default unit")
+	}
+	stockCount, err := entity.stock.productStockRepo.CountDocuments(ctx, bson.M{"unitId": objId})
+	if err != nil {
+		return nil, err
+	}
+	if stockCount > 0 {
+		return nil, errors.New("cannot remove unit with stock history")
 	}
 	err = entity.productUnitsRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {

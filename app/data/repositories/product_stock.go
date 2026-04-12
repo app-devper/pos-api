@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -242,6 +243,12 @@ func (entity *productStockEntity) RemoveProductStockById(id string) (*entities.P
 		return nil, err
 	}
 	var data entities.ProductStock
+	if err = entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data); err != nil {
+		return nil, err
+	}
+	if data.Quantity > 0 {
+		return nil, errors.New("cannot remove stock with remaining quantity")
+	}
 	err = entity.productStockRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {
 		return nil, err
