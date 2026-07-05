@@ -8,7 +8,30 @@ func ToFormat(date time.Time) string {
 	return date.In(location).Format(format)
 }
 
+func ToFormatDate(date time.Time) string {
+	location := GetLocation()
+	format := "02 Jan 2006"
+	return date.In(location).Format(format)
+}
+
 func GetLocation() *time.Location {
-	location, _ := time.LoadLocation("Asia/Bangkok")
+	location, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil || location == nil {
+		return time.FixedZone("ICT", 7*60*60)
+	}
 	return location
+}
+
+func Bod(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
+}
+
+func InArrayString(val string, array []string) bool {
+	for _, v := range array {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }

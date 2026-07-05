@@ -1,0 +1,7 @@
+interface:
+  display_name: "Code Commit Standard"
+  short_description: "Standardize clean, reviewable git commits"
+  default_prompt: "Use $code-commit-standard to stage and commit my changes with clean semantic grouping and a concise conventional-style message."
+
+policy:
+  allow_implicit_invocation: true

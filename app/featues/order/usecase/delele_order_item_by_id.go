@@ -1,30 +1,34 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/core/utils"
-	"pos/app/domain/repository"
+	"pos/app/core/errcode"
+	"pos/app/data/repositories"
+	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
-func DeleteOrderItemById(orderEntity repository.IOrder, productEntity repository.IProduct) gin.HandlerFunc {
+func DeleteOrderItemById(orderEntity repositories.IOrder, _ repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		req := request.CancelOrderAction{}
+		_ = ctx.ShouldBindJSON(&req)
 		itemId := ctx.Param("itemId")
-		result, err := orderEntity.RemoveOrderItemById(itemId)
+		userId := ctx.GetString("UserId")
+		item, err := orderEntity.GetOrderItemById(itemId)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return
 		}
-		_, err = orderEntity.UpdateTotalOrderById(result.OrderId.Hex())
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		if err := ensureOrderItemBranchAccess(item, ctx.GetString("BranchId")); err != nil {
+			abortOrderBranchMismatch(ctx)
 			return
 		}
-
-		_, _ = productEntity.AddQuantityById(result.ProductId.Hex(), result.Quantity)
-
-		date := utils.ToFormat(result.CreatedDate)
-		_, _ = utils.NotifyMassage("ยกเลิกสินค้ารายการวันที่ " + date + "\n\n1. " + result.GetMessage())
+		result, err := orderEntity.CancelOrderItemById(itemId, userId, ctx.GetString("BranchId"), req.Reason)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			return
+		}
 
 		ctx.JSON(http.StatusOK, result)
 	}

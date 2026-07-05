@@ -1,42 +1,71 @@
 package request
 
+type GetProduct struct {
+	Category string `json:"category" form:"category"`
+	BranchId string `json:"-"`
+}
+
 type Product struct {
-	Name         string  `json:"name" binding:"required"`
-	NameEn       string  `json:"nameEn"`
-	Description  string  `json:"description"`
-	Price        float64 `json:"price" binding:"required"`
-	CostPrice    float64 `json:"costPrice" binding:"required"`
-	Unit         string  `json:"unit"`
-	Quantity     int     `json:"quantity"`
-	SerialNumber string  `json:"serialNumber" binding:"required"`
-	Category     string  `json:"category"`
-	LotNumber    string  `json:"lotNumber"`
-	ExpireDate   string  `json:"expireDate"`
-	CreatedBy    string
+	Name              string           `json:"name" binding:"required"`
+	NameEn            string           `json:"nameEn"`
+	Description       string           `json:"description"`
+	Price             float64          `json:"price" binding:"required"`
+	CostPrice         float64          `json:"costPrice" binding:"required"`
+	Unit              string           `json:"unit"`
+	Quantity          int              `json:"quantity"`
+	SerialNumber      string           `json:"serialNumber" binding:"required"`
+	Category          string           `json:"category"`
+	LotNumber         string           `json:"lotNumber" binding:"required"`
+	ExpireDate        FlexibleTime     `json:"expireDate" binding:"required"`
+	ReceiveId         string           `json:"receiveId"`
+	Status            string           `json:"status"`
+	MinStock          int              `json:"minStock"`
+	DrugInfo          *RequestDrugInfo `json:"drugInfo"`
+	DrugRegistrations []string         `json:"drugRegistrations"`
+	ReceiveCode       string
+	CreatedBy         string
+	BranchId          string
+}
+
+type CreateProduct struct {
+	Name              string           `json:"name" binding:"required"`
+	NameEn            string           `json:"nameEn"`
+	Description       string           `json:"description"`
+	Price             float64          `json:"price" binding:"required"`
+	CostPrice         float64          `json:"costPrice" binding:"required"`
+	Unit              string           `json:"unit" binding:"required"`
+	SerialNumber      string           `json:"serialNumber" binding:"required"`
+	Category          string           `json:"category"`
+	Status            string           `json:"status"`
+	MinStock          int              `json:"minStock"`
+	DrugInfo          *RequestDrugInfo `json:"drugInfo"`
+	DrugRegistrations []string         `json:"drugRegistrations"`
+	CreatedBy         string
 }
 
 type UpdateProduct struct {
-	Name        string  `json:"name" binding:"required"`
-	NameEn      string  `json:"nameEn"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price" binding:"required"`
-	CostPrice   float64 `json:"costPrice" binding:"required"`
-	Unit        string  `json:"unit"`
-	Quantity    int     `json:"quantity"`
-	Category    string  `json:"category"`
-	UpdatedBy   string
+	Name              string           `json:"name" binding:"required"`
+	NameEn            string           `json:"nameEn"`
+	Description       string           `json:"description"`
+	Category          string           `json:"category"`
+	Status            string           `json:"status"`
+	MinStock          int              `json:"minStock"`
+	DrugInfo          *RequestDrugInfo `json:"drugInfo"`
+	DrugRegistrations []string         `json:"drugRegistrations"`
+	UpdatedBy         string
 }
 
-type ProductLot struct {
-	Quantity   int     `json:"quantity" binding:"required"`
-	LotNumber  string  `json:"lotNumber" binding:"required"`
-	ExpireDate string  `json:"expireDate" binding:"required"`
-	CostPrice  float64 `json:"costPrice"  binding:"required"`
-}
-
-type ProductPrice struct {
-	ProductId     string  `json:"productId" binding:"required"`
-	CustomerId    string  `json:"customerId" binding:"required"`
-	CustomerPrice float64 `json:"customerPrice"  binding:"required"`
-	CreatedBy     string
+type RequestDrugInfo struct {
+	GenericName       string   `json:"genericName"`
+	DosageForm        string   `json:"dosageForm"`
+	Strength          string   `json:"strength"`
+	Indication        string   `json:"indication"`
+	Dosage            string   `json:"dosage"`
+	SideEffects       string   `json:"sideEffects"`
+	Contraindications string   `json:"contraindications"`
+	StorageCondition  string   `json:"storageCondition"`
+	Manufacturer      string   `json:"manufacturer"`
+	RegistrationNo    string   `json:"registrationNo"`
+	IsControlled      bool     `json:"isControlled"`
+	DrugInteractions  []string `json:"drugInteractions"`
 }

@@ -1,16 +1,20 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/domain/repository"
+	"pos/app/core/errcode"
+	"pos/app/data/repositories"
+
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
-func GetCustomers(customerEntity repository.ICustomer) gin.HandlerFunc {
+func GetCustomers(customerEntity repositories.ICustomer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		result, err := customerEntity.GetCustomerAll()
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			logrus.WithError(err).Error("get customers failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
 			return
 		}
 

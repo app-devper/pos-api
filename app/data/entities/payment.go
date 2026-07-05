@@ -1,0 +1,23 @@
+package entities
+
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+type Payment struct {
+	Id           primitive.ObjectID `bson:"_id" json:"id"`
+	BranchId     primitive.ObjectID `bson:"branchId" json:"branchId"`
+	OrderId      primitive.ObjectID `bson:"orderId" json:"orderId"`
+	Status       string             `bson:"status" json:"status"`
+	CancelReason string             `bson:"cancelReason,omitempty" json:"cancelReason,omitempty"`
+	Amount       float64            `bson:"amount" json:"amount"`
+	Total        float64            `bson:"total" json:"total"`
+	Change       float64            `bson:"change" json:"change"`
+	Type         string             `bson:"type" json:"type"`
+	CreatedBy    string             `bson:"createdBy" json:"-"`
+	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
+	UpdatedBy    string             `bson:"updatedBy" json:"-"`
+	UpdatedDate  time.Time          `bson:"updatedDate" json:"-"`
+}

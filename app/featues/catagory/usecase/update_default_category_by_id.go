@@ -1,23 +1,21 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/domain/repository"
-	"pos/app/domain/request"
+	"pos/app/core/errcode"
+	"pos/app/data/repositories"
+
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
-func UpdateDefaultCategoryById(entity repository.ICategory) gin.HandlerFunc {
+func UpdateDefaultCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		categoryId := ctx.Param("categoryId")
-		req := request.Category{}
-		if err := ctx.ShouldBind(&req); err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		result, err := entity.UpdateDefaultCategoryById(categoryId)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			logrus.WithError(err).WithField("categoryId", categoryId).Error("update default category failed")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

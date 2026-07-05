@@ -1,17 +1,19 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
-	"pos/app/domain/repository"
+	"pos/app/core/errcode"
+	"pos/app/data/repositories"
+
+	"github.com/gin-gonic/gin"
 )
 
-func GetOrderItemByProductId(orderEntity repository.IOrder) gin.HandlerFunc {
+func GetOrderItemByProductId(orderEntity repositories.IOrder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		productId := ctx.Param("productId")
-		result, err := orderEntity.GetOrderItemByProductId(productId)
+		result, err := orderEntity.GetOrderItemByProductId(productId, ctx.GetString("BranchId"))
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return
 		}
 

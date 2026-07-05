@@ -1,33 +1,58 @@
 package request
 
-import "time"
-
 type Order struct {
-	Items        []OrderItem `json:"items" binding:"required"`
-	Amount       float64     `json:"amount" binding:"required"`
-	Type         string      `json:"type" binding:"required"`
-	CustomerCode string      `json:"customerCode"`
-	Total        float64     `json:"total"`
-	TotalCost    float64     `json:"totalCost"`
-	Change       float64     `json:"change"`
-	Message      string      `json:"message"`
-	CreatedBy    string
-	Code         string
+	Items          []OrderItem    `json:"items" binding:"required"`
+	Payments       []OrderPayment `json:"payments"`
+	Amount         float64        `json:"amount" binding:"required"`
+	Type           string         `json:"type" binding:"required"`
+	CustomerCode   string         `json:"customerCode"`
+	CustomerName   string         `json:"customerName"`
+	PatientId      string         `json:"patientId"`
+	PharmacistName string         `json:"pharmacistName"`
+	LicenseNo      string         `json:"licenseNo"`
+	PrescriberName string         `json:"prescriberName"`
+	BuyerName      string         `json:"buyerName"`
+	BuyerIdCard    string         `json:"buyerIdCard"`
+	Total          float64        `json:"total" binding:"required"`
+	TotalCost      float64        `json:"totalCost"`
+	Discount       float64        `json:"discount"`
+	Change         float64        `json:"change"`
+	Message        string         `json:"message"`
+	CreatedBy      string
+	Code           string
+	BranchId       string
+}
+
+type OrderPayment struct {
+	Amount float64 `json:"amount" binding:"required"`
+	Type   string  `json:"type" binding:"required"`
 }
 
 type OrderItem struct {
-	ProductId string  `json:"productId" binding:"required"`
-	Quantity  int     `json:"quantity" binding:"required"`
-	Price     float64 `json:"price" binding:"required"`
-	CostPrice float64 `json:"costPrice"`
-	Discount  float64 `json:"discount"`
+	ProductId string           `json:"productId" binding:"required"`
+	Quantity  int              `json:"quantity" binding:"required"`
+	UnitId    string           `json:"unitId" binding:"required"`
+	Price     float64          `json:"price" binding:"required"`
+	CostPrice float64          `json:"costPrice"`
+	Discount  float64          `json:"discount"`
+	Stocks    []OrderItemStock `json:"stocks" binding:"required"`
+}
+
+type OrderItemStock struct {
+	Quantity int    `json:"quantity" binding:"required"`
+	StockId  string `json:"stockId"`
 }
 
 type GetOrderRange struct {
-	StartDate time.Time `form:"startDate" binding:"required"`
-	EndDate   time.Time `form:"endDate" binding:"required"`
+	StartDate FlexibleTime `form:"startDate" binding:"required"`
+	EndDate   FlexibleTime `form:"endDate" binding:"required"`
+	BranchId  string
 }
 
 type UpdateCustomerCode struct {
 	CustomerCode string `json:"customerCode"`
+}
+
+type CancelOrderAction struct {
+	Reason string `json:"reason"`
 }
