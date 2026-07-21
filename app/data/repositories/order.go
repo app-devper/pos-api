@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -28,7 +29,7 @@ type orderEntity struct {
 }
 
 type IOrder interface {
-	CreateOrder(form request.Order) (*entities.Order, error)
+	CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
 	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
 	UpdateTotal() ([]entities.Order, error)
@@ -54,6 +55,11 @@ type IOrder interface {
 	CancelOrderItemByOrderProductId(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
 	GetOrderItemByProductId(productId string, branchId string) ([]entities.OrderItem, error)
 	GetOrderItemOrderDetailsByProductId(productId string, branchId string, form request.GetOrderRange) ([]entities.OrderItemOrderDetail, error)
+
+	GetOversoldOrderItemsByProductId(productId string, branchId string) ([]entities.OrderItem, error)
+	UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error)
+	DrainOversoldQtyByOrderItemId(orderItemId string, drain int, stockRef string) (*entities.OrderItem, error)
+	IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error)
 
 	GetPaymentByOrderId(orderId string) (*entities.Payment, error)
 	RemovePaymentByOrderId(orderId string) (*entities.Payment, error)
@@ -110,7 +116,7 @@ func ensureOrderIndexes(orderRepo *mongo.Collection, orderItemRepo *mongo.Collec
 	})
 }
 
-func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, error) {
+func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error) {
 	logrus.Info("CreateOrder")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -121,29 +127,31 @@ func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, err
 
 	session, err := entity.client.StartSession()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer session.EndSession(ctx)
 
 	var created *entities.Order
+	var createdItems []entities.OrderItem
 	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		order, txErr := entity.createOrderWithContext(sessCtx, form)
+		order, items, txErr := entity.createOrderWithContext(sessCtx, form)
 		if txErr != nil {
 			return nil, txErr
 		}
 		created = order
+		createdItems = items
 		return order, nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return created, nil
+	return created, createdItems, nil
 }
 
-func (entity *orderEntity) createOrderWithContext(ctx context.Context, form request.Order) (*entities.Order, error) {
+func (entity *orderEntity) createOrderWithContext(ctx context.Context, form request.Order) (*entities.Order, []entities.OrderItem, error) {
 	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var orderId = primitive.NewObjectID()
 	data := entities.Order{
@@ -170,20 +178,21 @@ func (entity *orderEntity) createOrderWithContext(ctx context.Context, form requ
 	}
 	_, err = entity.orderRepo.InsertOne(ctx, data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	count := len(form.Items)
+	items := make([]entities.OrderItem, count)
 	orderItem := make([]interface{}, count)
 	for i := 0; i < count; i++ {
 		formItem := form.Items[i]
 		productId, err := primitive.ObjectIDFromHex(formItem.ProductId)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		unitId, err := primitive.ObjectIDFromHex(formItem.UnitId)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		countStock := len(formItem.Stocks)
 		stocks := make([]entities.OrderItemStock, countStock)
@@ -212,11 +221,12 @@ func (entity *orderEntity) createOrderWithContext(ctx context.Context, form requ
 			UpdatedBy:   form.CreatedBy,
 			UpdatedDate: time.Now(),
 		}
+		items[i] = item
 		orderItem[i] = item
 	}
 	_, err = entity.orderItemRepo.InsertMany(ctx, orderItem)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(form.Payments) > 0 {
@@ -256,9 +266,9 @@ func (entity *orderEntity) createOrderWithContext(ctx context.Context, form requ
 		_, err = entity.paymentRepo.InsertOne(ctx, payment)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &data, nil
+	return &data, items, nil
 }
 
 func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities.Order, error) {
@@ -945,6 +955,110 @@ func (entity *orderEntity) GetOrderItemByProductId(productId string, branchId st
 	return items, nil
 }
 
+func (entity *orderEntity) GetOversoldOrderItemsByProductId(productId string, branchId string) ([]entities.OrderItem, error) {
+	logrus.Info("GetOversoldOrderItemsByProductId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{
+		"productId":   objId,
+		"oversoldQty": bson.M{"$gt": 0},
+		"$or":         confirmedOrderItemStatusMatchClauses(),
+	}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "_id", Value: 1}})
+	cursor, err := entity.orderItemRepo.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	items := []entities.OrderItem{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (entity *orderEntity) UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error) {
+	logrus.Info("UpdateOrderItemAllocationById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(orderItemId)
+	if err != nil {
+		return nil, err
+	}
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	var data entities.OrderItem
+	err = entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$set": bson.M{"stocks": stocks, "oversoldQty": oversoldQty, "updatedDate": time.Now()},
+	}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *orderEntity) DrainOversoldQtyByOrderItemId(orderItemId string, drain int, stockRef string) (*entities.OrderItem, error) {
+	logrus.Info("DrainOversoldQtyByOrderItemId")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(orderItemId)
+	if err != nil {
+		return nil, err
+	}
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	var data entities.OrderItem
+	err = entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{
+		"_id":         objId,
+		"oversoldQty": bson.M{"$gte": drain},
+	}, bson.M{
+		"$inc":  bson.M{"oversoldQty": -drain},
+		"$push": bson.M{"stocks": entities.OrderItemStock{Quantity: drain, StockId: stockRef}},
+		"$set":  bson.M{"updatedDate": time.Now()},
+	}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (entity *orderEntity) IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error) {
+	logrus.Info("IncrementOrderItemReturnedQtyById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(orderItemId)
+	if err != nil {
+		return nil, err
+	}
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnNewDoc,
+	}
+	var data entities.OrderItem
+	err = entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
+		"$inc": bson.M{"returnedQty": quantity},
+		"$set": bson.M{"updatedDate": time.Now()},
+	}, opts).Decode(&data)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
 func (entity *orderEntity) GetOrderItemOrderDetailsByProductId(productId string, branchId string, form request.GetOrderRange) ([]entities.OrderItemOrderDetail, error) {
 	logrus.Info("GetOrderItemOrderDetailsByProductId")
 	ctx, cancel := utils.InitContext()
@@ -1301,10 +1415,7 @@ func (entity *orderEntity) restoreOrderItemStockAndHistory(ctx context.Context, 
 
 	unit := entities.ProductUnit{}
 	if err := entity.productUnitsRepo.FindOne(ctx, bson.M{"_id": item.UnitId}).Decode(&unit); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil
-		}
-		return err
+		return orderHistoryUnitLookupError(err)
 	}
 
 	balance, err := entity.getProductStockBalanceWithContext(ctx, item.ProductId, unit.Id, branchId)
@@ -1332,6 +1443,13 @@ func (entity *orderEntity) restoreOrderItemStockAndHistory(ctx context.Context, 
 		CreatedDate: time.Now(),
 	}
 	_, err = entity.productHistoryRepo.InsertOne(ctx, history)
+	return err
+}
+
+func orderHistoryUnitLookupError(err error) error {
+	if err == mongo.ErrNoDocuments {
+		return errors.New("product unit not found for order history")
+	}
 	return err
 }
 

@@ -12,7 +12,10 @@ import (
 func DeleteOrderItemByOrderProductId(orderEntity repositories.IOrder, _ repositories.IProduct) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.CancelOrderAction{}
-		_ = ctx.ShouldBindJSON(&req)
+		if err := ctx.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, err.Error())
+			return
+		}
 		orderId := ctx.Param("orderId")
 		productId := ctx.Param("productId")
 		userId := ctx.GetString("UserId")

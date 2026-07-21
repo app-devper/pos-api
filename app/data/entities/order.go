@@ -77,6 +77,8 @@ type OrderItem struct {
 	Price        float64            `bson:"price" json:"price"`
 	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
 	Discount     float64            `bson:"discount" json:"discount"`
+	OversoldQty  int                `bson:"oversoldQty,omitempty" json:"oversoldQty,omitempty"`
+	ReturnedQty  int                `bson:"returnedQty,omitempty" json:"returnedQty,omitempty"`
 	CreatedBy    string             `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy    string             `bson:"updatedBy" json:"-"`
@@ -96,6 +98,8 @@ type OrderItemProductDetail struct {
 	Price        float64            `bson:"price" json:"price"`
 	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
 	Discount     float64            `bson:"discount" json:"discount"`
+	OversoldQty  int                `bson:"oversoldQty,omitempty" json:"oversoldQty,omitempty"`
+	ReturnedQty  int                `bson:"returnedQty,omitempty" json:"returnedQty,omitempty"`
 	CreatedBy    string             `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy    string             `bson:"updatedBy" json:"-"`
@@ -116,6 +120,8 @@ type OrderItemOrderDetail struct {
 	Price        float64            `bson:"price" json:"price"`
 	CostPrice    float64            `bson:"costPrice" json:"costPrice"`
 	Discount     float64            `bson:"discount" json:"discount"`
+	OversoldQty  int                `bson:"oversoldQty,omitempty" json:"oversoldQty,omitempty"`
+	ReturnedQty  int                `bson:"returnedQty,omitempty" json:"returnedQty,omitempty"`
 	CreatedBy    string             `bson:"createdBy" json:"-"`
 	CreatedDate  time.Time          `bson:"createdDate" json:"createdDate"`
 	UpdatedBy    string             `bson:"updatedBy" json:"-"`

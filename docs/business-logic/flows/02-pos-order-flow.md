@@ -64,6 +64,7 @@
 - ตัด stock ตาม `item.Stocks` ที่ frontend เลือกและส่งมา
 - อัปเดต lot balance
 - สร้าง product history
+- ถ้า stock movement หรือ product history ไม่ครบ ต้อง rollback เชิงธุรกิจและไม่ตอบ success
 - ข้อมูลรายงาน ข.ย. 10–13 ดึงจาก order entity โดยตรง
 
 ### Step 8: Post-Order Actions
@@ -85,6 +86,8 @@
 - allergy / compliance data ไม่ครบ (ชื่อเภสัชกร, เลขใบอนุญาต, ผู้ซื้อ, เลขบัตรประชาชน) → ปัจจุบันต้อง block ที่ frontend ตาม workflow ของ POS
 - payment total ไม่พอ → ไม่ให้ submit
 - Backend validation fail → ไม่สร้าง order ครึ่งทาง
+- stock deduction หรือ product history step ล้มเหลว → rollback order flow และตอบ error
+- cancel request ที่ส่ง JSON body ผิดรูปแบบ → reject เป็น bad request ก่อนเริ่ม cancel
 
 ## Expected Outcome
 

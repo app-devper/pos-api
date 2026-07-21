@@ -68,7 +68,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.UpdateReceiveItemsById(repository.Receive),
+		usecase.UpdateReceiveItemsById(repository.Receive, repository.Product),
 	)
 
 	receiveRoute.PATCH("/:receiveId/import",
@@ -76,7 +76,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireSession(repository.Session),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
-		usecase.ImportReceiveToStock(repository.Receive, repository.Product),
+		usecase.ImportReceiveToStockWithReconciliation(repository.Receive, repository.Product, repository.Order, repository.ProductStock),
 	)
 
 }

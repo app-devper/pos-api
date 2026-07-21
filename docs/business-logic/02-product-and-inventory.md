@@ -47,6 +47,8 @@
 - stock ถูกสร้างจาก receive, product receive, stock adjustment หรือ stock transfer
 - stock ทุกก้อนต้องผูกกับ branch, unit, quantity, และข้อมูล lot/expiry เมื่อเกี่ยวข้อง
 - การเปลี่ยนแปลง stock ต้องสร้าง product history และใช้ branch-scoped balance เท่านั้น
+- ถ้าโหลด unit สำหรับ history ไม่ได้ หรือสร้าง product history ไม่สำเร็จ ระบบต้อง fail action แทนการตอบ success แบบไม่มี audit trail
+- stock record ที่ยังมี quantity คงเหลือห้ามลบออกตรงๆ เพราะจะทำให้ inventory และ audit trail สูญเสียความหมาย
 
 ### 4. Receive and Lot Tracking
 
@@ -111,12 +113,15 @@
 - สินค้าที่ต้องติดตาม lot ต้องเก็บ lot number และวันหมดอายุ
 - สินค้าที่ใกล้หมดอายุควรถูกแจ้งเตือนล่วงหน้า
 - หาก POS UI ใช้นโยบาย FEFO ตอนเลือก lot ระบบควรส่ง `item.Stocks` ที่สะท้อนลำดับนั้นมาให้ backend ใช้ตัด stock
+- lot ที่ยังมี quantity คงเหลือต้องไม่ถูกลบ เพราะยังเป็นส่วนหนึ่งของ stock reality และ expiry tracking
 
 ### 7. Product History
 
 - ทุกการเคลื่อนไหวที่กระทบสต็อกควรสร้างประวัติสินค้า
 - ประวัติต้องตอบได้ว่าเกิดจาก receive, order, adjustment หรือ transfer
 - Product history เป็นแหล่งอ้างอิงสำคัญในการตรวจสอบย้อนหลัง
+- product history ใน stock-moving flows เป็น required side effect ไม่ใช่ best effort logging
+- การลบ unit ต้องไม่ทำให้ stock หรือ history ย้อนหลังเหลือ reference ที่อธิบายไม่ได้
 
 ## Validation Rules
 
@@ -125,6 +130,8 @@
 - expireDate ต้องสมเหตุสมผลเมื่อสินค้าอยู่ในกลุ่มที่ต้องติดตาม lot
 - การแปลงหน่วยต้องไม่ทำให้ base quantity ผิด
 - สต็อกหลังคำนวณต้องไม่ติดลบใน workflow ปกติ
+- การลบ lot/stock/unit ต้องถูก reject ถ้ายังทำให้ stock reality หรือ audit trail แตก
+- stock-moving action ต้องถูก reject ถ้าระบบไม่สามารถสร้าง product history ที่สอดคล้องกับ movement นั้นได้
 
 ## Edge Cases
 

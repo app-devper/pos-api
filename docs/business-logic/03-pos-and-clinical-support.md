@@ -52,6 +52,7 @@
 
 - stock ถูกตัดตาม unit / quantity ของ transaction จริง
 - ระบบสร้าง product history และรักษา consistency ระหว่าง order กับ inventory
+- ถ้าไม่สามารถสร้าง product history ได้ ต้องถือว่า order-side stock movement ยังไม่สมบูรณ์และไม่ควรถูกมองว่า success
 - ถ้าตัด stock ไม่ครบหรือ step สำคัญล้มเหลว ต้องไม่ปล่อย order ค้างครึ่งทาง
 
 ### 7. Create Downstream Clinical Outputs
@@ -116,6 +117,7 @@
 - การยืนยันขายใช้ stock lots ที่ frontend เลือกและส่งมาใน `item.Stocks`
 - Backend ตัด stock, lot balance, และ product history จาก payload นั้นใน transaction เชิงธุรกิจเดียวกัน
 - ถ้าตัด stock ไม่ครบ ต้องยกเลิกการบันทึกออเดอร์ทั้งชุด
+- ถ้า unit lookup หรือ product history step ล้มเหลว ต้อง fail flow นั้นเช่นกัน เพื่อคง audit trail ให้ครบ
 
 ### 7. KHY Data Source
 

@@ -49,6 +49,7 @@
 - `DELETE /orders/:orderId`, `DELETE /orders/items/:itemId`, และ `DELETE /orders/:orderId/products/:productId` ใช้เป็น cancel semantics ไม่ใช่ hard delete
 - Request body สามารถส่ง `{"reason":"..."}` เพื่อเก็บเหตุผลการยกเลิกสำหรับ audit ได้
 - ถ้าไม่ส่ง `reason` ระบบยังต้องทำงานได้เพื่อคง backward compatibility กับ client เดิม
+- ถ้าส่ง JSON body มาแต่ parse ไม่ได้ ระบบต้องตอบ `400 bad request` แทนการ ignore body แล้ว cancel ต่อ
 - การ cancel ต้อง reverse stock อย่างสอดคล้อง และ mark payment/item/order เป็น `CANCELLED`
 
 ## Endpoints
@@ -84,6 +85,7 @@
 - stock insufficient
 - compliance data missing for controlled drugs
 - invalid payment total
+- malformed cancel action payload
 - invalid product or unit reference
 - branch context ไม่ถูกต้อง
 - order not found

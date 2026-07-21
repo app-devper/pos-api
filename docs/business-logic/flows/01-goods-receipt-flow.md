@@ -49,6 +49,8 @@
 - Backend เพิ่ม stock ตาม base quantity ที่คำนวณแล้ว
 - Backend สร้าง product history สำหรับแต่ละรายการ
 - Backend คำนวณ total cost ระดับเอกสาร
+- หากมีการแก้รายการสินค้าในภายหลัง Backend ต้อง sync ทั้ง `receive.items` และ `receive_items` collection เพื่อให้ import/report ใช้ข้อมูลชุดเดียวกัน
+- หากมีการแก้รายการสินค้าในภายหลัง Backend ต้อง recalc `totalCost` จากรายการล่าสุดใน transaction เดียวกันด้วย
 
 ### Step 6: Response and Refresh
 
@@ -61,15 +63,20 @@
 - ถ้าสินค้ามีหลายหน่วย ต้องแปลงหน่วยก่อน commit
 - ถ้า lot เดิมมีอยู่แล้ว ต้องตัดสินใจตามนโยบายระบบว่าจะรวม balance หรือสร้าง record เพิ่ม
 - ถ้ารายการใดรายการหนึ่ง invalid ต้อง reject ทั้งเอกสาร
+- ถ้าแก้ receive items หลังสร้างเอกสาร ต้องอัปเดต source of truth ทุกชุดที่ downstream ใช้อ่าน ไม่ใช่แค่ตัว document หลัก
+- ถ้าแก้ receive items หลังสร้างเอกสาร ต้องตรวจว่า product ของทุกรายการยังมีอยู่จริงก่อนยอมรับการแก้ไข
 
 ## Error Flow
 
 - ถ้าข้อมูลไม่ครบ Frontend ต้อง block ก่อน submit เท่าที่ตรวจได้
 - ถ้า Backend พบข้อมูลไม่สมบูรณ์ ต้อง reject และไม่สร้างข้อมูลครึ่งทาง
 - ถ้า save สำเร็จบางส่วนไม่ได้ ระบบต้อง rollback เชิงธุรกิจให้ข้อมูลไม่ค้างกลาง
+- ถ้า patch items อ้าง product ที่หาไม่เจอ ต้อง reject ทันที ไม่ปล่อยให้ receive ค้างรายการเสีย
 
 ## Expected Outcome
 
 - receive document ถูกสร้างครบ
 - stock และ lot balance ถูกอัปเดตถูกต้อง
 - มี product history สำหรับการตรวจสอบย้อนหลัง
+- ข้อมูลที่ KHY9/report/import อ่านจาก `receive_items` ต้องตรงกับรายการล่าสุดของเอกสาร
+- `totalCost` ของเอกสารต้องตรงกับ receive items ล่าสุดหลังการแก้ไข
