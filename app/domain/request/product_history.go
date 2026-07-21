@@ -150,6 +150,30 @@ func UpdateProductStockQuantityHistory(productId string, unit string, stock Upda
 	}
 }
 
+func AdjustStockHistory(productId string, unit string, adjustment StockAdjustment, balance int) ProductHistory {
+	return ProductHistory{
+		ProductId:   productId,
+		Type:        constant.HistoryTypeStockAdjustment,
+		Description: "ปรับสต็อกสินค้า (" + adjustment.Reason + ") จำนวน " + strconv.Itoa(adjustment.Delta) + " " + unit,
+		Unit:        unit,
+		Quantity:    adjustment.Delta,
+		Balance:     balance,
+		CreatedBy:   adjustment.CreatedBy,
+	}
+}
+
+func ProductReturnHistory(productId string, unit string, quantity int, reason string, balance int, createdBy string) ProductHistory {
+	return ProductHistory{
+		ProductId:   productId,
+		Type:        constant.HistoryTypeProductReturn,
+		Description: "รับคืนสินค้า (" + reason + ") จำนวน " + strconv.Itoa(quantity) + " " + unit,
+		Unit:        unit,
+		Quantity:    quantity,
+		Balance:     balance,
+		CreatedBy:   createdBy,
+	}
+}
+
 func AddOrderItemProductHistory(productId string, unit string, item OrderItem, balance int, createdBy string) ProductHistory {
 	return ProductHistory{
 		ProductId:   productId,

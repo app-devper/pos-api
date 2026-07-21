@@ -52,7 +52,7 @@ func CreateOrder(
 		}
 		req.Code = sequence.GenerateCode()
 
-		result, err := orderEntity.CreateOrder(req)
+		result, createdItems, err := orderEntity.CreateOrder(req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
 			return
@@ -88,25 +88,51 @@ func CreateOrder(
 		}
 
 		// Update product stock
-		for _, item := range req.Items {
+		for i, item := range req.Items {
 			if len(item.Stocks) > 0 {
+				finalStocks := make([]entities.OrderItemStock, 0, len(item.Stocks))
+				oversoldQty := 0
+
 				// Update stock quantity
 				for _, itemStock := range item.Stocks {
 					if itemStock.StockId != "" {
 						stock, err := productStock.RemoveProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
-						if err != nil {
+						if err == nil && stock != nil {
+							updatedStocks = append(updatedStocks, *stock)
+							stockAdjustments = append(stockAdjustments, stockAdjustment{
+								stockId:  itemStock.StockId,
+								quantity: itemStock.Quantity,
+							})
+							finalStocks = append(finalStocks, entities.OrderItemStock{StockId: itemStock.StockId, Quantity: itemStock.Quantity})
+							continue
+						}
+						if !item.AllowOversell {
+							if err == nil {
+								err = fmt.Errorf("insufficient stock for product %s", item.ProductId)
+							}
 							rollback(fmt.Errorf("failed to update stock for product %s: %w", item.ProductId, err))
 							return
 						}
-						if stock == nil {
-							rollback(fmt.Errorf("failed to update stock for product %s", item.ProductId))
+
+						drainedStock, drained, drainErr := productStock.DrainProductStockQuantityById(itemStock.StockId, itemStock.Quantity)
+						if drainErr != nil {
+							rollback(fmt.Errorf("failed to drain oversold stock for product %s: %w", item.ProductId, drainErr))
 							return
 						}
-						updatedStocks = append(updatedStocks, *stock)
-						stockAdjustments = append(stockAdjustments, stockAdjustment{
-							stockId:  itemStock.StockId,
-							quantity: itemStock.Quantity,
-						})
+						if drained > 0 {
+							if drainedStock != nil {
+								updatedStocks = append(updatedStocks, *drainedStock)
+							}
+							stockAdjustments = append(stockAdjustments, stockAdjustment{
+								stockId:  itemStock.StockId,
+								quantity: drained,
+							})
+							finalStocks = append(finalStocks, entities.OrderItemStock{
+								StockId:  itemStock.StockId,
+								Quantity: drained,
+							})
+						}
+						oversoldQty += itemStock.Quantity - drained
 					} else {
 						if _, err := productEntity.RemoveQuantitySoldFirstById(item.ProductId, itemStock.Quantity); err != nil {
 							rollback(fmt.Errorf("failed to update sold-first quantity for product %s: %w", item.ProductId, err))
@@ -116,6 +142,14 @@ func CreateOrder(
 							productId: item.ProductId,
 							quantity:  itemStock.Quantity,
 						})
+						finalStocks = append(finalStocks, entities.OrderItemStock{StockId: itemStock.StockId, Quantity: itemStock.Quantity})
+					}
+				}
+
+				if oversoldQty > 0 {
+					if _, err := orderEntity.UpdateOrderItemAllocationById(createdItems[i].Id.Hex(), finalStocks, oversoldQty); err != nil {
+						rollback(fmt.Errorf("failed to record oversold quantity for product %s: %w", item.ProductId, err))
+						return
 					}
 				}
 

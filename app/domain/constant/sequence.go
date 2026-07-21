@@ -1,13 +1,16 @@
 package constant
 
 const (
-	MEMBER         = "MEMBER"
-	ORDER          = "ORDER"
-	RECEIVE        = "RECEIVE"
-	PRODUCT        = "PRODUCT"
-	BRANCH         = "BRANCH"
-	EMPLOYEE       = "EMPLOYEE"
-	STOCK_TRANSFER = "STOCK_TRANSFER"
+	MEMBER           = "MEMBER"
+	ORDER            = "ORDER"
+	RECEIVE          = "RECEIVE"
+	PRODUCT          = "PRODUCT"
+	BRANCH           = "BRANCH"
+	EMPLOYEE         = "EMPLOYEE"
+	STOCK_TRANSFER   = "STOCK_TRANSFER"
+	STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT"
+	STOCK_COUNT      = "STOCK_COUNT"
+	PRODUCT_RETURN   = "PRODUCT_RETURN"
 )
 
 const (
