@@ -156,7 +156,8 @@ func CreateProductReturn(
 func GetProductReturnsByOrderId(productReturnEntity repositories.IProductReturn) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		orderId := ctx.Param("orderId")
-		result, err := productReturnEntity.GetProductReturnsByOrderId(orderId)
+		branchId := utils.GetBranchId(ctx)
+		result, err := productReturnEntity.GetProductReturnsByOrderId(orderId, branchId)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RT_BAD_REQUEST_002, err.Error())
 			return

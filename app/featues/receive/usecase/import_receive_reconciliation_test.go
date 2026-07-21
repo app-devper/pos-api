@@ -17,8 +17,8 @@ type reconcileOrderStub struct {
 	oversoldItems []entities.OrderItem
 	drainCalls    []struct {
 		orderItemId string
+		lotId       string
 		drain       int
-		stockRef    string
 	}
 }
 
@@ -26,38 +26,22 @@ func (s *reconcileOrderStub) GetOversoldOrderItemsByProductId(productId string, 
 	return s.oversoldItems, nil
 }
 
-func (s *reconcileOrderStub) DrainOversoldQtyByOrderItemId(orderItemId string, drain int, stockRef string) (*entities.OrderItem, error) {
+func (s *reconcileOrderStub) DrainOversoldAgainstLot(orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error) {
 	s.drainCalls = append(s.drainCalls, struct {
 		orderItemId string
+		lotId       string
 		drain       int
-		stockRef    string
-	}{orderItemId, drain, stockRef})
-	return &entities.OrderItem{}, nil
+	}{orderItemId, lotId, drain})
+	return &entities.OrderItem{}, &entities.ProductStock{}, nil
 }
 
 type reconcileStockStub struct {
 	repositories.IProductStock
-	lots        []entities.ProductStock
-	removeCalls []struct {
-		stockId  string
-		quantity int
-	}
+	lots []entities.ProductStock
 }
 
 func (s *reconcileStockStub) GetProductStocksByProductIdAndReceiveCode(productId string, receiveCode string, branchId string) ([]entities.ProductStock, error) {
 	return s.lots, nil
-}
-
-func (s *reconcileStockStub) RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	s.removeCalls = append(s.removeCalls, struct {
-		stockId  string
-		quantity int
-	}{stockId, quantity})
-	return &entities.ProductStock{}, nil
-}
-
-func (s *reconcileStockStub) AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return &entities.ProductStock{}, nil
 }
 
 func TestImportReceiveToStockReconcilesOversoldOrdersAgainstNewLot(t *testing.T) {
@@ -108,10 +92,10 @@ func TestImportReceiveToStockReconcilesOversoldOrdersAgainstNewLot(t *testing.T)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
-	if len(stockRepo.removeCalls) != 1 || stockRepo.removeCalls[0].stockId != lotID.Hex() || stockRepo.removeCalls[0].quantity != 4 {
-		t.Fatalf("expected lot %s to be drained by 4, got %+v", lotID.Hex(), stockRepo.removeCalls)
-	}
-	if len(orderRepo.drainCalls) != 1 || orderRepo.drainCalls[0].orderItemId != orderItemID.Hex() || orderRepo.drainCalls[0].drain != 4 || orderRepo.drainCalls[0].stockRef != lotID.Hex() {
+	if len(orderRepo.drainCalls) != 1 ||
+		orderRepo.drainCalls[0].orderItemId != orderItemID.Hex() ||
+		orderRepo.drainCalls[0].lotId != lotID.Hex() ||
+		orderRepo.drainCalls[0].drain != 4 {
 		t.Fatalf("expected oversold order item %s to be drained by 4 against lot %s, got %+v", orderItemID.Hex(), lotID.Hex(), orderRepo.drainCalls)
 	}
 }

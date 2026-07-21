@@ -498,34 +498,40 @@ func (entity *productStockEntity) DrainProductStockQuantityById(stockId string, 
 		return nil, 0, err
 	}
 
-	var current entities.ProductStock
-	if err := entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&current); err != nil {
-		return nil, 0, err
-	}
-
-	drain := quantity
-	if current.Quantity < drain {
-		drain = current.Quantity
-	}
-	if drain <= 0 {
-		return &current, 0, nil
-	}
-
-	isReturnNewDoc := options.After
+	isReturnBeforeDoc := options.Before
 	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
+		ReturnDocument: &isReturnBeforeDoc,
 	}
-	var data entities.ProductStock
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{
-		"_id":      objId,
-		"quantity": bson.M{"$gte": drain},
-	}, bson.M{
-		"$inc": bson.M{"quantity": -drain},
-	}, opts).Decode(&data)
-	if err != nil {
+	update := mongo.Pipeline{
+		{{
+			Key: "$set",
+			Value: bson.M{
+				"quantity": bson.M{
+					"$max": bson.A{
+						bson.M{"$subtract": bson.A{"$quantity", quantity}},
+						0,
+					},
+				},
+			},
+		}},
+	}
+
+	var before entities.ProductStock
+	if err := entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, update, opts).Decode(&before); err != nil {
 		return nil, 0, err
 	}
-	return &data, drain, nil
+
+	drained := quantity
+	if before.Quantity < drained {
+		drained = before.Quantity
+	}
+	if drained <= 0 {
+		return &before, 0, nil
+	}
+
+	after := before
+	after.Quantity = before.Quantity - drained
+	return &after, drained, nil
 }
 
 // --- ProductHistory ---
