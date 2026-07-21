@@ -87,6 +87,7 @@
 - payment total ไม่พอ → ไม่ให้ submit
 - Backend validation fail → ไม่สร้าง order ครึ่งทาง
 - stock deduction หรือ product history step ล้มเหลว → rollback order flow และตอบ error
+- cancel request ที่ส่ง JSON body ผิดรูปแบบ → reject เป็น bad request ก่อนเริ่ม cancel
 
 ## Expected Outcome
 
