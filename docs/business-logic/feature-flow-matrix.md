@@ -28,10 +28,14 @@
 | Employees | `07-settings-and-master-data.md` | `flows/15-employee-management-flow.md` | `lifecycle/10-employee-lifecycle.md` | `api-contracts/11-employees-contract.md` | - | เชื่อม role + branch mapping |
 | Suppliers | `07-settings-and-master-data.md` | `flows/16-supplier-management-flow.md` | `lifecycle/11-supplier-lifecycle.md` | `api-contracts/12-suppliers-contract.md` | - | ใช้กับ receives และ purchase reports |
 | Categories | `07-settings-and-master-data.md` | `flows/17-category-management-flow.md` | `lifecycle/12-category-lifecycle.md` | `api-contracts/13-categories-contract.md` | - | ใช้ใน product grouping/filtering |
+| Stock Adjustment | `09-stock-adjustments-counts-and-returns.md` | `flows/19-stock-adjustment-flow.md` | - | `api-contracts/17-stock-adjustments-contract.md` | - | single-effect operation ไม่มี state machine จึงไม่มี lifecycle doc; trigger oversell reconciliation เมื่อ delta บวก |
+| Stock Count | `09-stock-adjustments-counts-and-returns.md` | `flows/20-stock-count-flow.md` | - | `api-contracts/18-stock-counts-contract.md` | - | เรียกใช้ stock adjustment logic ภายในต่อบรรทัดที่มีผลต่าง |
+| Product Return | `09-stock-adjustments-counts-and-returns.md` | `flows/21-product-return-flow.md` | - | `api-contracts/19-product-returns-contract.md` | - | คืนได้เฉพาะจำนวนที่ผูกกับ lot จริงของ order เดิม ไม่รวม oversold/synthetic adjustment |
 
 ## Coverage Notes
 
 - feature ที่มีครบเกือบทุกมิติมากที่สุดคือ `product`, `receive`, `order`, `reports`, `patients`, `promotions`, และ `stock transfer`
-- feature ที่ยังไม่มี screen doc แยกชัดคือ `branches`, `employees`, `suppliers`, และ `categories`
+- feature ที่ยังไม่มี screen doc แยกชัดคือ `branches`, `employees`, `suppliers`, `categories`, `stock adjustment`, `stock count`, และ `product return` (สามตัวหลังยังไม่มี dedicated screen ในโค้ด frontend)
+- `stock adjustment`, `stock count`, และ `product return` ไม่มี lifecycle doc โดยตั้งใจ เพราะเป็น single-effect operation (สร้างแล้วมีผลทันที) ไม่ใช่ multi-state workflow แบบ stock transfer
 - feature toggles ใน settings ปัจจุบันเป็น stored configuration ที่ frontend/consumer ใช้ตัดสินใจเอง ยังไม่ใช่ backend runtime gate ของทุก API
 - ถ้าจะเพิ่มเอกสารต่อ รอบถัดไปควรเลือกจากมิติที่ยังว่างอยู่ก่อน ไม่ใช่เพิ่ม flow ซ้ำกับ feature ที่ coverage ดีอยู่แล้ว
