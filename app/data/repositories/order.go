@@ -59,6 +59,7 @@ type IOrder interface {
 	GetOversoldOrderItemsByProductId(productId string, branchId string) ([]entities.OrderItem, error)
 	UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error)
 	DrainOversoldQtyByOrderItemId(orderItemId string, drain int, stockRef string) (*entities.OrderItem, error)
+	DrainOversoldAgainstLot(orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error)
 	IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error)
 
 	GetPaymentByOrderId(orderId string) (*entities.Payment, error)
@@ -1034,6 +1035,75 @@ func (entity *orderEntity) DrainOversoldQtyByOrderItemId(orderItemId string, dra
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *orderEntity) DrainOversoldAgainstLot(orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error) {
+	logrus.Info("DrainOversoldAgainstLot")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+
+	if entity.client == nil {
+		return entity.drainOversoldAgainstLotWithContext(ctx, orderItemId, lotId, drain)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var updatedItem *entities.OrderItem
+	var updatedStock *entities.ProductStock
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		item, stock, txErr := entity.drainOversoldAgainstLotWithContext(sessCtx, orderItemId, lotId, drain)
+		if txErr != nil {
+			return nil, txErr
+		}
+		updatedItem = item
+		updatedStock = stock
+		return item, nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return updatedItem, updatedStock, nil
+}
+
+func (entity *orderEntity) drainOversoldAgainstLotWithContext(ctx context.Context, orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error) {
+	stockObjId, err := primitive.ObjectIDFromHex(lotId)
+	if err != nil {
+		return nil, nil, err
+	}
+	isReturnNewDoc := options.After
+
+	stockOpts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
+	var stock entities.ProductStock
+	if err := entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{
+		"_id":      stockObjId,
+		"quantity": bson.M{"$gte": drain},
+	}, bson.M{
+		"$inc": bson.M{"quantity": -drain},
+	}, stockOpts).Decode(&stock); err != nil {
+		return nil, nil, err
+	}
+
+	itemObjId, err := primitive.ObjectIDFromHex(orderItemId)
+	if err != nil {
+		return nil, nil, err
+	}
+	itemOpts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
+	var item entities.OrderItem
+	if err := entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{
+		"_id":         itemObjId,
+		"oversoldQty": bson.M{"$gte": drain},
+	}, bson.M{
+		"$inc":  bson.M{"oversoldQty": -drain},
+		"$push": bson.M{"stocks": entities.OrderItemStock{Quantity: drain, StockId: lotId}},
+		"$set":  bson.M{"updatedDate": time.Now()},
+	}, itemOpts).Decode(&item); err != nil {
+		return nil, nil, err
+	}
+	return &item, &stock, nil
 }
 
 func (entity *orderEntity) IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error) {

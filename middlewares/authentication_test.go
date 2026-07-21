@@ -37,6 +37,15 @@ func (s *branchRepoStub) GetBranchByCode(code string) (*entities.Branch, error) 
 	return s.getByCodeFn(code)
 }
 
+type sessionRepoStub struct {
+	repositories.ISession
+	getByIDFn func(sessionId string) (string, error)
+}
+
+func (s *sessionRepoStub) GetSessionById(sessionId string) (string, error) {
+	return s.getByIDFn(sessionId)
+}
+
 func TestRequireBranchUsesEmployeeBranchAndRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -295,6 +304,57 @@ func TestRequireAuthenticatedAcceptsValidTokenWhenConfigPresent(t *testing.T) {
 	}
 	if got := ctx.GetString("SessionId"); got != "session-1" {
 		t.Fatalf("expected SessionId session-1, got %s", got)
+	}
+}
+
+func TestRequireSessionSetsUserIdOnValidSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	sessionRepo := &sessionRepoStub{
+		getByIDFn: func(sessionId string) (string, error) {
+			if sessionId != "session-1" {
+				t.Fatalf("expected sessionId session-1, got %s", sessionId)
+			}
+			return "user-1", nil
+		},
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx.Set("SessionId", "session-1")
+
+	RequireSession(sessionRepo)(ctx)
+
+	if ctx.IsAborted() {
+		t.Fatalf("expected middleware to continue, got status %d body %s", w.Code, w.Body.String())
+	}
+	if got := ctx.GetString("UserId"); got != "user-1" {
+		t.Fatalf("expected UserId user-1, got %s", got)
+	}
+}
+
+func TestRequireSessionRejectsInvalidSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	sessionRepo := &sessionRepoStub{
+		getByIDFn: func(sessionId string) (string, error) {
+			return "", errors.New("session not found")
+		},
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx.Set("SessionId", "session-1")
+
+	RequireSession(sessionRepo)(ctx)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, w.Code)
+	}
+	if body := w.Body.String(); !strings.Contains(body, errcode.AU_UNAUTHORIZED_005) {
+		t.Fatalf("expected errcode %s in response body, got %s", errcode.AU_UNAUTHORIZED_005, body)
 	}
 }
 

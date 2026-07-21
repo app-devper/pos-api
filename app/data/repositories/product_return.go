@@ -20,7 +20,7 @@ type productReturnEntity struct {
 type IProductReturn interface {
 	CreateProductReturn(param ProductReturnInput) (*entities.ProductReturn, error)
 	GetProductReturnById(id string) (*entities.ProductReturn, error)
-	GetProductReturnsByOrderId(orderId string) ([]entities.ProductReturn, error)
+	GetProductReturnsByOrderId(orderId string, branchId string) ([]entities.ProductReturn, error)
 }
 
 type ProductReturnInput struct {
@@ -89,7 +89,7 @@ func (entity *productReturnEntity) GetProductReturnById(id string) (*entities.Pr
 	return &data, nil
 }
 
-func (entity *productReturnEntity) GetProductReturnsByOrderId(orderId string) ([]entities.ProductReturn, error) {
+func (entity *productReturnEntity) GetProductReturnsByOrderId(orderId string, branchId string) ([]entities.ProductReturn, error) {
 	logrus.Info("GetProductReturnsByOrderId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -97,8 +97,16 @@ func (entity *productReturnEntity) GetProductReturnsByOrderId(orderId string) ([
 	if err != nil {
 		return nil, err
 	}
+	filter := bson.M{"orderId": objId}
+	if branchId != "" {
+		branchObjID, err := primitive.ObjectIDFromHex(branchId)
+		if err != nil {
+			return nil, err
+		}
+		filter["branchId"] = branchObjID
+	}
 	opts := options.Find().SetSort(bson.D{{Key: "createdDate", Value: -1}})
-	cursor, err := entity.productReturnRepo.Find(ctx, bson.M{"orderId": objId}, opts)
+	cursor, err := entity.productReturnRepo.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}

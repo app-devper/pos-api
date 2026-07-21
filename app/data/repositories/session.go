@@ -9,7 +9,6 @@ import (
 	"pos/db"
 )
 
-// um-api stores sessions under "session:<id>" with a JSON body keyed by userId.
 const sessionPrefix = "session:"
 
 type sessionEntity struct {
@@ -31,10 +30,14 @@ func (entity *sessionEntity) GetSessionById(sessionId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return parseSessionUserId([]byte(raw))
+}
+
+func parseSessionUserId(raw []byte) (string, error) {
 	var data struct {
 		UserId string `json:"userId"`
 	}
-	if err := json.Unmarshal([]byte(raw), &data); err != nil {
+	if err := json.Unmarshal(raw, &data); err != nil {
 		return "", err
 	}
 	return data.UserId, nil

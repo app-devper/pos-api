@@ -76,13 +76,12 @@ func reconcileOversoldFromImport(
 			logrus.WithError(err).WithField("productId", productId).Warn("failed to look up newly imported lots during import reconciliation")
 			continue
 		}
-		drainOversoldAgainstLots(orderEntity, productStock, oversoldItems, lots)
+		drainOversoldAgainstLots(orderEntity, oversoldItems, lots)
 	}
 }
 
 func drainOversoldAgainstLots(
 	orderEntity repositories.IOrder,
-	productStock repositories.IProductStock,
 	oversoldItems []entities.OrderItem,
 	lots []entities.ProductStock,
 ) {
@@ -104,13 +103,11 @@ func drainOversoldAgainstLots(
 			if available < drain {
 				drain = available
 			}
-			if _, err := productStock.RemoveProductStockQuantityById(lotId, drain); err != nil {
-				logrus.WithError(err).WithField("stockId", lotId).Warn("failed to drain lot during oversold reconciliation")
-				continue
-			}
-			if _, err := orderEntity.DrainOversoldQtyByOrderItemId(oversoldItems[j].Id.Hex(), drain, lotId); err != nil {
-				logrus.WithError(err).WithField("orderItemId", oversoldItems[j].Id.Hex()).Warn("failed to record oversold reconciliation on order item")
-				_, _ = productStock.AddProductStockQuantityById(lotId, drain)
+			if _, _, err := orderEntity.DrainOversoldAgainstLot(oversoldItems[j].Id.Hex(), lotId, drain); err != nil {
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"orderItemId": oversoldItems[j].Id.Hex(),
+					"stockId":     lotId,
+				}).Warn("failed to reconcile oversold quantity against lot")
 				continue
 			}
 			available -= drain
