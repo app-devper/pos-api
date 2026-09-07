@@ -6,7 +6,7 @@ substitutions:
   _SERVICE: pos-dev-api
   _REGION: asia-southeast1
   _REPOSITORY: cloud-run-source-deploy
-  _CORS_ALLOWED_ORIGINS: https://devperpos.web.app,https://devper-pos.web.app
+  _CORS_ALLOWED_ORIGINS: https://devper.web.app,https://devperpos.web.app,https://devper-pos.web.app
 
 steps:
   - id: test

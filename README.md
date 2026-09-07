@@ -126,7 +126,7 @@ Service account ของ Cloud Build ต้องมี role `roles/run.admin`,
 | `_SERVICE` | `pos-dev-api` | ชื่อ Cloud Run service |
 | `_REGION` | `asia-southeast1` | region ของ service และ Artifact Registry |
 | `_REPOSITORY` | `cloud-run-source-deploy` | Artifact Registry repository |
-| `_CORS_ALLOWED_ORIGINS` | `https://devperpos.web.app,https://devper-pos.web.app` | origin ที่อนุญาต — ต้องอัปเดตเมื่อเพิ่ม/เปลี่ยน host ของ POS web |
+| `_CORS_ALLOWED_ORIGINS` | `https://devper.web.app,https://devperpos.web.app,https://devper-pos.web.app` | origin ที่อนุญาต — ต้องอัปเดตเมื่อเพิ่ม/เปลี่ยน host ของ POS web |
 
 ถ้าไม่ตั้ง `CORS_ALLOWED_ORIGINS` service จะ fallback เป็น `*` และ log warning ไว้
 
