@@ -49,12 +49,14 @@
 ### Other top-level directories
 - `db/` — `init.go` initialises Mongo client and Redis client into `db.Resource`.
 - `docs/business-logic/` — rich documentation: numbered markdown chapters (01–08), `api-contracts/`, `flows/`, `lifecycle/`, `screens/`, `feature-flow-matrix.md`, `requirement.md`.
+- `Dockerfile` / `cloudbuild.yaml` — container build and the Cloud Build pipeline that auto-deploys `main` to Cloud Run service `pos-dev-api`.
 
 ## Common Commands
 - Run app: `go run main.go`
 - Run all tests: `go test ./...`
 - Run a package's tests: `go test ./app/data/repositories`
 - Format code: `gofmt -w <file>`
+- Deploy manually: `gcloud builds submit --config=cloudbuild.yaml --region=asia-southeast1`
 
 ## Environment Notes
 - Local development expects `.env` in repo root.
