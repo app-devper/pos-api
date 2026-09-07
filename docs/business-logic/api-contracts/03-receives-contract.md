@@ -29,11 +29,17 @@
 - `PATCH /receives/:receiveId/total-cost` — อัปเดตต้นทุนรวมของเอกสาร
 - `PATCH /receives/:receiveId/items` — อัปเดตรายการสินค้าในเอกสาร
 - `PATCH /receives/:receiveId/import` — นำเข้าข้อมูลรับสินค้าเข้าสู่ stock (trigger stock/lot/history update)
+- เมื่อแก้ `items` backend ต้อง sync ทั้ง field `receive.items` และ collection `receive_items` ให้ตรงกัน เพราะ import flow และรายงาน ข.ย.9 อ่านจาก `receive_items`
+- เมื่อแก้ `items` backend ควรคำนวณ `totalCost` ระดับเอกสารใหม่จากรายการล่าสุดอัตโนมัติ แทนการปล่อยให้ยอดรวมค้างจาก state เก่า
+- เมื่อแก้ `items` backend ต้อง validate `productId` จริงเหมือนการแก้เอกสารทั้งใบ เพื่อไม่ให้ bad item หลุดไปพังใน import/report ภายหลัง
 
 ### 4. Data Integrity
 
 - ถ้า item ใด item หนึ่งผิด ต้องไม่สร้าง receive ครึ่งทาง
 - Backend ต้องรับประกันความสอดคล้องของ stock, lot และ history เมื่อ create หรือ import สำเร็จ
+- Backend ต้องไม่ปล่อยให้ receive document กับ `receive_items` collection ถือข้อมูลคนละชุดหลังจาก update items
+- Backend ต้องไม่ปล่อยให้ `totalCost` ของเอกสารไม่ตรงกับผลรวมจาก receive items ล่าสุด
+- Backend ต้องไม่ยอมรับ receive items ที่อ้าง product ที่ไม่มีอยู่จริง
 
 ## Endpoints
 
@@ -53,7 +59,9 @@
 - invalid supplier
 - invalid product
 - quantity / price / expiry invalid
+- patch items with missing product not allowed
 - branch context ไม่ถูกต้อง
 - receive not found
 - import ซ้ำ (ถ้ามีการป้องกัน)
 - cancel imported receive not allowed
+- receive items out of sync with document state ต้องไม่เกิดขึ้นใน flow ปกติ

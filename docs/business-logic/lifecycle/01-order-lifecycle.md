@@ -69,6 +69,7 @@
 - ผู้ใช้มีสิทธิ์สูงพอ
 - มีเหตุผลรองรับการยกเลิก
 - ระบบรองรับการคืน stock หรือ reversal อย่างถูกต้อง
+- ถ้า client ส่ง payload การยกเลิกมา payload นั้นต้อง parse ได้ถูกต้องก่อนเริ่ม cancel flow
 
 #### Backend Effects
 

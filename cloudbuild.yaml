@@ -1,0 +1,62 @@
+# Auto-deploy pipeline for the POS API.
+# Wired to a Cloud Build trigger on branch `main` (see README "Deploy").
+# Tests gate the build: a failing `go test ./...` stops the deploy.
+
+substitutions:
+  _SERVICE: pos-dev-api
+  _REGION: asia-southeast1
+  _REPOSITORY: cloud-run-source-deploy
+  _CORS_ALLOWED_ORIGINS: https://devperpos.web.app,https://devper-pos.web.app
+
+steps:
+  - id: test
+    name: golang:1.24
+    entrypoint: go
+    args: ['test', './...']
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:$SHORT_SHA
+      - --tag
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE
+      - --image
+      - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:$SHORT_SHA
+      - --region
+      - $_REGION
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      # --update-env-vars merges: env vars and secrets already set on the
+      # service (MONGO_HOST, REDIS_HOST, SECRET_KEY, ...) are left untouched.
+      - --update-env-vars
+      - CORS_ALLOWED_ORIGINS=$_CORS_ALLOWED_ORIGINS
+      - --quiet
+
+images:
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:$SHORT_SHA
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/$_SERVICE:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 1200s

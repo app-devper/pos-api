@@ -267,26 +267,9 @@ func (entity *receiveEntity) updateReceiveByIdWithContext(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
-	items := make([]entities.ReceiveItem, 0, len(form.ReceiveItems))
-	for _, item := range form.ReceiveItems {
-		productId, err := primitive.ObjectIDFromHex(item.ProductId)
-		if err != nil {
-			return nil, err
-		}
-		ri := entities.ReceiveItem{
-			ProductId:    productId,
-			CostPrice:    item.CostPrice,
-			Quantity:     item.Quantity,
-			LotNumber:    item.LotNumber,
-			UnitId:       item.UnitId,
-			BaseQuantity: item.BaseQuantity,
-		}
-		if item.ExpireDate != "" {
-			if t, e := time.Parse(time.RFC3339, item.ExpireDate); e == nil {
-				ri.ExpireDate = t
-			}
-		}
-		items = append(items, ri)
+	items, err := buildReceiveItems(form.ReceiveItems)
+	if err != nil {
+		return nil, err
 	}
 
 	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
@@ -326,30 +309,55 @@ func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.Upda
 	logrus.Info("UpdateReceiveItems")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+
+	if entity.client == nil {
+		return entity.updateReceiveItemsByIdWithContext(ctx, id, form)
+	}
+
+	session, err := entity.client.StartSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.EndSession(ctx)
+
+	var result *entities.Receive
+	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		data, txErr := entity.updateReceiveItemsByIdWithContext(sessCtx, id, form)
+		if txErr != nil {
+			return nil, txErr
+		}
+		result = data
+		return data, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (entity *receiveEntity) updateReceiveItemsByIdWithContext(ctx context.Context, id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
 	obId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	items := make([]entities.ReceiveItem, 0, len(form.ReceiveItems))
-	for _, item := range form.ReceiveItems {
-		productId, err := primitive.ObjectIDFromHex(item.ProductId)
-		if err != nil {
+	items, err := buildReceiveItems(form.ReceiveItems)
+	if err != nil {
+		return nil, err
+	}
+	totalCost := calculateReceiveItemsTotalCost(items)
+
+	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		docs := make([]interface{}, 0, len(items))
+		for _, item := range items {
+			item.ReceiveId = obId
+			docs = append(docs, item)
+		}
+		if _, err = entity.receiveItemsRepo.InsertMany(ctx, docs); err != nil {
 			return nil, err
 		}
-		ri := entities.ReceiveItem{
-			ProductId:    productId,
-			CostPrice:    item.CostPrice,
-			Quantity:     item.Quantity,
-			LotNumber:    item.LotNumber,
-			UnitId:       item.UnitId,
-			BaseQuantity: item.BaseQuantity,
-		}
-		if item.ExpireDate != "" {
-			if t, e := time.Parse(time.RFC3339, item.ExpireDate); e == nil {
-				ri.ExpireDate = t
-			}
-		}
-		items = append(items, ri)
 	}
 
 	isReturnNewDoc := options.After
@@ -359,6 +367,7 @@ func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.Upda
 	data := entities.Receive{}
 	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
 		"items":       items,
+		"totalCost":   totalCost,
 		"updatedBy":   form.UpdatedBy,
 		"updatedDate": time.Now(),
 	}}, opts).Decode(&data)
@@ -366,6 +375,39 @@ func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.Upda
 		return nil, err
 	}
 	return &data, nil
+}
+
+func buildReceiveItems(items []request.ReceiveItem) ([]entities.ReceiveItem, error) {
+	result := make([]entities.ReceiveItem, 0, len(items))
+	for _, item := range items {
+		productId, err := primitive.ObjectIDFromHex(item.ProductId)
+		if err != nil {
+			return nil, err
+		}
+		receiveItem := entities.ReceiveItem{
+			ProductId:    productId,
+			CostPrice:    item.CostPrice,
+			Quantity:     item.Quantity,
+			LotNumber:    item.LotNumber,
+			UnitId:       item.UnitId,
+			BaseQuantity: item.BaseQuantity,
+		}
+		if item.ExpireDate != "" {
+			if t, e := time.Parse(time.RFC3339, item.ExpireDate); e == nil {
+				receiveItem.ExpireDate = t
+			}
+		}
+		result = append(result, receiveItem)
+	}
+	return result, nil
+}
+
+func calculateReceiveItemsTotalCost(items []entities.ReceiveItem) float64 {
+	var totalCost float64
+	for _, item := range items {
+		totalCost += item.CostPrice * float64(item.Quantity)
+	}
+	return totalCost
 }
 
 func (entity *receiveEntity) CreateReceiveItem(receiveId string, _ string, productId string, form request.Product) (*entities.ReceiveItem, error) {

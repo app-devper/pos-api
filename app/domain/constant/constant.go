@@ -32,4 +32,24 @@ const (
 	HistoryTypeUpdateProductStockQuantity = "UpdateProductStockQuantity"
 	HistoryTypeAddOrderItemProduct        = "AddOrderItemProduct"
 	HistoryTypeRemoveOrderItemProduct     = "RemoveOrderItemProduct"
+	HistoryTypeStockAdjustment            = "StockAdjustment"
+	HistoryTypeProductReturn              = "ProductReturn"
 )
+
+const (
+	AdjustmentReasonCount   = "นับสต็อก"
+	AdjustmentReasonDamaged = "ยาเสียหาย"
+	AdjustmentReasonExpired = "ยาหมดอายุ"
+	AdjustmentReasonLost    = "สูญหาย"
+	AdjustmentReasonOther   = "อื่นๆ"
+)
+
+func AdjustmentReasons() []string {
+	return []string{
+		AdjustmentReasonCount,
+		AdjustmentReasonDamaged,
+		AdjustmentReasonExpired,
+		AdjustmentReasonLost,
+		AdjustmentReasonOther,
+	}
+}

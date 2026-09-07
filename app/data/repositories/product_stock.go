@@ -32,10 +32,12 @@ type IProductStock interface {
 	RemoveProductStockById(id string) (*entities.ProductStock, error)
 	GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStocksByProductAndUnitId(productId string, unitId string, branchId string) ([]entities.ProductStock, error)
+	GetProductStocksByProductIdAndReceiveCode(productId string, receiveCode string, branchId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string, branchId string) int
 	GetProductStockBalance(productId string, unitId string, branchId string) int
 	RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
 	AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
+	DrainProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, int, error)
 
 	// ProductHistory
 	CreateProductHistory(param request.ProductHistory) (*entities.ProductHistory, error)
@@ -134,6 +136,33 @@ func (entity *productStockEntity) GetProductStockById(id string) (*entities.Prod
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *productStockEntity) GetProductStocksByProductIdAndReceiveCode(productId string, receiveCode string, branchId string) ([]entities.ProductStock, error) {
+	logrus.Info("GetProductStocksByProductIdAndReceiveCode")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	product, err := primitive.ObjectIDFromHex(productId)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"productId": product, "receiveCode": receiveCode}
+	if branchId != "" {
+		branch, branchErr := primitive.ObjectIDFromHex(branchId)
+		if branchErr != nil {
+			return nil, branchErr
+		}
+		filter["branchId"] = branch
+	}
+	cursor, err := entity.productStockRepo.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	items := []entities.ProductStock{}
+	if err = cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func (entity *productStockEntity) GetProductStocksByProductId(productId string, branchId string) (items []entities.ProductStock, err error) {
@@ -458,6 +487,51 @@ func (entity *productStockEntity) RemoveProductStockQuantityById(stockId string,
 		return nil, err
 	}
 	return &data, nil
+}
+
+func (entity *productStockEntity) DrainProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, int, error) {
+	logrus.Info("DrainProductStockQuantityById")
+	ctx, cancel := utils.InitContext()
+	defer cancel()
+	objId, err := primitive.ObjectIDFromHex(stockId)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	isReturnBeforeDoc := options.Before
+	opts := &options.FindOneAndUpdateOptions{
+		ReturnDocument: &isReturnBeforeDoc,
+	}
+	update := mongo.Pipeline{
+		{{
+			Key: "$set",
+			Value: bson.M{
+				"quantity": bson.M{
+					"$max": bson.A{
+						bson.M{"$subtract": bson.A{"$quantity", quantity}},
+						0,
+					},
+				},
+			},
+		}},
+	}
+
+	var before entities.ProductStock
+	if err := entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, update, opts).Decode(&before); err != nil {
+		return nil, 0, err
+	}
+
+	drained := quantity
+	if before.Quantity < drained {
+		drained = before.Quantity
+	}
+	if drained <= 0 {
+		return &before, 0, nil
+	}
+
+	after := before
+	after.Quantity = before.Quantity - drained
+	return &after, drained, nil
 }
 
 // --- ProductHistory ---

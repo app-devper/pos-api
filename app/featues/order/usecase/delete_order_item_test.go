@@ -209,3 +209,105 @@ func TestDeleteOrderByIdReturnsTransactionalError(t *testing.T) {
 		t.Fatalf("expected errcode %s in response body, got %s", errcode.OR_BAD_REQUEST_002, w.Body.String())
 	}
 }
+
+func TestDeleteOrderByIdRejectsMalformedJSONBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &cancelOrderRepoStub{
+		getOrderByIDFn: func(id string) (*entities.Order, error) {
+			t.Fatal("order lookup should not run for malformed JSON")
+			return nil, nil
+		},
+		cancelOrderByIDFn: func(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
+			t.Fatal("order cancel should not run for malformed JSON")
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/orders/"+primitive.NewObjectID().Hex(), strings.NewReader("{"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "orderId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	DeleteOrderById(repo, nil)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), errcode.OR_BAD_REQUEST_001) {
+		t.Fatalf("expected errcode %s in response body, got %s", errcode.OR_BAD_REQUEST_001, w.Body.String())
+	}
+}
+
+func TestDeleteOrderItemByIdRejectsMalformedJSONBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &cancelOrderRepoStub{
+		getOrderItemByIDFn: func(id string) (*entities.OrderItem, error) {
+			t.Fatal("item lookup should not run for malformed JSON")
+			return nil, nil
+		},
+		cancelByIDFn: func(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+			t.Fatal("order item cancel should not run for malformed JSON")
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/orders/items/"+primitive.NewObjectID().Hex(), strings.NewReader("{"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "itemId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	DeleteOrderItemById(repo, nil)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), errcode.OR_BAD_REQUEST_001) {
+		t.Fatalf("expected errcode %s in response body, got %s", errcode.OR_BAD_REQUEST_001, w.Body.String())
+	}
+}
+
+func TestDeleteOrderItemByOrderProductIdRejectsMalformedJSONBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	repo := &cancelOrderRepoStub{
+		getOrderByIDFn: func(id string) (*entities.Order, error) {
+			t.Fatal("order lookup should not run for malformed JSON")
+			return nil, nil
+		},
+		cancelByOrderProductIDFn: func(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+			t.Fatal("order item by product cancel should not run for malformed JSON")
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/orders/"+primitive.NewObjectID().Hex()+"/products/"+primitive.NewObjectID().Hex(), strings.NewReader("{"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{
+		{Key: "orderId", Value: primitive.NewObjectID().Hex()},
+		{Key: "productId", Value: primitive.NewObjectID().Hex()},
+	}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", primitive.NewObjectID().Hex())
+
+	DeleteOrderItemByOrderProductId(repo, nil)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), errcode.OR_BAD_REQUEST_001) {
+		t.Fatalf("expected errcode %s in response body, got %s", errcode.OR_BAD_REQUEST_001, w.Body.String())
+	}
+}

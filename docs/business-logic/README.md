@@ -20,6 +20,7 @@
 - `06-dashboard-and-analytics.md`
 - `07-settings-and-master-data.md`
 - `08-promotions-and-stock-transfer.md`
+- `09-stock-adjustments-counts-and-returns.md`
 - `feature-flow-matrix.md`
 
 ## เอกสาร Workflow / Sequence Flow
@@ -42,6 +43,9 @@
 - `flows/16-supplier-management-flow.md`
 - `flows/17-category-management-flow.md`
 - `flows/18-customer-history-flow.md`
+- `flows/19-stock-adjustment-flow.md`
+- `flows/20-stock-count-flow.md`
+- `flows/21-product-return-flow.md`
 
 ## เอกสาร Lifecycle / State Transition
 
@@ -94,6 +98,9 @@
 - `api-contracts/13-categories-contract.md`
 - `api-contracts/15-customer-histories-contract.md`
 - `api-contracts/16-dashboard-contract.md`
+- `api-contracts/17-stock-adjustments-contract.md`
+- `api-contracts/18-stock-counts-contract.md`
+- `api-contracts/19-product-returns-contract.md`
 
 ## หลักการออกแบบ business logic
 

@@ -1,0 +1,12 @@
+.git
+.github
+.codex
+.idea
+.env
+docs
+*_test.go
+AGENTS.md
+README.md
+Dockerfile
+.dockerignore
+cloudbuild.yaml

@@ -22,6 +22,9 @@ type Repository struct {
 	CustomerHistory repositories.ICustomerHistory
 	Patient         repositories.IPatient
 	StockTransfer   repositories.IStockTransfer
+	StockAdjustment repositories.IStockAdjustment
+	StockCount      repositories.IStockCount
+	ProductReturn   repositories.IProductReturn
 }
 
 func InitRepository(resource *db.Resource) *Repository {
@@ -42,5 +45,8 @@ func InitRepository(resource *db.Resource) *Repository {
 		CustomerHistory: repositories.NewCustomerHistoryEntity(resource),
 		Patient:         repositories.NewPatientEntity(resource),
 		StockTransfer:   repositories.NewStockTransferEntity(resource),
+		StockAdjustment: repositories.NewStockAdjustmentEntity(resource),
+		StockCount:      repositories.NewStockCountEntity(resource),
+		ProductReturn:   repositories.NewProductReturnEntity(resource),
 	}
 }

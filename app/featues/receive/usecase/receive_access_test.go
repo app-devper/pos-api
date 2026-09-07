@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,6 +25,11 @@ type receiveAccessRepoStub struct {
 	importReceiveToStockFn    func(receiveId string, userId string, branchId string) (*entities.Receive, error)
 	updateReceiveItemsByIDFn  func(id string, form request.UpdateReceiveItems) (*entities.Receive, error)
 	updateReceiveTotalCostFn  func(id string, totalCost float64) (*entities.Receive, error)
+}
+
+type receiveAccessProductStub struct {
+	repositories.IProduct
+	getProductByIDFn func(id string) (*entities.Product, error)
 }
 
 func (s *receiveAccessRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
@@ -51,6 +57,10 @@ func (s *receiveAccessRepoStub) UpdateReceiveItemsById(id string, form request.U
 
 func (s *receiveAccessRepoStub) UpdateReceiveTotalCostById(id string, totalCost float64) (*entities.Receive, error) {
 	return s.updateReceiveTotalCostFn(id, totalCost)
+}
+
+func (s *receiveAccessProductStub) GetProductById(id string) (*entities.Product, error) {
+	return s.getProductByIDFn(id)
 }
 
 func TestGetReceiveByIdRejectsForeignBranch(t *testing.T) {
@@ -156,7 +166,7 @@ func TestUpdateReceiveItemsByIdRejectsForeignBranch(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	UpdateReceiveItemsById(repo)(ctx)
+	UpdateReceiveItemsById(repo, nil)(ctx)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
@@ -214,13 +224,141 @@ func TestUpdateReceiveItemsByIdRejectsImportedReceive(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID.Hex())
 
-	UpdateReceiveItemsById(repo)(ctx)
+	UpdateReceiveItemsById(repo, nil)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
 	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
 		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
+	}
+}
+
+func TestUpdateReceiveItemsByIdFiltersInvalidItemsBeforeRepositoryUpdate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	var gotForm request.UpdateReceiveItems
+	repo := &receiveAccessRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.ACTIVE}, nil
+		},
+		updateReceiveItemsByIDFn: func(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
+			gotForm = form
+			return &entities.Receive{}, nil
+		},
+	}
+	productRepo := &receiveAccessProductStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			return &entities.Product{
+				Id:           primitive.NewObjectID(),
+				Name:         "Paracetamol",
+				SerialNumber: "PD-001",
+				Price:        10,
+				Unit:         "TAB",
+			}, nil
+		},
+	}
+
+	body := `{"items":[{"productId":"","costPrice":1,"quantity":1},{"productId":"` + primitive.NewObjectID().Hex() + `","costPrice":5,"quantity":2,"expireDate":"2026-12-31"}]}`
+	req := httptest.NewRequest(http.MethodPatch, "/receives/1/items", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveItemsById(repo, productRepo)(ctx)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
+	}
+	if len(gotForm.ReceiveItems) != 1 {
+		t.Fatalf("expected only 1 valid item sent to repository, got %d", len(gotForm.ReceiveItems))
+	}
+	if gotForm.UpdatedBy != "user-1" {
+		t.Fatalf("expected UpdatedBy user-1, got %s", gotForm.UpdatedBy)
+	}
+}
+
+func TestUpdateReceiveItemsByIdFailsWhenProductLookupFails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	repo := &receiveAccessRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.ACTIVE, Code: "RC-001"}, nil
+		},
+		updateReceiveItemsByIDFn: func(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
+			t.Fatal("update items should not be called when product lookup fails")
+			return nil, nil
+		},
+	}
+	productRepo := &receiveAccessProductStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			return nil, errors.New("product lookup failed")
+		},
+	}
+
+	body := `{"items":[{"productId":"` + primitive.NewObjectID().Hex() + `","costPrice":5,"quantity":2,"expireDate":"2026-12-31"}]}`
+	req := httptest.NewRequest(http.MethodPatch, "/receives/1/items", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveItemsById(repo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "product lookup failed") {
+		t.Fatalf("expected product lookup error, got %s", w.Body.String())
+	}
+}
+
+func TestUpdateReceiveItemsByIdFailsWhenProductNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	branchID := primitive.NewObjectID()
+	repo := &receiveAccessRepoStub{
+		getReceiveByIDFn: func(id string) (*entities.Receive, error) {
+			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.ACTIVE, Code: "RC-001"}, nil
+		},
+		updateReceiveItemsByIDFn: func(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
+			t.Fatal("update items should not be called when product is missing")
+			return nil, nil
+		},
+	}
+	productRepo := &receiveAccessProductStub{
+		getProductByIDFn: func(id string) (*entities.Product, error) {
+			return nil, nil
+		},
+	}
+
+	productID := primitive.NewObjectID().Hex()
+	body := `{"items":[{"productId":"` + productID + `","costPrice":5,"quantity":2,"expireDate":"2026-12-31"}]}`
+	req := httptest.NewRequest(http.MethodPatch, "/receives/1/items", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = req
+	ctx.Params = gin.Params{{Key: "receiveId", Value: primitive.NewObjectID().Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", branchID.Hex())
+
+	UpdateReceiveItemsById(repo, productRepo)(ctx)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "product "+productID+" not found") {
+		t.Fatalf("expected product not found error, got %s", w.Body.String())
 	}
 }
 

@@ -15,10 +15,13 @@ import (
 	"pos/app/featues/order"
 	"pos/app/featues/patient"
 	"pos/app/featues/product"
+	"pos/app/featues/product_return"
 	"pos/app/featues/promotion"
 	"pos/app/featues/receive"
 	"pos/app/featues/report"
 	"pos/app/featues/setting"
+	"pos/app/featues/stock_adjustment"
+	"pos/app/featues/stock_count"
 	"pos/app/featues/stock_transfer"
 	"pos/app/featues/supplier"
 	"pos/db"
@@ -58,6 +61,12 @@ func (app Routes) StartGin() error {
 	}
 	defer resource.Close()
 
+	// Liveness endpoints: "/health" for direct Cloud Run probes and
+	// "/api/pos/health" for probes that go through the Firebase gateway,
+	// whose "/health" rewrite is owned by the UM service.
+	r.GET("/health", healthCheck())
+	r.GET("/api/pos/health", healthCheck())
+
 	publicRoute := r.Group("/api/pos/v1")
 
 	repository := domain.InitRepository(resource)
@@ -80,6 +89,9 @@ func (app Routes) StartGin() error {
 	customer_history.ApplyCustomerHistoryAPI(publicRoute, repository)
 	patient.ApplyPatientAPI(publicRoute, repository)
 	stock_transfer.ApplyStockTransferAPI(publicRoute, repository)
+	stock_adjustment.ApplyStockAdjustmentAPI(publicRoute, repository)
+	stock_count.ApplyStockCountAPI(publicRoute, repository)
+	product_return.ApplyProductReturnAPI(publicRoute, repository)
 
 	r.NoRoute(middlewares.NoRoute())
 
@@ -102,6 +114,15 @@ func (app Routes) StartGin() error {
 	}
 
 	return nil
+}
+
+func healthCheck() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": getEnv("K_SERVICE", "pos-api"),
+		})
+	}
 }
 
 func initDefaultBranch(repository *domain.Repository) {

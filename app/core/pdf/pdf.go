@@ -1,9 +1,7 @@
 package pdf
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
+	_ "embed"
 
 	"github.com/go-pdf/fpdf"
 )
@@ -15,26 +13,21 @@ const (
 	TitleSize  = 12
 )
 
-func fontsDir() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "fonts")
-}
+// Fonts are embedded so PDF generation keeps working from a container image,
+// where the build-time source tree is not present at runtime.
+var (
+	//go:embed fonts/Sarabun-Regular.ttf
+	fontRegular []byte
+	//go:embed fonts/Sarabun-Bold.ttf
+	fontBold []byte
+	//go:embed fonts/Sarabun-Italic.ttf
+	fontItalic []byte
+)
 
 func InitFont(pdf *fpdf.Fpdf) {
-	dir := fontsDir()
-	regularPath := filepath.Join(dir, "Sarabun-Regular.ttf")
-	boldPath := filepath.Join(dir, "Sarabun-Bold.ttf")
-	italicPath := filepath.Join(dir, "Sarabun-Italic.ttf")
-
-	if _, err := os.Stat(regularPath); err == nil {
-		pdf.AddUTF8Font(FontFamily, "", regularPath)
-	}
-	if _, err := os.Stat(boldPath); err == nil {
-		pdf.AddUTF8Font(FontFamily, "B", boldPath)
-	}
-	if _, err := os.Stat(italicPath); err == nil {
-		pdf.AddUTF8Font(FontFamily, "I", italicPath)
-	}
+	pdf.AddUTF8FontFromBytes(FontFamily, "", fontRegular)
+	pdf.AddUTF8FontFromBytes(FontFamily, "B", fontBold)
+	pdf.AddUTF8FontFromBytes(FontFamily, "I", fontItalic)
 }
 
 func NewPDF() *fpdf.Fpdf {

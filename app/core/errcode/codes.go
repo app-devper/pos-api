@@ -157,6 +157,27 @@ const (
 	DA_INTERNAL_001    = "DA-500-001" // internal server error
 )
 
+// ─── Stock Adjustment (AJ) ──────────────────────────────────────────────────
+const (
+	AJ_BAD_REQUEST_001 = "AJ-400-001" // invalid request body
+	AJ_BAD_REQUEST_002 = "AJ-400-002" // create/query failed
+	AJ_INTERNAL_001    = "AJ-500-001" // internal server error
+)
+
+// ─── Stock Count (SC) ───────────────────────────────────────────────────────
+const (
+	SC_BAD_REQUEST_001 = "SC-400-001" // invalid request body
+	SC_BAD_REQUEST_002 = "SC-400-002" // create/query failed
+	SC_INTERNAL_001    = "SC-500-001" // internal server error
+)
+
+// ─── Product Return (RT) ────────────────────────────────────────────────────
+const (
+	RT_BAD_REQUEST_001 = "RT-400-001" // invalid request body
+	RT_BAD_REQUEST_002 = "RT-400-002" // create/query failed
+	RT_INTERNAL_001    = "RT-500-001" // internal server error
+)
+
 // ─── System (SY) ────────────────────────────────────────────────────────────
 const (
 	SY_NOT_FOUND_001 = "SY-404-001" // route not found

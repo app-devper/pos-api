@@ -91,6 +91,60 @@ Dev mode with auto-reload:
 nodemon --exec go run main.go --signal SIGTERM
 ```
 
+## Deploy
+
+Deploy ทำอัตโนมัติผ่าน Cloud Build — ทุก push ที่เข้า branch `main` จะ build image, deploy ขึ้น Cloud Run service `pos-dev-api` (`asia-southeast1`) ให้เอง ขั้นตอนใน [`cloudbuild.yaml`](cloudbuild.yaml):
+
+1. `go test ./...` — ถ้า test ตก build จะหยุด ไม่ deploy
+2. build container จาก [`Dockerfile`](Dockerfile) (multi-stage, static binary บน distroless)
+3. push ขึ้น Artifact Registry ด้วย tag `$SHORT_SHA` และ `latest`
+4. `gcloud run deploy` ด้วย image ของ commit นั้น
+
+Deploy ใช้ `--update-env-vars` ซึ่ง merge ค่าเข้าไป ไม่ล้างของเดิม — env และ secret ที่ตั้งไว้บน service (`MONGO_HOST`, `REDIS_HOST`, `SECRET_KEY`, `CLIENT_ID`, `SYSTEM`, `MONGO_POS_DB_NAME`) จึงยังอยู่ครบ มีแค่ `CORS_ALLOWED_ORIGINS` ที่ pipeline เป็นคนกำหนด
+
+### สร้าง trigger ครั้งแรก
+
+```bash
+gcloud builds triggers create github \
+  --name=pos-api-main-deploy \
+  --repo-owner=app-devper \
+  --repo-name=pos-api \
+  --branch-pattern='^main$' \
+  --build-config=cloudbuild.yaml \
+  --region=asia-southeast1 \
+  --project=devperpos
+```
+
+Service account ของ Cloud Build ต้องมี role `roles/run.admin`, `roles/artifactregistry.writer` และ `roles/iam.serviceAccountUser`
+
+### Substitutions
+
+ค่า default อยู่ใน `cloudbuild.yaml` override ได้ที่ trigger:
+
+| Substitution | Default | คำอธิบาย |
+|---|---|---|
+| `_SERVICE` | `pos-dev-api` | ชื่อ Cloud Run service |
+| `_REGION` | `asia-southeast1` | region ของ service และ Artifact Registry |
+| `_REPOSITORY` | `cloud-run-source-deploy` | Artifact Registry repository |
+| `_CORS_ALLOWED_ORIGINS` | `https://devperpos.web.app,https://devper-pos.web.app` | origin ที่อนุญาต — ต้องอัปเดตเมื่อเพิ่ม/เปลี่ยน host ของ POS web |
+
+ถ้าไม่ตั้ง `CORS_ALLOWED_ORIGINS` service จะ fallback เป็น `*` และ log warning ไว้
+
+### Deploy ด้วยมือ
+
+```bash
+gcloud builds submit --config=cloudbuild.yaml --region=asia-southeast1 --project=devperpos
+```
+
+## Health Check
+
+| Path | ใช้เมื่อ |
+|---|---|
+| `GET /health` | ยิงตรงที่ Cloud Run service |
+| `GET /api/pos/health` | ยิงผ่าน Firebase gateway (`https://api.devper.app`) เพราะ `/health` ของ gateway ถูก map ไปที่ UM service |
+
+ทั้งสอง path ไม่ต้อง auth และไม่แตะ database — ใช้เป็น liveness signal ล้วน ๆ ส่วน dependency ถูกตรวจด้วย `Ping` ตอน startup อยู่แล้ว
+
 ## Cloud Run Cost Tips
 
 โปรเจกต์นี้รองรับการ deploy บน Cloud Run ได้ดีขึ้นแล้วด้วย default ที่ช่วยลด cost:

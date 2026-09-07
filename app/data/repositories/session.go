@@ -2,10 +2,14 @@ package repositories
 
 import (
 	"context"
+	"encoding/json"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"pos/db"
 )
+
+const sessionPrefix = "session:"
 
 type sessionEntity struct {
 	rdb *redis.Client
@@ -22,9 +26,19 @@ func NewSessionEntity(resource *db.Resource) ISession {
 
 func (entity *sessionEntity) GetSessionById(sessionId string) (string, error) {
 	logrus.Info("GetSessionById")
-	result, err := entity.rdb.Get(context.Background(), sessionId).Result()
+	raw, err := entity.rdb.Get(context.Background(), sessionPrefix+sessionId).Result()
 	if err != nil {
 		return "", err
 	}
-	return result, nil
+	return parseSessionUserId([]byte(raw))
+}
+
+func parseSessionUserId(raw []byte) (string, error) {
+	var data struct {
+		UserId string `json:"userId"`
+	}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return "", err
+	}
+	return data.UserId, nil
 }
