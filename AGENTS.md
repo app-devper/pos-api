@@ -59,7 +59,7 @@
 
 ## Environment Notes
 - Deploy is automatic on push to `main` via the `deploy-pos-api` Cloud Build trigger. Its build config is **inline on the trigger** (project `devperpos`, region `global`), not in this repo — there is no `cloudbuild.yaml` or `Dockerfile` here, and the build uses Google Cloud buildpacks. It runs no tests, so `check` on the PR is the only gate.
-- Cloud Run env vars and secrets live on the service and survive deploys; the pipeline never sets them. See README "Deploy".
+- Cloud Run config lives on the service and survives deploys; the pipeline never sets it. `MONGO_HOST`, `REDIS_HOST` and `SECRET_KEY` come from Secret Manager (`pos-api-*`); the rest are plain env vars. See README "Deploy".
 - Local development expects `.env` in repo root.
 - **Required** env vars (validated at startup in `validateStartupConfig`): `SECRET_KEY`, `CLIENT_ID`, `SYSTEM`, `MONGO_HOST`, `MONGO_POS_DB_NAME`, `REDIS_HOST`.
 - Optional: `PORT` (default `8080`), `GIN_MODE`, `AUTO_INIT_DEFAULT_BRANCH`, HTTP timeout vars.
