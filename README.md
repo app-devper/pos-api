@@ -137,9 +137,25 @@ gcloud builds triggers describe deploy-pos-api --project=devperpos --region=glob
   จะโดน gcloud ตัดเป็นหลาย env var)
 - `CORS_ALLOWED_ORIGINS` ตั้งไว้บน service แล้ว ต้องอัปเดตเองเมื่อเพิ่มหรือเปลี่ยน
   host ของ POS web ถ้าไม่ได้ตั้ง service จะ fallback เป็น `*` พร้อม log warning
-- ตอนนี้ secret (`MONGO_HOST`, `REDIS_HOST`, `SECRET_KEY`, `LINE_TOKEN`) เก็บเป็น
-  env var ธรรมดาบน service อ่านได้จาก console และ `gcloud run services describe`
-  ควรย้ายไป Secret Manager แล้วอ้างด้วย `--set-secrets`
+- secret อยู่ใน Secret Manager แล้ว service อ้างถึงด้วย `--set-secrets` ไม่ใช่
+  เก็บเป็น env var ธรรมดา:
+
+  | Env | Secret |
+  |---|---|
+  | `MONGO_HOST` | `pos-api-mongo-host` |
+  | `REDIS_HOST` | `pos-api-redis-host` |
+  | `SECRET_KEY` | `pos-api-secret-key` |
+
+  service account `1056670356976-compute@developer.gserviceaccount.com` มี role
+  `roles/secretmanager.secretAccessor` บนทั้งสามตัว หมุนค่าใหม่ด้วยการเพิ่ม
+  version แล้ว service จะหยิบไปเองเพราะอ้าง `:latest`:
+
+  ```bash
+  printf '%s' 'ค่าใหม่' | gcloud secrets versions add pos-api-secret-key --project=devperpos --data-file=-
+  ```
+
+  env var ที่เหลือบน service (`MONGO_POS_DB_NAME`, `CLIENT_ID`, `SYSTEM`,
+  `GIN_MODE`, `CORS_ALLOWED_ORIGINS`) ไม่ใช่ความลับ เก็บเป็น plain ต่อไปได้
 
 ### Deploy ด้วยมือ
 
