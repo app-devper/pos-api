@@ -93,47 +93,58 @@ nodemon --exec go run main.go --signal SIGTERM
 
 ## Deploy
 
-Deploy ทำอัตโนมัติผ่าน Cloud Build — ทุก push ที่เข้า branch `main` จะ build image, deploy ขึ้น Cloud Run service `pos-dev-api` (`asia-southeast1`) ให้เอง ขั้นตอนใน [`cloudbuild.yaml`](cloudbuild.yaml):
+Deploy ทำอัตโนมัติ ทุก push ที่เข้า branch `main` จะ build และขึ้น Cloud Run
+service `pos-dev-api` (`asia-southeast1`) ให้เอง
 
-1. `go test ./...` — ถ้า test ตก build จะหยุด ไม่ deploy
-2. build container จาก [`Dockerfile`](Dockerfile) (multi-stage, static binary บน distroless)
-3. push ขึ้น Artifact Registry ด้วย tag `$SHORT_SHA` และ `latest`
-4. `gcloud run deploy` ด้วย image ของ commit นั้น
+**build config ไม่ได้อยู่ใน repo นี้** — มันเก็บเป็น inline config บนตัว trigger
+เอง แก้ pipeline ต้องไปแก้ที่ trigger ใน Google Cloud ไม่ใช่ที่นี่
 
-Deploy ใช้ `--update-env-vars` ซึ่ง merge ค่าเข้าไป ไม่ล้างของเดิม — env และ secret ที่ตั้งไว้บน service (`MONGO_HOST`, `REDIS_HOST`, `SECRET_KEY`, `CLIENT_ID`, `SYSTEM`, `MONGO_POS_DB_NAME`) จึงยังอยู่ครบ มีแค่ `CORS_ALLOWED_ORIGINS` ที่ pipeline เป็นคนกำหนด
-
-### สร้าง trigger ครั้งแรก
-
-```bash
-gcloud builds triggers create github \
-  --name=pos-api-main-deploy \
-  --repo-owner=app-devper \
-  --repo-name=pos-api \
-  --branch-pattern='^main$' \
-  --build-config=cloudbuild.yaml \
-  --region=asia-southeast1 \
-  --project=devperpos
+```
+trigger   deploy-pos-api
+project   devperpos
+region    global          ← ไม่ใช่ asia-southeast1 ที่ service อยู่
+branch    ^main$
 ```
 
-Service account ของ Cloud Build ต้องมี role `roles/run.admin`, `roles/artifactregistry.writer` และ `roles/iam.serviceAccountUser`
+ดูของจริง:
 
-### Substitutions
+```bash
+gcloud builds triggers describe deploy-pos-api --project=devperpos --region=global
+```
 
-ค่า default อยู่ใน `cloudbuild.yaml` override ได้ที่ trigger:
+ขั้นตอนที่ trigger ทำ:
 
-| Substitution | Default | คำอธิบาย |
-|---|---|---|
-| `_SERVICE` | `pos-dev-api` | ชื่อ Cloud Run service |
-| `_REGION` | `asia-southeast1` | region ของ service และ Artifact Registry |
-| `_REPOSITORY` | `cloud-run-source-deploy` | Artifact Registry repository |
-| `_CORS_ALLOWED_ORIGINS` | `https://devper.web.app,https://devperpos.web.app,https://devper-pos.web.app` | origin ที่อนุญาต — ต้องอัปเดตเมื่อเพิ่ม/เปลี่ยน host ของ POS web |
+1. build ด้วย Google Cloud buildpacks (`gcr.io/buildpacks/builder:v1`) — เป็น
+   Go buildpack ที่ compile จาก source ตรง ๆ ไม่ได้ใช้ Dockerfile
+2. push ขึ้น `asia.gcr.io/devperpos/pos-api/pos-dev-api:$COMMIT_SHA`
+3. `gcloud run services update` ด้วย image ของ commit นั้น
 
-ถ้าไม่ตั้ง `CORS_ALLOWED_ORIGINS` service จะ fallback เป็น `*` และ log warning ไว้
+### ข้อควรรู้
+
+- **ไม่มีด่าน test ใน pipeline** — deploy ออกไม่ว่าเทสต์จะผ่านหรือไม่ ด่านเดียวที่
+  มีคือ workflow `check` ที่รันตอนเปิด PR เพราะฉะนั้นอย่า push เข้า `main` ตรง ๆ
+  ให้ผ่าน PR เสมอตาม git flow
+- **pipeline ไม่ตั้ง env var ให้** ทุกค่าอยู่บน Cloud Run service และอยู่ข้ามการ
+  deploy เพราะ `services update` แก้เฉพาะสิ่งที่ระบุ ตั้งค่าใหม่ด้วย:
+
+  ```bash
+  gcloud run services update pos-dev-api \
+    --project=devperpos --region=asia-southeast1 \
+    --update-env-vars='^##^KEY=value'
+  ```
+
+  (`^##^` เปลี่ยน separator เพราะค่าที่มี comma อย่าง `CORS_ALLOWED_ORIGINS`
+  จะโดน gcloud ตัดเป็นหลาย env var)
+- `CORS_ALLOWED_ORIGINS` ตั้งไว้บน service แล้ว ต้องอัปเดตเองเมื่อเพิ่มหรือเปลี่ยน
+  host ของ POS web ถ้าไม่ได้ตั้ง service จะ fallback เป็น `*` พร้อม log warning
+- ตอนนี้ secret (`MONGO_HOST`, `REDIS_HOST`, `SECRET_KEY`, `LINE_TOKEN`) เก็บเป็น
+  env var ธรรมดาบน service อ่านได้จาก console และ `gcloud run services describe`
+  ควรย้ายไป Secret Manager แล้วอ้างด้วย `--set-secrets`
 
 ### Deploy ด้วยมือ
 
 ```bash
-gcloud builds submit --config=cloudbuild.yaml --region=asia-southeast1 --project=devperpos
+gcloud builds triggers run deploy-pos-api --project=devperpos --region=global --branch=main
 ```
 
 ## Health Check
