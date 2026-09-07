@@ -61,6 +61,12 @@ func (app Routes) StartGin() error {
 	}
 	defer resource.Close()
 
+	// Liveness endpoints: "/health" for direct Cloud Run probes and
+	// "/api/pos/health" for probes that go through the Firebase gateway,
+	// whose "/health" rewrite is owned by the UM service.
+	r.GET("/health", healthCheck())
+	r.GET("/api/pos/health", healthCheck())
+
 	publicRoute := r.Group("/api/pos/v1")
 
 	repository := domain.InitRepository(resource)
@@ -108,6 +114,15 @@ func (app Routes) StartGin() error {
 	}
 
 	return nil
+}
+
+func healthCheck() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": getEnv("K_SERVICE", "pos-api"),
+		})
+	}
 }
 
 func initDefaultBranch(repository *domain.Repository) {
