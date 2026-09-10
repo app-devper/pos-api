@@ -74,24 +74,7 @@ func (app Routes) StartGin() error {
 		initDefaultBranch(repository)
 	}
 
-	product.ApplyProductAPI(publicRoute, repository)
-	order.ApplyOrderAPI(publicRoute, repository)
-	catagory.ApplyCategoryAPI(publicRoute, repository)
-	customer.ApplyCustomerAPI(publicRoute, repository)
-	supplier.ApplySupplierAPI(publicRoute, repository)
-	receive.ApplyReceiveAPI(publicRoute, repository)
-	branch.ApplyBranchAPI(publicRoute, repository)
-	employee.ApplyEmployeeAPI(publicRoute, repository)
-	dashboard.ApplyDashboardAPI(publicRoute, repository)
-	report.ApplyReportAPI(publicRoute, repository)
-	setting.ApplySettingAPI(publicRoute, repository)
-	promotion.ApplyPromotionAPI(publicRoute, repository)
-	customer_history.ApplyCustomerHistoryAPI(publicRoute, repository)
-	patient.ApplyPatientAPI(publicRoute, repository)
-	stock_transfer.ApplyStockTransferAPI(publicRoute, repository)
-	stock_adjustment.ApplyStockAdjustmentAPI(publicRoute, repository)
-	stock_count.ApplyStockCountAPI(publicRoute, repository)
-	product_return.ApplyProductReturnAPI(publicRoute, repository)
+	applyFeatureAPIs(publicRoute, repository)
 
 	r.NoRoute(middlewares.NoRoute())
 
@@ -123,6 +106,29 @@ func healthCheck() gin.HandlerFunc {
 			"service": getEnv("K_SERVICE", "pos-api"),
 		})
 	}
+}
+
+// applyFeatureAPIs registers every feature on the given group. Kept apart from
+// StartGin so a test can mount the same set without a database behind it.
+func applyFeatureAPIs(route *gin.RouterGroup, repository *domain.Repository) {
+	product.ApplyProductAPI(route, repository)
+	order.ApplyOrderAPI(route, repository)
+	catagory.ApplyCategoryAPI(route, repository)
+	customer.ApplyCustomerAPI(route, repository)
+	supplier.ApplySupplierAPI(route, repository)
+	receive.ApplyReceiveAPI(route, repository)
+	branch.ApplyBranchAPI(route, repository)
+	employee.ApplyEmployeeAPI(route, repository)
+	dashboard.ApplyDashboardAPI(route, repository)
+	report.ApplyReportAPI(route, repository)
+	setting.ApplySettingAPI(route, repository)
+	promotion.ApplyPromotionAPI(route, repository)
+	customer_history.ApplyCustomerHistoryAPI(route, repository)
+	patient.ApplyPatientAPI(route, repository)
+	stock_transfer.ApplyStockTransferAPI(route, repository)
+	stock_adjustment.ApplyStockAdjustmentAPI(route, repository)
+	stock_count.ApplyStockCountAPI(route, repository)
+	product_return.ApplyProductReturnAPI(route, repository)
 }
 
 func initDefaultBranch(repository *domain.Repository) {
