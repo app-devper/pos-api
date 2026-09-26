@@ -8,6 +8,7 @@ const (
 	AU_UNAUTHORIZED_004 = "AU-401-004" // clientId mismatch
 	AU_UNAUTHORIZED_005 = "AU-401-005" // session invalid
 	AU_FORBIDDEN_001    = "AU-403-001" // employee not found / no branch access
+	AU_UNAVAILABLE_001  = "AU-503-001" // UM session store unavailable; retry, do not sign out
 )
 
 // ─── Branch (BR) ────────────────────────────────────────────────────────────
