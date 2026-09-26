@@ -23,18 +23,21 @@ type sessionEntity struct {
 	checker *sessionclient.Checker
 }
 
+// NewSessionEntity reads UM sessions from REDIS_HOST. If that is missing or
+// invalid it fails closed: every check reports the store as unavailable.
 func NewSessionEntity(resource *db.Resource) ISession {
 	checker, err := sessionclient.New(resource.RedisHost)
-	if err != nil {
-		logrus.Fatalf("session client: %v", err)
-	}
-	if !checker.Enabled() {
-		logrus.Fatal("session client: REDIS_HOST is required")
+	if err != nil || !checker.Enabled() {
+		logrus.Errorf("session client not configured (REDIS_HOST): %v; every session check will fail", err)
+		return &sessionEntity{}
 	}
 	return &sessionEntity{checker: checker}
 }
 
 func (entity *sessionEntity) Authorize(ctx context.Context, sessionId, system, method string) (string, error) {
+	if entity.checker == nil {
+		return "", sessionclient.ErrUnavailable
+	}
 	session, err := entity.checker.Authorize(ctx, sessionId, system, method)
 	if err != nil {
 		if !errors.Is(err, sessionclient.ErrSessionRejected) {
