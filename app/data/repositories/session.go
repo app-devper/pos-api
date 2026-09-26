@@ -2,43 +2,48 @@ package repositories
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/sirupsen/logrus"
 	"pos/db"
 )
 
-const sessionPrefix = "session:"
+// ISession confirms the UM session behind a verified access token by reading
+// UM's session store through sessionclient (um-api ADR-0004).
+type ISession interface {
+	// Authorize returns the session's user id. It fails with
+	// sessionclient.ErrSessionRejected when the session is gone or belongs to
+	// another system, and with sessionclient.ErrUnavailable when the store
+	// cannot answer and the outage policy does not let the request continue.
+	Authorize(ctx context.Context, sessionId, system, method string) (string, error)
+}
 
 type sessionEntity struct {
-	rdb *redis.Client
+	checker *sessionclient.Checker
 }
 
-type ISession interface {
-	GetSessionById(sessionId string) (string, error)
-}
-
+// NewSessionEntity reads UM sessions from REDIS_HOST. If that is missing or
+// invalid it fails closed: every check reports the store as unavailable.
 func NewSessionEntity(resource *db.Resource) ISession {
-	entity := &sessionEntity{rdb: resource.RdDb}
-	return entity
+	checker, err := sessionclient.New(resource.RedisHost)
+	if err != nil || !checker.Enabled() {
+		logrus.Errorf("session client not configured (REDIS_HOST): %v; every session check will fail", err)
+		return &sessionEntity{}
+	}
+	return &sessionEntity{checker: checker}
 }
 
-func (entity *sessionEntity) GetSessionById(sessionId string) (string, error) {
-	logrus.Info("GetSessionById")
-	raw, err := entity.rdb.Get(context.Background(), sessionPrefix+sessionId).Result()
+func (entity *sessionEntity) Authorize(ctx context.Context, sessionId, system, method string) (string, error) {
+	if entity.checker == nil {
+		return "", sessionclient.ErrUnavailable
+	}
+	session, err := entity.checker.Authorize(ctx, sessionId, system, method)
 	if err != nil {
+		if !errors.Is(err, sessionclient.ErrSessionRejected) {
+			logrus.Warn("session check: ", err)
+		}
 		return "", err
 	}
-	return parseSessionUserId([]byte(raw))
-}
-
-func parseSessionUserId(raw []byte) (string, error) {
-	var data struct {
-		UserId string `json:"userId"`
-	}
-	if err := json.Unmarshal(raw, &data); err != nil {
-		return "", err
-	}
-	return data.UserId, nil
+	return session.UserId, nil
 }

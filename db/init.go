@@ -18,6 +18,8 @@ type Resource struct {
 	Client *mongo.Client
 	PosDb  *mongo.Database
 	RdDb   *redis.Client
+	// RedisHost is the REDIS_HOST URL; UM's sessions live in the same Redis.
+	RedisHost string
 }
 
 // Close use this method to close database connection
@@ -115,9 +117,10 @@ func InitResource() (*Resource, error) {
 	}
 
 	return &Resource{
-		Client: mongoClient,
-		PosDb:  mongoClient.Database(posDbName),
-		RdDb:   rdb,
+		Client:    mongoClient,
+		PosDb:     mongoClient.Database(posDbName),
+		RdDb:      rdb,
+		RedisHost: redisHost,
 	}, nil
 }
 
