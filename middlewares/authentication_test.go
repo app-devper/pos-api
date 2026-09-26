@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -40,9 +42,12 @@ func (s *branchRepoStub) GetBranchByCode(code string) (*entities.Branch, error) 
 type sessionRepoStub struct {
 	repositories.ISession
 	getByIDFn func(sessionId string) (string, error)
+	gotSystem string
+	gotMethod string
 }
 
-func (s *sessionRepoStub) GetSessionById(sessionId string) (string, error) {
+func (s *sessionRepoStub) Authorize(_ context.Context, sessionId, system, method string) (string, error) {
+	s.gotSystem, s.gotMethod = system, method
 	return s.getByIDFn(sessionId)
 }
 
@@ -323,6 +328,7 @@ func TestRequireSessionSetsUserIdOnValidSession(t *testing.T) {
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx.Set("SessionId", "session-1")
+	ctx.Set("System", "POS")
 
 	RequireSession(sessionRepo)(ctx)
 
@@ -331,6 +337,28 @@ func TestRequireSessionSetsUserIdOnValidSession(t *testing.T) {
 	}
 	if got := ctx.GetString("UserId"); got != "user-1" {
 		t.Fatalf("expected UserId user-1, got %s", got)
+	}
+	if sessionRepo.gotSystem != "POS" || sessionRepo.gotMethod != http.MethodGet {
+		t.Fatalf("expected the token's system and request method, got %q %q", sessionRepo.gotSystem, sessionRepo.gotMethod)
+	}
+}
+
+func TestRequireSessionReturns503WhenSessionStoreUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	sessionRepo := &sessionRepoStub{
+		getByIDFn: func(string) (string, error) { return "", sessionclient.ErrUnavailable },
+	}
+
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	ctx.Set("SessionId", "session-1")
+
+	RequireSession(sessionRepo)(ctx)
+
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), errcode.AU_UNAVAILABLE_001) {
+		t.Fatalf("expected 503 %s, got %d %s", errcode.AU_UNAVAILABLE_001, w.Code, w.Body.String())
 	}
 }
 
