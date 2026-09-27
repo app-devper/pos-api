@@ -53,6 +53,7 @@ func (app Routes) StartGin() error {
 
 	r.Use(gin.Logger())
 	r.Use(middlewares.NewRecovery())
+	r.Use(middlewares.NewGatewayHost(os.Getenv("GATEWAY_HOSTS")))
 	r.Use(middlewares.NewCors(getCorsOrigins()))
 
 	resource, err := db.InitResource()
