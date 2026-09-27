@@ -71,6 +71,10 @@ func (app Routes) StartGin() error {
 	publicRoute := r.Group("/api/pos/v1")
 
 	repository := domain.InitRepository(resource)
+	repository.Auth, err = middlewares.NewAuth(resource.RedisHost)
+	if err != nil {
+		return fmt.Errorf("UM token verification: %w", err)
+	}
 	if shouldAutoInitDefaultBranch() {
 		initDefaultBranch(repository)
 	}

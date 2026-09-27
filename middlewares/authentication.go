@@ -2,17 +2,15 @@ package middlewares
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"pos/app/core/errcode"
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
-	"strings"
 
 	"github.com/app-devper/um-api/sessionclient"
+	"github.com/app-devper/um-api/sessionclient/ginauth"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -44,105 +42,36 @@ func RequireBranch(employeeEntity repositories.IEmployee, branchEntity repositor
 	}
 }
 
-type AccessClaims struct {
-	Role     string `json:"role"`
-	System   string `json:"system"`
-	ClientId string `json:"clientId"`
-	jwt.RegisteredClaims
+// NewAuth verifies UM access tokens for pos: SYSTEM and CLIENT_ID pin the
+// token, and the session is confirmed in UM's Redis at redisHost
+// (um-api ADR-0005). It fails when any of them is missing.
+func NewAuth(redisHost string) (*ginauth.Auth, error) {
+	store, err := sessionclient.RedisStoreFor(redisHost)
+	if err != nil {
+		return nil, err
+	}
+	return NewAuthWithStore(store)
 }
 
-type authConfig struct {
-	jwtKey   []byte
-	clientId string
-	system   string
+// NewAuthWithStore is NewAuth with UM's session store supplied, for tests.
+func NewAuthWithStore(store sessionclient.Store) (*ginauth.Auth, error) {
+	verifier, err := sessionclient.NewVerifier(sessionclient.Config{
+		SecretKey: os.Getenv("SECRET_KEY"),
+		System:    os.Getenv("SYSTEM"),
+		ClientID:  os.Getenv("CLIENT_ID"),
+		Store:     store,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ginauth.New(verifier, func(ctx *gin.Context, e *sessionclient.Error) {
+		errcode.Abort(ctx, e.Status, e.Code, e.Message)
+	}), nil
 }
 
-func RequireAuthenticated() gin.HandlerFunc {
-	config, configErr := loadAuthConfig()
-	return func(ctx *gin.Context) {
-		if configErr != nil {
-			errcode.Abort(ctx, http.StatusInternalServerError, errcode.SY_INTERNAL_001, configErr.Error())
-			return
-		}
-
-		token := ctx.GetHeader("Authorization")
-		if token == "" {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_001, "missing authorization header")
-			return
-		}
-		jwtToken := strings.Split(token, "Bearer ")
-		if len(jwtToken) < 2 {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_001, "missing authorization header")
-			return
-		}
-		claims := &AccessClaims{}
-		tkn, err := jwt.ParseWithClaims(jwtToken[1], claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-			}
-			return config.jwtKey, nil
-		})
-		if err != nil {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_002, err.Error())
-			return
-		}
-		if tkn == nil || !tkn.Valid || claims.ID == "" {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_002, "token invalid")
-			return
-		}
-		if config.system != claims.System {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_003, "system invalid")
-			return
-		}
-		if config.clientId != claims.ClientId {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_004, "clientId invalid")
-			return
-		}
-
-		ctx.Set("SessionId", claims.ID)
-		ctx.Set("Role", claims.Role)
-		ctx.Set("System", claims.System)
-		ctx.Set("ClientId", claims.ClientId)
-		ctx.Next()
-	}
-}
-
-func RequireSession(sessionEntity repositories.ISession) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		userId, err := sessionEntity.Authorize(ctx.Request.Context(),
-			ctx.GetString("SessionId"), ctx.GetString("System"), ctx.Request.Method)
-		if errors.Is(err, sessionclient.ErrUnavailable) {
-			errcode.Abort(ctx, http.StatusServiceUnavailable, errcode.AU_UNAVAILABLE_001, "identity service unavailable")
-			return
-		}
-		if err != nil {
-			errcode.Abort(ctx, http.StatusUnauthorized, errcode.AU_UNAUTHORIZED_005, "session invalid")
-			return
-		}
-		ctx.Set("UserId", userId)
-		ctx.Next()
-	}
-}
-
-func loadAuthConfig() (*authConfig, error) {
-	secretKey := os.Getenv("SECRET_KEY")
-	if secretKey == "" {
-		return nil, errors.New("missing required env: SECRET_KEY")
-	}
-
-	clientId := os.Getenv("CLIENT_ID")
-	if clientId == "" {
-		return nil, errors.New("missing required env: CLIENT_ID")
-	}
-
-	system := os.Getenv("SYSTEM")
-	if system == "" {
-		return nil, errors.New("missing required env: SYSTEM")
-	}
-
-	return &authConfig{
-		jwtKey:   []byte(secretKey),
-		clientId: clientId,
-		system:   system,
-	}, nil
+// RequireSession admits a caller with a live UM session. Every pos route uses
+// the default outage policy: while UM is unreachable a read may continue with
+// the session last confirmed for its token, and writes wait.
+func RequireSession(auth *ginauth.Auth) gin.HandlerFunc {
+	return auth.Require(sessionclient.ReadOnlyWithLastGood)
 }

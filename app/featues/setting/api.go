@@ -1,11 +1,11 @@
 package setting
 
 import (
-	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/setting/usecase"
 	"pos/middlewares"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,17 +16,15 @@ func ApplySettingAPI(
 	settingRoute := route.Group("settings")
 
 	settingRoute.GET("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		usecase.GetSetting(repository.Setting),
 	)
 
 	settingRoute.PUT("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.UpsertSetting(repository.Setting),
 	)
 }
