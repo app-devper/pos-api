@@ -1,11 +1,11 @@
 package customer
 
 import (
-	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/customer/usecase"
 	"pos/middlewares"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,48 +16,41 @@ func ApplyCustomerAPI(
 	customerRoute := route.Group("customers")
 
 	customerRoute.POST("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.CreateCustomer(repository.Customer, repository.Sequence),
 	)
 
 	customerRoute.GET("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		usecase.GetCustomers(repository.Customer),
 	)
 
 	customerRoute.GET("/:customerId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		usecase.GetCustomerById(repository.Customer),
 	)
 
 	customerRoute.PUT("/:customerId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.UpdateCustomerById(repository.Customer),
 	)
 
 	customerRoute.PATCH("/:customerId/status",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.UpdateCustomerStatusById(repository.Customer),
 	)
 
 	customerRoute.DELETE("/:customerId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.DeleteCustomerById(repository.Customer),
 	)
 
 	customerRoute.GET("/code/:customerCode",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		usecase.GetCustomerByCode(repository.Customer),
 	)
 

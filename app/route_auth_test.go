@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -8,14 +9,16 @@ import (
 	"testing"
 
 	"pos/app/domain"
+	"pos/middlewares"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
 // buildRouter registers every feature the same way StartGin does. The handlers
-// never run here: RequireAuthenticated rejects a request with no Authorization
-// header before anything reaches a repository, so the nil fields are never
-// dereferenced.
+// never run here: RequireSession rejects a request with no Authorization
+// header before anything reaches a repository or the session store, so the
+// nil fields are never dereferenced.
 func buildRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	t.Setenv("SECRET_KEY", "test-secret")
@@ -26,8 +29,20 @@ func buildRouter(t *testing.T) *gin.Engine {
 	r := gin.New()
 	r.GET("/health", healthCheck())
 	r.GET("/api/pos/health", healthCheck())
-	applyFeatureAPIs(r.Group("/api/pos/v1"), &domain.Repository{})
+	auth, err := middlewares.NewAuthWithStore(unusedStore{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	applyFeatureAPIs(r.Group("/api/pos/v1"), &domain.Repository{Auth: auth})
 	return r
+}
+
+// unusedStore stands in for UM's session store; anonymous requests never
+// reach it.
+type unusedStore struct{}
+
+func (unusedStore) Session(context.Context, string) (sessionclient.Session, error) {
+	return sessionclient.Session{}, sessionclient.ErrUnavailable
 }
 
 var pathParam = regexp.MustCompile(`:[a-zA-Z]+`)

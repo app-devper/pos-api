@@ -1,11 +1,11 @@
 package stock_adjustment
 
 import (
-	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/stock_adjustment/usecase"
 	"pos/middlewares"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,18 +16,16 @@ func ApplyStockAdjustmentAPI(
 	ajRoute := route.Group("stock-adjustments")
 
 	ajRoute.POST("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.CreateStockAdjustment(repository.StockAdjustment, repository.ProductStock, repository.Product, repository.Order, repository.Sequence),
 	)
 
 	ajRoute.GET("/product/:productId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.GetStockAdjustmentsByProductId(repository.StockAdjustment),
 	)
 }

@@ -1,11 +1,11 @@
 package employee
 
 import (
-	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/employee/usecase"
 	"pos/middlewares"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,44 +16,38 @@ func ApplyEmployeeAPI(
 	employeeRoute := route.Group("employees")
 
 	employeeRoute.POST("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.CreateEmployee(repository.Employee),
 	)
 
 	employeeRoute.GET("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.GetEmployees(repository.Employee),
 	)
 
 	employeeRoute.GET("/:employeeId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.GetEmployeeById(repository.Employee),
 	)
 
 	employeeRoute.PUT("/:employeeId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.UpdateEmployeeById(repository.Employee),
 	)
 
 	employeeRoute.DELETE("/:employeeId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.DeleteEmployeeById(repository.Employee),
 	)
 
 	employeeRoute.GET("/branch/:branchId",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		middlewares.RequireSession(repository.Auth),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.GetEmployeesByBranchId(repository.Employee),
 	)
 }
