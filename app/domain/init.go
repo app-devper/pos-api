@@ -1,12 +1,14 @@
 package domain
 
 import (
+	"github.com/app-devper/um-api/sessionclient/ginauth"
 	"pos/app/data/repositories"
 	"pos/db"
 )
 
 type Repository struct {
-	Session         repositories.ISession
+	// Auth verifies UM tokens and sessions; set by the app at startup.
+	Auth            *ginauth.Auth
 	Sequence        repositories.ISequence
 	Category        repositories.ICategory
 	Order           repositories.IOrder
@@ -29,7 +31,6 @@ type Repository struct {
 
 func InitRepository(resource *db.Resource) *Repository {
 	return &Repository{
-		Session:         repositories.NewSessionEntity(resource),
 		Category:        repositories.NewCategoryEntity(resource),
 		Order:           repositories.NewOrderEntity(resource),
 		Sequence:        repositories.NewSequenceEntity(resource),

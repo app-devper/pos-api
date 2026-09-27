@@ -1,11 +1,11 @@
 package stock_transfer
 
 import (
-	"pos/app/core/constant"
 	"pos/app/domain"
 	"pos/app/featues/stock_transfer/usecase"
 	"pos/middlewares"
 
+	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,42 +16,37 @@ func ApplyStockTransferAPI(
 	stRoute := route.Group("stock-transfers")
 
 	stRoute.POST("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.CreateStockTransfer(repository.StockTransfer, repository.Product, repository.Sequence),
 	)
 
 	stRoute.GET("",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.GetStockTransfers(repository.StockTransfer),
 	)
 
 	stRoute.GET("/:id",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.GetStockTransferById(repository.StockTransfer),
 	)
 
 	stRoute.PATCH("/:id/approve",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.ApproveStockTransfer(repository.StockTransfer),
 	)
 
 	stRoute.PATCH("/:id/reject",
-		middlewares.RequireAuthenticated(),
-		middlewares.RequireSession(repository.Session),
+		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		middlewares.RequireAuthorization(constant.ADMIN, constant.SUPER),
+		repository.Auth.AtLeast(sessionclient.RoleAdmin),
 		usecase.RejectStockTransfer(repository.StockTransfer),
 	)
 }

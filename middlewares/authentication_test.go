@@ -1,11 +1,9 @@
 package middlewares
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"pos/app/domain/constant"
 	"strings"
 	"testing"
@@ -14,9 +12,7 @@ import (
 	"pos/app/data/entities"
 	"pos/app/data/repositories"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -37,18 +33,6 @@ type branchRepoStub struct {
 
 func (s *branchRepoStub) GetBranchByCode(code string) (*entities.Branch, error) {
 	return s.getByCodeFn(code)
-}
-
-type sessionRepoStub struct {
-	repositories.ISession
-	getByIDFn func(sessionId string) (string, error)
-	gotSystem string
-	gotMethod string
-}
-
-func (s *sessionRepoStub) Authorize(_ context.Context, sessionId, system, method string) (string, error) {
-	s.gotSystem, s.gotMethod = system, method
-	return s.getByIDFn(sessionId)
 }
 
 func TestRequireBranchUsesEmployeeBranchAndRole(t *testing.T) {
@@ -246,164 +230,5 @@ func TestRequireBranchStillFallsBackWhenEmployeeMissing(t *testing.T) {
 	}
 	if got := ctx.GetString("BranchId"); got != hqID.Hex() {
 		t.Fatalf("expected BranchId %s, got %s", hqID.Hex(), got)
-	}
-}
-
-func TestRequireAuthenticatedRejectsMissingAuthConfig(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	restore := snapshotEnv([]string{"SECRET_KEY", "CLIENT_ID", "SYSTEM"})
-	defer restore()
-
-	t.Setenv("SECRET_KEY", "")
-	t.Setenv("CLIENT_ID", "client")
-	t.Setenv("SYSTEM", "pos")
-
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx.Request.Header.Set("Authorization", "Bearer token")
-
-	RequireAuthenticated()(ctx)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
-	}
-	if body := w.Body.String(); !strings.Contains(body, errcode.SY_INTERNAL_001) {
-		t.Fatalf("expected errcode %s in response body, got %s", errcode.SY_INTERNAL_001, body)
-	}
-}
-
-func TestRequireAuthenticatedAcceptsValidTokenWhenConfigPresent(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	restore := snapshotEnv([]string{"SECRET_KEY", "CLIENT_ID", "SYSTEM"})
-	defer restore()
-
-	t.Setenv("SECRET_KEY", "super-secret")
-	t.Setenv("CLIENT_ID", "client")
-	t.Setenv("SYSTEM", "pos")
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, AccessClaims{
-		Role:     "ADMIN",
-		System:   "pos",
-		ClientId: "client",
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID: "session-1",
-		},
-	})
-	signedToken, err := token.SignedString([]byte("super-secret"))
-	if err != nil {
-		t.Fatalf("expected signed token, got %v", err)
-	}
-
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx.Request.Header.Set("Authorization", "Bearer "+signedToken)
-
-	RequireAuthenticated()(ctx)
-
-	if ctx.IsAborted() {
-		t.Fatalf("expected middleware to continue, got status %d body %s", w.Code, w.Body.String())
-	}
-	if got := ctx.GetString("SessionId"); got != "session-1" {
-		t.Fatalf("expected SessionId session-1, got %s", got)
-	}
-}
-
-func TestRequireSessionSetsUserIdOnValidSession(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	sessionRepo := &sessionRepoStub{
-		getByIDFn: func(sessionId string) (string, error) {
-			if sessionId != "session-1" {
-				t.Fatalf("expected sessionId session-1, got %s", sessionId)
-			}
-			return "user-1", nil
-		},
-	}
-
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx.Set("SessionId", "session-1")
-	ctx.Set("System", "POS")
-
-	RequireSession(sessionRepo)(ctx)
-
-	if ctx.IsAborted() {
-		t.Fatalf("expected middleware to continue, got status %d body %s", w.Code, w.Body.String())
-	}
-	if got := ctx.GetString("UserId"); got != "user-1" {
-		t.Fatalf("expected UserId user-1, got %s", got)
-	}
-	if sessionRepo.gotSystem != "POS" || sessionRepo.gotMethod != http.MethodGet {
-		t.Fatalf("expected the token's system and request method, got %q %q", sessionRepo.gotSystem, sessionRepo.gotMethod)
-	}
-}
-
-func TestRequireSessionReturns503WhenSessionStoreUnavailable(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	sessionRepo := &sessionRepoStub{
-		getByIDFn: func(string) (string, error) { return "", sessionclient.ErrUnavailable },
-	}
-
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = httptest.NewRequest(http.MethodPost, "/", nil)
-	ctx.Set("SessionId", "session-1")
-
-	RequireSession(sessionRepo)(ctx)
-
-	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), errcode.AU_UNAVAILABLE_001) {
-		t.Fatalf("expected 503 %s, got %d %s", errcode.AU_UNAVAILABLE_001, w.Code, w.Body.String())
-	}
-}
-
-func TestRequireSessionRejectsInvalidSession(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	sessionRepo := &sessionRepoStub{
-		getByIDFn: func(sessionId string) (string, error) {
-			return "", errors.New("session not found")
-		},
-	}
-
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx.Set("SessionId", "session-1")
-
-	RequireSession(sessionRepo)(ctx)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, w.Code)
-	}
-	if body := w.Body.String(); !strings.Contains(body, errcode.AU_UNAUTHORIZED_005) {
-		t.Fatalf("expected errcode %s in response body, got %s", errcode.AU_UNAUTHORIZED_005, body)
-	}
-}
-
-func snapshotEnv(keys []string) func() {
-	values := make(map[string]*string, len(keys))
-	for _, key := range keys {
-		if value, ok := os.LookupEnv(key); ok {
-			copied := value
-			values[key] = &copied
-			continue
-		}
-		values[key] = nil
-	}
-
-	return func() {
-		for _, key := range keys {
-			if values[key] == nil {
-				_ = os.Unsetenv(key)
-				continue
-			}
-			_ = os.Setenv(key, *values[key])
-		}
 	}
 }
