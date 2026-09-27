@@ -3,7 +3,7 @@ module pos
 go 1.24.0
 
 require (
-	github.com/app-devper/um-api/sessionclient v0.2.0
+	github.com/app-devper/um-api/sessionclient v0.2.2
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-pdf/fpdf v0.9.0
