@@ -29,7 +29,7 @@ func recordSale(ctx *gin.Context, orderEntity repositories.IOrder, sequenceEntit
 		var rejected *repositories.SaleRejected
 		switch {
 		case errors.Is(err, repositories.ErrSaleConflict):
-			errcode.Abort(ctx, http.StatusConflict, errcode.OR_CONFLICT_001, err.Error())
+			errcode.Abort(ctx, http.StatusConflict, errcode.OR_CONFLICT_001, "บิลนี้ถูกบันทึกไปแล้วด้วยรายการที่ต่างกัน ตรวจสอบประวัติการขายก่อนเริ่มบิลใหม่")
 		case errors.As(err, &rejected):
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, err.Error())
 		case err != nil:
