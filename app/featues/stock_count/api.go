@@ -19,7 +19,7 @@ func ApplyStockCountAPI(
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.CreateStockCount(repository.StockCount, repository.StockAdjustment, repository.ProductStock, repository.Product, repository.Order, repository.Sequence),
+		usecase.CreateStockCount(repository.StockCount),
 	)
 
 	scRoute.GET("",

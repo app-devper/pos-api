@@ -3,8 +3,8 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/domain/request"
 	"pos/db"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,30 +14,18 @@ import (
 )
 
 type stockAdjustmentEntity struct {
+	recorder            *stockRecorder
 	stockAdjustmentRepo *mongo.Collection
 }
 
 type IStockAdjustment interface {
-	CreateStockAdjustment(param StockAdjustmentInput) (*entities.StockAdjustment, error)
+	ApplyStockAdjustment(req request.StockAdjustment) (*entities.StockAdjustment, error)
 	GetStockAdjustmentsByProductId(productId string, branchId string) ([]entities.StockAdjustment, error)
-}
-
-type StockAdjustmentInput struct {
-	BranchId  primitive.ObjectID
-	Code      string
-	ProductId primitive.ObjectID
-	StockId   primitive.ObjectID
-	Reason    string
-	Note      string
-	Delta     int
-	Before    int
-	After     int
-	CreatedBy string
 }
 
 func NewStockAdjustmentEntity(resource *db.Resource) IStockAdjustment {
 	stockAdjustmentRepo := resource.PosDb.Collection("stock_adjustments")
-	entity := &stockAdjustmentEntity{stockAdjustmentRepo: stockAdjustmentRepo}
+	entity := &stockAdjustmentEntity{recorder: newStockRecorder(resource), stockAdjustmentRepo: stockAdjustmentRepo}
 	ensureStockAdjustmentIndexes(stockAdjustmentRepo)
 	return entity
 }
@@ -49,30 +37,6 @@ func ensureStockAdjustmentIndexes(repo *mongo.Collection) {
 	createCollectionIndex(repo, "stock_adjustments branchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-}
-
-func (entity *stockAdjustmentEntity) CreateStockAdjustment(param StockAdjustmentInput) (*entities.StockAdjustment, error) {
-	logrus.Info("CreateStockAdjustment")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	data := entities.StockAdjustment{
-		Id:          primitive.NewObjectID(),
-		BranchId:    param.BranchId,
-		Code:        param.Code,
-		ProductId:   param.ProductId,
-		StockId:     param.StockId,
-		Reason:      param.Reason,
-		Note:        param.Note,
-		Delta:       param.Delta,
-		Before:      param.Before,
-		After:       param.After,
-		CreatedBy:   param.CreatedBy,
-		CreatedDate: time.Now(),
-	}
-	if _, err := entity.stockAdjustmentRepo.InsertOne(ctx, data); err != nil {
-		return nil, err
-	}
-	return &data, nil
 }
 
 func (entity *stockAdjustmentEntity) GetStockAdjustmentsByProductId(productId string, branchId string) ([]entities.StockAdjustment, error) {

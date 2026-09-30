@@ -13,18 +13,18 @@ import (
 )
 
 type recorderStub struct {
-	repositories.IProductReturn
-	seen  request.ProductReturn
+	repositories.IStockAdjustment
+	seen  request.StockAdjustment
 	calls int
 	err   error
 }
 
-func (s *recorderStub) RecordProductReturn(req request.ProductReturn) (*entities.ProductReturn, error) {
+func (s *recorderStub) ApplyStockAdjustment(req request.StockAdjustment) (*entities.StockAdjustment, error) {
 	s.seen = req
 	s.calls++
-	return &entities.ProductReturn{}, s.err
+	return &entities.StockAdjustment{}, s.err
 }
-func TestCreateProductReturnUsesTrustedIdentityAndMapsOutcome(t *testing.T) {
+func TestCreateStockAdjustmentUsesTrustedIdentityAndMapsOutcome(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, fail := range []bool{false, true} {
 		repo := &recorderStub{}
@@ -33,11 +33,11 @@ func TestCreateProductReturnUsesTrustedIdentityAndMapsOutcome(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
-		ctx.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"orderId":"order","items":[{"orderItemId":"line","quantity":1}],"BranchId":"untrusted","CreatedBy":"untrusted"}`))
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"productId":"product","stockId":"stock","reason":"other","delta":1,"BranchId":"untrusted","CreatedBy":"untrusted"}`))
 		ctx.Request.Header.Set("Content-Type", "application/json")
 		ctx.Set("BranchId", "trusted-branch")
 		ctx.Set("UserId", "trusted-user")
-		CreateProductReturn(repo)(ctx)
+		CreateStockAdjustment(repo)(ctx)
 		want := http.StatusOK
 		if fail {
 			want = http.StatusBadRequest
@@ -50,13 +50,13 @@ func TestCreateProductReturnUsesTrustedIdentityAndMapsOutcome(t *testing.T) {
 		}
 	}
 }
-func TestCreateProductReturnRejectsMalformedInputBeforeRecording(t *testing.T) {
+func TestCreateStockAdjustmentRejectsMalformedInputBeforeRecording(t *testing.T) {
 	repo := &recorderStub{}
 	w := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(w)
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
-	CreateProductReturn(repo)(ctx)
+	CreateStockAdjustment(repo)(ctx)
 	if w.Code != http.StatusBadRequest || repo.calls != 0 {
 		t.Fatalf("invalid command recorded: status %d calls %d", w.Code, repo.calls)
 	}

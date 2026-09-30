@@ -3,8 +3,8 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/domain/request"
 	"pos/db"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,26 +14,19 @@ import (
 )
 
 type stockCountEntity struct {
+	recorder       *stockRecorder
 	stockCountRepo *mongo.Collection
 }
 
 type IStockCount interface {
-	CreateStockCount(param StockCountInput) (*entities.StockCount, error)
+	RecordStockCount(req request.StockCount) (*entities.StockCount, error)
 	GetStockCountById(id string) (*entities.StockCount, error)
 	GetStockCounts(branchId string) ([]entities.StockCount, error)
 }
 
-type StockCountInput struct {
-	BranchId  primitive.ObjectID
-	CountNo   string
-	Note      string
-	Items     []entities.StockCountItem
-	CreatedBy string
-}
-
 func NewStockCountEntity(resource *db.Resource) IStockCount {
 	stockCountRepo := resource.PosDb.Collection("stock_counts")
-	entity := &stockCountEntity{stockCountRepo: stockCountRepo}
+	entity := &stockCountEntity{recorder: newStockRecorder(resource), stockCountRepo: stockCountRepo}
 	ensureStockCountIndexes(stockCountRepo)
 	return entity
 }
@@ -42,25 +35,6 @@ func ensureStockCountIndexes(repo *mongo.Collection) {
 	createCollectionIndex(repo, "stock_counts branchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-}
-
-func (entity *stockCountEntity) CreateStockCount(param StockCountInput) (*entities.StockCount, error) {
-	logrus.Info("CreateStockCount")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	data := entities.StockCount{
-		Id:          primitive.NewObjectID(),
-		BranchId:    param.BranchId,
-		CountNo:     param.CountNo,
-		Note:        param.Note,
-		Items:       param.Items,
-		CreatedBy:   param.CreatedBy,
-		CreatedDate: time.Now(),
-	}
-	if _, err := entity.stockCountRepo.InsertOne(ctx, data); err != nil {
-		return nil, err
-	}
-	return &data, nil
 }
 
 func (entity *stockCountEntity) GetStockCountById(id string) (*entities.StockCount, error) {

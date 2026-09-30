@@ -11,6 +11,7 @@ import (
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,8 +32,22 @@ func CreateOrder(
 	sequenceEntity repositories.ISequence,
 ) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		var probe struct {
+			SaleId string `json:"saleId"`
+		}
+		if err := ctx.ShouldBindBodyWith(&probe, binding.JSON); err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, err.Error())
+			return
+		}
+		if probe.SaleId != "" {
+			recordSale(ctx, orderEntity, sequenceEntity)
+			return
+		}
+
+		// A till from before saleId: it priced the Sale and chose its Stock
+		// itself. Kept until no such till is left.
 		req := request.Order{}
-		if err := ctx.ShouldBind(&req); err != nil {
+		if err := ctx.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, err.Error())
 			return
 		}

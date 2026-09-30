@@ -73,7 +73,7 @@
 
 ### Edge Cases
 
-- บรรทัดใดบรรทัดหนึ่งในชุดนับล้มเหลว (เช่น stock ไม่พบ) — รายการก่อนหน้าที่ apply ไปแล้วจะไม่ถูก rollback อัตโนมัติ (best-effort เหมือน stock transfer/receive ปัจจุบัน ไม่ใช่ transactional ทั้งชุด)
+- บรรทัดใดบรรทัดหนึ่งในชุดนับล้มเหลว หรือบันทึกเอกสาร/history/reconciliation ไม่สำเร็จ — rollback ทั้งชุด รวม Stock, Adjustment, Count และ sequence; ไม่มีผลสำเร็จบางส่วน
 
 ## Part D: Product Return
 
@@ -94,6 +94,16 @@
 
 - order item เดียวถูกคืนหลายครั้งบางส่วน (partial return) — ต้องไล่ allocate จาก lot ที่ถูกต้องทุกครั้งโดยไม่คืนซ้ำส่วนเดิม
 - order item ที่มีทั้งส่วน lot จริงและส่วน oversold/synthetic ปนกัน — คืนได้เฉพาะสัดส่วน lot จริงเท่านั้น
+
+## Atomic recording
+
+- Return, Adjustment และ Count แต่ละคำขอเป็น MongoDB transaction เดียว ใช้ snapshot เดียว และ commit แบบ majority; ต้องใช้ replica set หรือ sharded cluster เช่นเดียวกับการบันทึก Sale
+- HTTP handler ส่งคำสั่งผ่าน interface เดียวของ repository; ไม่เรียก repository หลายตัวที่สร้าง context แยกกัน
+- Count คำนวณ delta จาก Stock ใน transaction ปัจจุบัน; เมื่อชนกับ writer อื่น MongoDB retry ทั้งคำสั่งจาก snapshot ใหม่
+- Stock ต้องตรง Product และ branch แม้ Count Line ไม่มีผลต่าง; ปฏิเสธ counted ติดลบและ Stock ซ้ำในคำขอ
+- Return ปฏิเสธ Line ซ้ำ, Order/Line ที่ยกเลิกแล้ว และส่วน Sold first ที่ไม่มี Lot จริง; refund ไม่เกินราคาที่จ่ายต่อหน่วยหลัง discount
+- Return และ cancellation ชนกันบน Order/Line; cancellation หลัง partial Return คืนเฉพาะจำนวนที่ยังไม่เคยคืน
+- Transaction retry เป็นการ retry ภายในคำสั่ง; Return/Adjustment/Count ยังไม่มี client request id จึงไม่ใช่ idempotent สำหรับการส่ง HTTP request ใหม่หลังผลลัพธ์ไม่ชัดเจน
 
 ## Expected Outcomes
 

@@ -29,6 +29,7 @@ const (
 const (
 	OR_BAD_REQUEST_001 = "OR-400-001" // invalid request body
 	OR_BAD_REQUEST_002 = "OR-400-002" // create/update/delete failed
+	OR_CONFLICT_001    = "OR-409-001" // saleId already recorded for a different Sale
 	OR_INTERNAL_001    = "OR-500-001" // internal server error
 )
 

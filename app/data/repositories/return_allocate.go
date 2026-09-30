@@ -1,4 +1,4 @@
-package usecase
+package repositories
 
 import (
 	"strings"
@@ -8,14 +8,14 @@ import (
 
 const syntheticStockRefPrefix = "ADJUST:"
 
-func isSyntheticStockRef(stockId string) bool {
-	return strings.HasPrefix(stockId, syntheticStockRefPrefix)
+func isRealLotReference(stockId string) bool {
+	return stockId != "" && !strings.HasPrefix(stockId, syntheticStockRefPrefix)
 }
 
 func realLotQuantity(stocks []entities.OrderItemStock) int {
 	total := 0
 	for _, s := range stocks {
-		if !isSyntheticStockRef(s.StockId) {
+		if isRealLotReference(s.StockId) {
 			total += s.Quantity
 		}
 	}
@@ -30,7 +30,7 @@ func allocateReturnAcrossRealLots(stocks []entities.OrderItemStock, alreadyRetur
 		if remaining <= 0 {
 			break
 		}
-		if isSyntheticStockRef(s.StockId) {
+		if !isRealLotReference(s.StockId) {
 			continue
 		}
 		qty := s.Quantity
@@ -53,4 +53,25 @@ func allocateReturnAcrossRealLots(stocks []entities.OrderItemStock, alreadyRetur
 		remaining -= take
 	}
 	return allocations
+}
+
+// A cancellation restores only the part a Return has not restored already.
+// Synthetic Adjustment references have no Lot to restore, while sold-first
+// allocations still reverse the Product's sold-first balance.
+func cancellationStock(stocks []entities.OrderItemStock, returned int) []entities.OrderItemStock {
+	result := make([]entities.OrderItemStock, 0, len(stocks))
+	for _, stock := range stocks {
+		if strings.HasPrefix(stock.StockId, syntheticStockRefPrefix) {
+			continue
+		}
+		if stock.StockId != "" {
+			skip := minInt(returned, stock.Quantity)
+			stock.Quantity -= skip
+			returned -= skip
+		}
+		if stock.Quantity > 0 {
+			result = append(result, stock)
+		}
+	}
+	return result
 }
