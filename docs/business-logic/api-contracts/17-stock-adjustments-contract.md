@@ -33,3 +33,8 @@
 - `AJ-400-001` invalid request body (bind ไม่ผ่าน)
 - `AJ-400-002` create/query failed — ครอบคลุม: reason ไม่ถูกต้อง, delta = 0, stock ไม่พบ, stock คนละ branch, ลด stock เกินที่มีอยู่จริง
 - `AJ-500-001` internal server error
+
+## Recording guarantee
+
+- ทุกการเปลี่ยน Stock, history, เอกสาร และ reconciliation ภายในคำขอ commit ใน transaction เดียว; หากขั้นใดล้มเหลวจะ rollback ทั้งหมด
+- Request/response shape และ endpoint เดิมคงเดิม; transaction retry ภายในไม่ใช่การ deduplicate HTTP request ใหม่

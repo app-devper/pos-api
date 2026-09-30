@@ -33,3 +33,8 @@
 - `RT-400-001` invalid request body (รวมถึง quantity ≤ 0)
 - `RT-400-002` create/query failed — ครอบคลุม: order ไม่พบ/คนละ branch, order item ไม่พบ/ไม่ใช่ของ order ที่ระบุ, ปริมาณคืนเกิน `realLotQuantity` ที่เหลือ, คืน stock กลับ lot ไม่สำเร็จ
 - `RT-500-001` internal server error
+
+## Recording guarantee
+
+- ทุกการเปลี่ยน Stock, history, เอกสาร และ reconciliation ภายในคำขอ commit ใน transaction เดียว; หากขั้นใดล้มเหลวจะ rollback ทั้งหมด
+- Request/response shape และ endpoint เดิมคงเดิม; transaction retry ภายในไม่ใช่การ deduplicate HTTP request ใหม่

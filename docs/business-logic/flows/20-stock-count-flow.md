@@ -8,7 +8,7 @@
 
 - ADMIN
 - SUPER
-- Backend stock count service (เรียกใช้ stock adjustment service ภายใน)
+- Backend Count module (ใช้ Adjustment policy ภายใน transaction เดียวกัน)
 
 ## Preconditions
 
@@ -28,7 +28,10 @@
 ## Error Flow
 
 - lot ในบรรทัดใดบรรทัดหนึ่งไม่พบ → reject การนับทั้งชุด
-- adjustment ของบรรทัดใดบรรทัดหนึ่งล้มเหลว (เช่น validation ของ stock adjustment ไม่ผ่าน) → reject คำขอ; รายการก่อนหน้าที่ apply ไปแล้วจะไม่ rollback อัตโนมัติ (best-effort เช่นเดียวกับ receive/stock transfer)
+- adjustment ของบรรทัดใดบรรทัดหนึ่งล้มเหลว (เช่น validation ของ stock adjustment ไม่ผ่าน) → reject คำขอ; rollback ทุกบรรทัด รวม Stock, Adjustment, history, reconciliation และ sequence
+
+- counted ติดลบ, Stock ซ้ำ หรือ Stock ไม่ตรง Product/branch แม้ delta = 0 → reject ทั้งชุด
+- document/history write ล้มเหลว → rollback ทั้งคำสั่ง
 
 ## Expected Outcome
 
