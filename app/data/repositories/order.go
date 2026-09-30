@@ -70,6 +70,12 @@ type IOrder interface {
 }
 
 func NewOrderEntity(resource *db.Resource) IOrder {
+	entity := newOrderEntity(resource)
+	ensureOrderIndexes(entity.orderRepo, entity.orderItemRepo, entity.paymentRepo)
+	return entity
+}
+
+func newOrderEntity(resource *db.Resource) *orderEntity {
 	orderRepo := resource.PosDb.Collection("orders")
 	orderItemRepo := resource.PosDb.Collection("order_items")
 	paymentRepo := resource.PosDb.Collection("payments")
@@ -82,7 +88,6 @@ func NewOrderEntity(resource *db.Resource) IOrder {
 		productsRepo: productsRepo, productStockRepo: productStockRepo, productUnitsRepo: productUnitsRepo, productHistoryRepo: productHistoryRepo,
 		productPricesRepo: resource.PosDb.Collection("product_prices"),
 	}
-	ensureOrderIndexes(orderRepo, orderItemRepo, paymentRepo)
 	return entity
 }
 
