@@ -19,6 +19,7 @@
 ### 1. Create Return
 
 - Request ต้องมี `orderId`, `reason`, `items: [{orderItemId, quantity, refund}]` อย่างน้อยหนึ่งรายการ
+- `refund` ของแต่ละรายการต้องไม่ติดลบและไม่เกิน `quantity ×` ยอดที่ลูกค้าจ่ายต่อหน่วย (`item.price / item.quantity − item.discount`) มิฉะนั้นตอบ `400`
 - Backend ต้องตรวจทุกบรรทัดให้ผ่าน validation ทั้งหมดก่อนเริ่ม mutation ใดๆ (ไม่ apply บางส่วนแล้วค่อย reject บรรทัดถัดไป)
 - เพดานคืนต่อบรรทัด = `realLotQuantity(order item) − returnedQty เดิม` ไม่ใช่ `quantity − returnedQty` เฉยๆ
 - Response คืนค่า `ProductReturn` document ที่มี `returnNo` (เลขที่อ้างอิง `RT-...`), รายการที่คืนสำเร็จ, และ `totalRefund`

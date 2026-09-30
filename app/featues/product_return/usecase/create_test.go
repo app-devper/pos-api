@@ -105,7 +105,7 @@ func TestCreateProductReturnRestoresStockAndRecordsReturn(t *testing.T) {
 		items: map[string]*entities.OrderItem{
 			orderItemID.Hex(): {
 				Id: orderItemID, OrderId: orderID, ProductId: productID, UnitId: unitID,
-				Quantity: 5, ReturnedQty: 0, Price: 20,
+				Quantity: 5, ReturnedQty: 0, Price: 100,
 				Stocks: []entities.OrderItemStock{{StockId: lotID.Hex(), Quantity: 5}},
 			},
 		},
@@ -161,7 +161,7 @@ func TestCreateProductReturnRejectsReturnBeyondRealLotQuantity(t *testing.T) {
 		items: map[string]*entities.OrderItem{
 			orderItemID.Hex(): {
 				Id: orderItemID, OrderId: orderID, ProductId: productID, UnitId: unitID,
-				Quantity: 5, ReturnedQty: 0, Price: 20,
+				Quantity: 5, ReturnedQty: 0, Price: 100,
 				Stocks: []entities.OrderItemStock{
 					{StockId: lotID.Hex(), Quantity: 3},
 					{StockId: "ADJUST:สูญหาย", Quantity: 2},
@@ -198,5 +198,52 @@ func TestCreateProductReturnRejectsReturnBeyondRealLotQuantity(t *testing.T) {
 	}
 	if len(productStockRepo.addCalls) != 0 {
 		t.Fatalf("expected no stock mutation on rejected return, got %+v", productStockRepo.addCalls)
+	}
+}
+
+func TestCreateProductReturnCapsRefundAtPaidShare(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	orderID := primitive.NewObjectID()
+	orderItemID := primitive.NewObjectID()
+	branchID := primitive.NewObjectID()
+	lotID := primitive.NewObjectID()
+
+	// 5 units at 20 with 2 off each: the customer paid 18 a unit.
+	for refund, wantOK := range map[string]bool{"36": true, "36.01": false, "40": false, "-1": false} {
+		orderRepo := &returnOrderStub{
+			order: &entities.Order{Id: orderID, BranchId: branchID},
+			items: map[string]*entities.OrderItem{
+				orderItemID.Hex(): {
+					Id: orderItemID, OrderId: orderID, ProductId: primitive.NewObjectID(), UnitId: primitive.NewObjectID(),
+					Quantity: 5, Price: 100, Discount: 2,
+					Stocks: []entities.OrderItemStock{{StockId: lotID.Hex(), Quantity: 5}},
+				},
+			},
+		}
+		productStockRepo := &returnProductStockStub{}
+		returnRepo := &returnReturnRepoStub{
+			createFn: func(param repositories.ProductReturnInput) (*entities.ProductReturn, error) {
+				return &entities.ProductReturn{Id: primitive.NewObjectID()}, nil
+			},
+		}
+
+		body := `{"orderId":"` + orderID.Hex() + `","reason":"r","items":[{"orderItemId":"` + orderItemID.Hex() + `","quantity":2,"refund":` + refund + `}]}`
+		req := httptest.NewRequest(http.MethodPost, "/product-returns", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		ctx.Request = req
+		ctx.Set("UserId", "user-1")
+		ctx.Set("BranchId", branchID.Hex())
+
+		CreateProductReturn(returnRepo, orderRepo, productStockRepo, &returnProductStub{}, &returnSequenceStub{})(ctx)
+
+		if got := w.Code == http.StatusOK; got != wantOK {
+			t.Errorf("refund %s: status %d %s", refund, w.Code, w.Body.String())
+		}
+		if !wantOK && len(productStockRepo.addCalls) != 0 {
+			t.Errorf("refund %s: stock changed on a rejected return", refund)
+		}
 	}
 }

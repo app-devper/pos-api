@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
@@ -77,6 +78,11 @@ func CreateProductReturn(
 			}
 			if item.ReturnedQty+line.Quantity > item.Quantity {
 				errcode.Abort(ctx, http.StatusBadRequest, errcode.RT_BAD_REQUEST_002, fmt.Sprintf("คืนได้สูงสุด %d", item.Quantity-item.ReturnedQty))
+				return
+			}
+
+			if maxRefund := paidPerUnit(item) * float64(line.Quantity); line.Refund < 0 || line.Refund > maxRefund+0.005 {
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.RT_BAD_REQUEST_002, fmt.Sprintf("คืนเงินได้สูงสุด %.2f", maxRefund))
 				return
 			}
 
@@ -164,6 +170,15 @@ func GetProductReturnsByOrderId(productReturnEntity repositories.IProductReturn)
 		}
 		ctx.JSON(http.StatusOK, result)
 	}
+}
+
+// paidPerUnit is what the customer paid for one unit of the Line: price is
+// the Line amount and discount is per unit.
+func paidPerUnit(item *entities.OrderItem) float64 {
+	if item.Quantity <= 0 {
+		return 0
+	}
+	return math.Max(item.Price/float64(item.Quantity)-item.Discount, 0)
 }
 
 func maxInt(a, b int) int {

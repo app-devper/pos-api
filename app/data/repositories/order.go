@@ -26,22 +26,20 @@ type orderEntity struct {
 	productStockRepo   *mongo.Collection
 	productUnitsRepo   *mongo.Collection
 	productHistoryRepo *mongo.Collection
+	productPricesRepo  *mongo.Collection
 }
 
 type IOrder interface {
 	CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error)
+	RecordSale(form request.Sale) (*RecordedSale, error)
+	FindSale(form request.Sale) (*RecordedSale, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
 	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
-	UpdateTotal() ([]entities.Order, error)
 	GetOrderById(id string) (*entities.Order, error)
 	GetOrderDetailById(id string) (*entities.OrderDetail, error)
-	UpdateTotalCostOrderById(id string, totalCost float64) (*entities.Order, error)
 	UpdateCustomerCodeOrderById(id string, customerCode string) (*entities.Order, error)
 	RemoveOrderById(id string) (*entities.OrderDetail, error)
 	CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error)
-	UpdateTotalOrderById(id string) (*entities.Order, error)
-	GetTotalOrderById(id string) float64
-	GetTotalCostOrderById(id string) float64
 
 	GetOrderItemRange(form request.GetOrderRange) ([]entities.OrderItemProductDetail, error)
 	GetOrderItemById(id string) (*entities.OrderItem, error)
@@ -82,6 +80,7 @@ func NewOrderEntity(resource *db.Resource) IOrder {
 	entity := &orderEntity{
 		client: resource.Client, orderRepo: orderRepo, orderItemRepo: orderItemRepo, paymentRepo: paymentRepo,
 		productsRepo: productsRepo, productStockRepo: productStockRepo, productUnitsRepo: productUnitsRepo, productHistoryRepo: productHistoryRepo,
+		productPricesRepo: resource.PosDb.Collection("product_prices"),
 	}
 	ensureOrderIndexes(orderRepo, orderItemRepo, paymentRepo)
 	return entity
@@ -90,6 +89,11 @@ func NewOrderEntity(resource *db.Resource) IOrder {
 func ensureOrderIndexes(orderRepo *mongo.Collection, orderItemRepo *mongo.Collection, paymentRepo *mongo.Collection) {
 	createCollectionIndex(orderRepo, "orders createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "createdDate", Value: -1}},
+	})
+	createCollectionIndex(orderRepo, "orders saleId", mongo.IndexModel{
+		Keys: bson.D{{Key: "saleId", Value: 1}},
+		Options: options.Index().SetUnique(true).
+			SetPartialFilterExpression(bson.M{"saleId": bson.M{"$type": "string"}}),
 	})
 	createCollectionIndex(orderRepo, "orders customerCode", mongo.IndexModel{
 		Keys: bson.D{{Key: "customerCode", Value: 1}},
@@ -386,49 +390,6 @@ func (entity *orderEntity) getPaymentsByOrderIDsWithContext(ctx context.Context,
 	return paymentMap, nil
 }
 
-func (entity *orderEntity) UpdateTotal() ([]entities.Order, error) {
-	logrus.Info("UpdateTotal")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	var items []entities.Order
-	cursor, err := entity.orderRepo.Find(ctx, bson.M{})
-	if err != nil {
-		return nil, err
-	}
-	for cursor.Next(ctx) {
-		var data entities.Order
-		err = cursor.Decode(&data)
-		if err != nil {
-			logrus.WithError(err).WithField("current", cursor.Current.String()).Error("failed to decode order while updating totals")
-		} else {
-			if data.Total == 0 {
-				data.Total = entity.GetTotalOrderById(data.Id.Hex())
-				data.TotalCost = entity.GetTotalCostOrderById(data.Id.Hex())
-				isReturnNewDoc := options.After
-				opts := &options.FindOneAndUpdateOptions{
-					ReturnDocument: &isReturnNewDoc,
-				}
-				err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": data.Id}, bson.M{"$set": bson.M{
-					"total":       data.Total,
-					"totalCost":   data.TotalCost,
-					"updatedDate": time.Now(),
-				}}, opts).Decode(&data)
-				if err != nil {
-					return nil, err
-				}
-			}
-			items = append(items, data)
-		}
-	}
-	if err = cursor.Err(); err != nil {
-		return nil, err
-	}
-	if items == nil {
-		items = []entities.Order{}
-	}
-	return items, nil
-}
-
 func (entity *orderEntity) GetOrderById(id string) (*entities.Order, error) {
 	logrus.Info("GetOrderById")
 	ctx, cancel := utils.InitContext()
@@ -439,30 +400,6 @@ func (entity *orderEntity) GetOrderById(id string) (*entities.Order, error) {
 	}
 	var data entities.Order
 	err = entity.orderRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
-func (entity *orderEntity) UpdateTotalCostOrderById(id string, totalCost float64) (*entities.Order, error) {
-	logrus.Info("UpdateTotalCostOrderById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Order
-	err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"totalCost":   totalCost,
-		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -595,78 +532,6 @@ func (entity *orderEntity) CancelOrderById(id string, userId string, branchId st
 		return nil, err
 	}
 	return result, nil
-}
-
-func (entity *orderEntity) UpdateTotalOrderById(id string) (*entities.Order, error) {
-	logrus.Info("UpdateTotalOrderById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	total, totalCost := entity.getOrderTotals(id)
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Order
-	err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"total":       total,
-		"totalCost":   totalCost,
-		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	return &data, nil
-}
-
-func (entity *orderEntity) getOrderTotals(orderId string) (total float64, totalCost float64) {
-	logrus.Info("getOrderTotals")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(orderId)
-	if err != nil {
-		return 0, 0
-	}
-	pipeline := []bson.M{
-		{"$match": bson.M{"orderId": objId, "$or": confirmedOrderItemStatusMatchClauses()}},
-		{"$group": bson.M{
-			"_id":       nil,
-			"total":     bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}},
-			"totalCost": bson.M{"$sum": bson.M{"$multiply": bson.A{"$costPrice", "$quantity"}}},
-		}},
-	}
-	var result []bson.M
-	cursor, err := entity.orderItemRepo.Aggregate(ctx, pipeline)
-	if err != nil {
-		return 0, 0
-	}
-	if err = cursor.All(ctx, &result); err != nil || len(result) == 0 {
-		return 0, 0
-	}
-	if v, ok := result[0]["total"].(float64); ok {
-		total = v
-	}
-	if v, ok := result[0]["totalCost"].(float64); ok {
-		totalCost = v
-	}
-	return total, totalCost
-}
-
-func (entity *orderEntity) GetTotalOrderById(orderId string) float64 {
-	total, _ := entity.getOrderTotals(orderId)
-	return total
-}
-
-func (entity *orderEntity) GetTotalCostOrderById(orderId string) float64 {
-	_, totalCost := entity.getOrderTotals(orderId)
-	return totalCost
 }
 
 func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]entities.OrderItemProductDetail, error) {
@@ -1629,7 +1494,7 @@ func (entity *orderEntity) updateTotalOrderByIdWithContext(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	total, totalCost, err := entity.getOrderTotalsWithContext(ctx, id)
+	totals, err := entity.getOrderTotalsWithContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -1637,8 +1502,9 @@ func (entity *orderEntity) updateTotalOrderByIdWithContext(ctx context.Context, 
 	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
 	var data entities.Order
 	err = entity.orderRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"total":       total,
-		"totalCost":   totalCost,
+		"total":       totals.total,
+		"totalCost":   totals.totalCost,
+		"discount":    totals.discount,
 		"updatedDate": time.Now(),
 	}}, opts).Decode(&data)
 	if err != nil {
@@ -1647,35 +1513,44 @@ func (entity *orderEntity) updateTotalOrderByIdWithContext(ctx context.Context, 
 	return &data, nil
 }
 
-func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderId string) (float64, float64, error) {
+// orderTotals are an Order's money summed over its confirmed Lines.
+type orderTotals struct {
+	total, totalCost, discount float64
+}
+
+// lineDiscountExpr is a Line's discount: discount is per unit.
+func lineDiscountExpr() bson.M {
+	return bson.M{"$multiply": bson.A{bson.M{"$ifNull": bson.A{"$discount", 0}}, "$quantity"}}
+}
+
+// lineTotalExpr is what a Line charges: price is already the Line amount
+// (unit price × quantity), before its per-unit discount.
+func lineTotalExpr() bson.M {
+	return bson.M{"$subtract": bson.A{"$price", lineDiscountExpr()}}
+}
+
+func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderId string) (orderTotals, error) {
 	objId, err := primitive.ObjectIDFromHex(orderId)
 	if err != nil {
-		return 0, 0, err
+		return orderTotals{}, err
 	}
 	pipeline := []bson.M{
 		{"$match": bson.M{"orderId": objId, "$or": confirmedOrderItemStatusMatchClauses()}},
-		{"$group": bson.M{"_id": nil, "total": bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}}, "totalCost": bson.M{"$sum": bson.M{"$multiply": bson.A{"$costPrice", "$quantity"}}}}},
+		{"$group": bson.M{"_id": nil, "total": bson.M{"$sum": lineTotalExpr()}, "totalCost": bson.M{"$sum": "$costPrice"}, "discount": bson.M{"$sum": lineDiscountExpr()}}},
 	}
-	var result []bson.M
 	cursor, err := entity.orderItemRepo.Aggregate(ctx, pipeline)
 	if err != nil {
-		return 0, 0, err
+		return orderTotals{}, err
+	}
+	var result []struct {
+		Total     float64 `bson:"total"`
+		TotalCost float64 `bson:"totalCost"`
+		Discount  float64 `bson:"discount"`
 	}
 	if err = cursor.All(ctx, &result); err != nil || len(result) == 0 {
-		if err != nil {
-			return 0, 0, err
-		}
-		return 0, 0, nil
+		return orderTotals{}, err
 	}
-	var total float64
-	var totalCost float64
-	if v, ok := result[0]["total"].(float64); ok {
-		total = v
-	}
-	if v, ok := result[0]["totalCost"].(float64); ok {
-		totalCost = v
-	}
-	return total, totalCost, nil
+	return orderTotals{total: result[0].Total, totalCost: result[0].TotalCost, discount: result[0].Discount}, nil
 }
 
 func confirmedOrderItemStatusMatchClauses() []bson.M {
@@ -1921,6 +1796,7 @@ func (entity *orderEntity) GetABCAnalysis(branchId string) ([]entities.ABCProduc
 func buildABCAnalysisPipeline(startDate time.Time, branchId string) ([]bson.M, error) {
 	matchFilter := bson.M{
 		"createdDate": bson.M{"$gte": startDate},
+		"$or":         confirmedOrderItemStatusMatchClauses(),
 	}
 	orderMatch := bson.A{
 		bson.M{"$eq": bson.A{"$_id", "$$oid"}},
@@ -1949,7 +1825,7 @@ func buildABCAnalysisPipeline(startDate time.Time, branchId string) ([]bson.M, e
 		{"$match": bson.M{"order.0": bson.M{"$exists": true}}},
 		{"$group": bson.M{
 			"_id":          "$productId",
-			"totalRevenue": bson.M{"$sum": bson.M{"$multiply": bson.A{"$price", "$quantity"}}},
+			"totalRevenue": bson.M{"$sum": lineTotalExpr()},
 			"totalQty":     bson.M{"$sum": "$quantity"},
 		}},
 		{"$lookup": bson.M{
