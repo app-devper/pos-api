@@ -1,4 +1,4 @@
-package usecase
+package repositories
 
 import (
 	"testing"

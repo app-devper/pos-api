@@ -1333,7 +1333,7 @@ func (entity *orderEntity) cancelOrderByIdWithContext(ctx context.Context, id st
 }
 
 func (entity *orderEntity) restoreOrderItemStockAndHistory(ctx context.Context, item *entities.OrderItemProductDetail, userId string, branchId string) error {
-	for _, itemStock := range item.Stocks {
+	for _, itemStock := range cancellationStock(item.Stocks, item.ReturnedQty) {
 		if itemStock.StockId != "" {
 			stockID, err := primitive.ObjectIDFromHex(itemStock.StockId)
 			if err != nil {
@@ -1362,7 +1362,9 @@ func (entity *orderEntity) restoreOrderItemStockAndHistory(ctx context.Context, 
 	if err != nil {
 		return err
 	}
-	h := request.RemoveOrderItemProductHistory(item.ProductId.Hex(), unit.Unit, item, balance, userId)
+	historyItem := *item
+	historyItem.Quantity = maxInt(0, item.Quantity-item.ReturnedQty)
+	h := request.RemoveOrderItemProductHistory(item.ProductId.Hex(), unit.Unit, &historyItem, balance, userId)
 	branchObjId, err := primitive.ObjectIDFromHex(branchId)
 	if err != nil {
 		return err

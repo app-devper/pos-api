@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -91,6 +92,10 @@ func (entity *sequenceEntity) NextSequence(field string) (*entities.Sequence, er
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 
+	return entity.nextSequenceWithContext(ctx, field)
+}
+
+func (entity *sequenceEntity) nextSequenceWithContext(ctx context.Context, field string) (*entities.Sequence, error) {
 	definition := getSequenceDefinition(field)
 	currentDate := getSequenceDate()
 
