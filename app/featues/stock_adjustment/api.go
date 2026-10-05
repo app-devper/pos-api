@@ -19,7 +19,7 @@ func ApplyStockAdjustmentAPI(
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.CreateStockAdjustment(repository.StockAdjustment, repository.ProductStock, repository.Product, repository.Order, repository.Sequence),
+		usecase.CreateStockAdjustment(repository.StockAdjustment),
 	)
 
 	ajRoute.GET("/product/:productId",

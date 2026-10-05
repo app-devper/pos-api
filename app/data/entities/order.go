@@ -29,7 +29,13 @@ type Order struct {
 	TotalCost      float64            `bson:"totalCost" json:"totalCost"`
 	Discount       float64            `bson:"discount" json:"discount"`
 	Type           string             `bson:"type" json:"type"`
-	Payments       []Payment          `json:"payments,omitempty"`
+	// SaleId is the till's id for the Sale this Order records; Orders from
+	// before it have none.
+	SaleId string `bson:"saleId,omitempty" json:"saleId,omitempty"`
+	// SaleFingerprint tells a repeat of the Sale from a different Sale
+	// reusing its id.
+	SaleFingerprint string    `bson:"saleFingerprint,omitempty" json:"-"`
+	Payments        []Payment `json:"payments,omitempty"`
 }
 
 type OrderDetail struct {

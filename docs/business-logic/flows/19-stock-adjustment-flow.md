@@ -34,6 +34,9 @@
 - lot ไม่พบ หรืออยู่คนละ branch → reject
 - ลดจำนวนเกินกว่าที่มีอยู่จริง → reject โดยไม่แก้ไข stock
 
+- Stock ไม่ตรง Product ที่ระบุ → reject
+- history, Adjustment document หรือ reconciliation ล้มเหลว → rollback ทั้งคำสั่ง
+
 ## Expected Outcome
 
 - stock ของ lot ที่ระบุถูกต้องตาม `before + delta = after`

@@ -19,6 +19,7 @@
 ### 1. Create Return
 
 - Request ต้องมี `orderId`, `reason`, `items: [{orderItemId, quantity, refund}]` อย่างน้อยหนึ่งรายการ
+- `refund` ของแต่ละรายการต้องไม่ติดลบและไม่เกิน `quantity ×` ยอดที่ลูกค้าจ่ายต่อหน่วย (`item.price / item.quantity − item.discount`) มิฉะนั้นตอบ `400`
 - Backend ต้องตรวจทุกบรรทัดให้ผ่าน validation ทั้งหมดก่อนเริ่ม mutation ใดๆ (ไม่ apply บางส่วนแล้วค่อย reject บรรทัดถัดไป)
 - เพดานคืนต่อบรรทัด = `realLotQuantity(order item) − returnedQty เดิม` ไม่ใช่ `quantity − returnedQty` เฉยๆ
 - Response คืนค่า `ProductReturn` document ที่มี `returnNo` (เลขที่อ้างอิง `RT-...`), รายการที่คืนสำเร็จ, และ `totalRefund`
@@ -32,3 +33,8 @@
 - `RT-400-001` invalid request body (รวมถึง quantity ≤ 0)
 - `RT-400-002` create/query failed — ครอบคลุม: order ไม่พบ/คนละ branch, order item ไม่พบ/ไม่ใช่ของ order ที่ระบุ, ปริมาณคืนเกิน `realLotQuantity` ที่เหลือ, คืน stock กลับ lot ไม่สำเร็จ
 - `RT-500-001` internal server error
+
+## Recording guarantee
+
+- ทุกการเปลี่ยน Stock, history, เอกสาร และ reconciliation ภายในคำขอ commit ใน transaction เดียว; หากขั้นใดล้มเหลวจะ rollback ทั้งหมด
+- Request/response shape และ endpoint เดิมคงเดิม; transaction retry ภายในไม่ใช่การ deduplicate HTTP request ใหม่

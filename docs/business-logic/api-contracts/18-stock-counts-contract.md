@@ -34,3 +34,8 @@
 - `SC-400-001` invalid request body
 - `SC-400-002` create/query failed — ครอบคลุม: stock ในบรรทัดใดบรรทัดหนึ่งไม่พบ, adjustment ของบรรทัดใดบรรทัดหนึ่งล้มเหลว
 - `SC-500-001` internal server error
+
+## Recording guarantee
+
+- ทุกการเปลี่ยน Stock, history, เอกสาร และ reconciliation ภายในคำขอ commit ใน transaction เดียว; หากขั้นใดล้มเหลวจะ rollback ทั้งหมด
+- Request/response shape และ endpoint เดิมคงเดิม; transaction retry ภายในไม่ใช่การ deduplicate HTTP request ใหม่

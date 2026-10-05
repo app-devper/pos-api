@@ -19,7 +19,7 @@ func ApplyProductReturnAPI(
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.CreateProductReturn(repository.ProductReturn, repository.Order, repository.ProductStock, repository.Product, repository.Sequence),
+		usecase.CreateProductReturn(repository.ProductReturn),
 	)
 
 	rtRoute.GET("/order/:orderId",

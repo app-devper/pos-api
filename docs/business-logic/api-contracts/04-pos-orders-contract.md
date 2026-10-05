@@ -25,6 +25,48 @@
 - Response ควรมีข้อมูล order ที่บันทึกสำเร็จและ identifiers ที่ใช้กับเอกสารหลังการขาย
 - Order entity เก็บ compliance data โดยตรง เพื่อรองรับรายงาน ข.ย. 10–13 ที่ดึงจาก orders
 
+### 2.1 Record Sale (`POST /orders` ที่มี `saleId`)
+
+Till ส่งเฉพาะสิ่งที่แคชเชียร์เลือก server เป็นผู้คิดราคาและตัด Stock เองจาก Stock ปัจจุบันใน transaction เดียว (order, items, payments, stock, sold first, product history — สำเร็จทั้งหมดหรือไม่บันทึกเลย)
+
+```json
+{
+  "saleId": "uuid สร้างโดย till ครั้งเดียวต่อ Sale",
+  "type": "CASH",
+  "payments": [{ "amount": 100, "type": "CASH" }],
+  "items": [
+    {
+      "productId": "...",
+      "unitId": "...",
+      "quantity": 2,
+      "priceType": "General | Regular | Wholesaler | Stock",
+      "stockId": "ล็อตที่แคชเชียร์เลือก (optional)",
+      "discount": 1,
+      "allowOversell": false
+    }
+  ],
+  "customerCode": "...", "customerName": "...", "patientId": "...",
+  "pharmacistName": "...", "licenseNo": "...", "prescriberName": "...", "buyerName": "...", "buyerIdCard": "..."
+}
+```
+
+- ราคา: `priceType: "Stock"` ใช้ราคาของ Stock (ล็อตที่เลือก หรือล็อตแรกตาม sequence ที่ยังมีของ) ถ้ามี; ไม่เช่นนั้นใช้ price list ของ customer type นั้น, ถ้าไม่มีใช้ price list แรกของ Unit, ถ้าไม่มีเลยราคา 0
+- `discount` ต่อหน่วย ถูกจำกัดให้อยู่ระหว่าง 0 ถึงราคาต่อหน่วย; ไม่มีส่วนลดระดับบิล
+- ตัด Stock: ล็อตที่เลือกก่อน แล้วล็อตอื่นใน branch ตาม sequence; ส่วนที่ขาดเข้า Sold first ยกเว้น `allowOversell` และบรรทัดได้ตัดล็อตจริงแล้ว — ส่วนที่ขาดผูกกับล็อตสุดท้าย (`oversoldQty`)
+- ต้นทุนคิดจากล็อตที่ตัดจริง (ล็อตไม่มีต้นทุนหรือ Sold first ใช้ต้นทุนของ Unit)
+- server คำนวณ `total`, `totalCost`, `discount`, `change` เอง; ยอดชำระรวมน้อยกว่า total → `400 OR-400-001`
+- ส่ง `saleId` เดิมซ้ำด้วยเนื้อหาเดิม → คืน Order เดิม (ไม่ตัด stock ซ้ำ ไม่ใช้เลข order ใหม่); เนื้อหาต่างกัน → `409 OR-409-001`
+- Response: `{ "data": Order, "stocks": [ProductStock ที่ถูกตัด] }`
+- Request ที่ไม่มี `saleId` ยังใช้ payload เดิม (till ตัดสินราคาและล็อตเอง) จนกว่า till รุ่นเก่าจะหมด
+
+### 2.2 ความหมายของเงินใน Order
+
+- `item.price` = ยอดบรรทัด (ราคาต่อหน่วย × จำนวน) ก่อนหักส่วนลด
+- `item.costPrice` = ต้นทุนของทั้งบรรทัด
+- `item.discount` = ส่วนลดต่อหน่วย; ลูกค้าจ่าย `price − discount × quantity`
+- `order.total` = Σ ยอดที่ลูกค้าจ่ายของบรรทัดที่ยังไม่ยกเลิก, `order.totalCost` = Σ `costPrice`, `order.discount` = Σ `discount × quantity` — ยกเลิกบรรทัดแล้วคำนวณใหม่ตามนี้
+- เงินคืนของ Return ต่อหน่วยไม่เกินที่ลูกค้าจ่ายต่อหน่วย (`price / quantity − discount`)
+
 ### 3. Post-Order Data
 
 - Frontend คาดหวังข้อมูลอ้างอิงสำหรับ receipt, tax invoice, labels หรือ report-related follow-up actions
@@ -85,6 +127,7 @@
 - stock insufficient
 - compliance data missing for controlled drugs
 - invalid payment total
+- `saleId` ซ้ำกับ Sale อื่น (`409 OR-409-001`)
 - malformed cancel action payload
 - invalid product or unit reference
 - branch context ไม่ถูกต้อง
