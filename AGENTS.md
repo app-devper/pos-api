@@ -48,7 +48,8 @@
 
 ### Other top-level directories
 - `db/` — `init.go` initialises Mongo client and Redis client into `db.Resource`.
-- `docs/business-logic/` — rich documentation: numbered markdown chapters (01–08), `api-contracts/`, `flows/`, `lifecycle/`, `screens/`, `feature-flow-matrix.md`, `requirement.md`.
+- `docs/business-logic/` — rich documentation: numbered markdown chapters (01–09), `api-contracts/`, `flows/`, `lifecycle/`, `screens/`, `feature-flow-matrix.md`, `requirement.md`.
+- `docs/adr/` — architecture decisions (Stock ledger, Oversell settlement, Sold first). Read them before changing how Stock moves; the domain glossary is devper-workspace's `CONTEXT.md`.
 
 ## Common Commands
 - Run app: `go run main.go`
