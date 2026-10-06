@@ -179,28 +179,33 @@ func TestAdjustmentRollsBackStockHistoryAndReconciliation(t *testing.T) {
 	}
 }
 
-func TestAdjustmentReconcilesFIFOAndPreservesValidation(t *testing.T) {
+func TestAdjustmentSettlesFIFOFromTheStockAndPreservesValidation(t *testing.T) {
 	f := newSaleFixture(t)
 	_, adjustments, _ := stockCommands(f)
 	stock := f.stock(1, 2, 3)
 	first, second := primitive.NewObjectID(), primitive.NewObjectID()
 	for _, id := range []primitive.ObjectID{first, second} {
-		f.insert("order_items", entities.OrderItem{Id: id, ProductId: f.product, BranchId: f.branchId, Status: constant.CONFIRMED, OversoldQty: 2})
+		f.insert("order_items", entities.OrderItem{Id: id, ProductId: f.product, UnitId: f.unit, BranchId: f.branchId, Status: constant.CONFIRMED, OversoldQty: 2})
 	}
 	got, err := adjustments.ApplyStockAdjustment(adjustmentRequest(f, stock, 3))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Before != 2 || got.After != 5 || f.quantity(stock) != 5 {
-		t.Fatal("Adjustment before/after incorrect")
+	// ADR-0002: the 3 that came in go to the waiting Lines, oldest first.
+	if got.Before != 2 || got.After != 5 || f.quantity(stock) != 2 {
+		t.Fatalf("Adjustment %d → %d, Stock now %d; want 2 → 5 and Stock 2", got.Before, got.After, f.quantity(stock))
 	}
-	for i, id := range []primitive.ObjectID{first, second} {
+	for i, want := range []struct {
+		id    primitive.ObjectID
+		owed  int
+		drawn int
+	}{{first, 0, 2}, {second, 1, 1}} {
 		var item entities.OrderItem
-		if err := f.pos.Collection("order_items").FindOne(context.Background(), bson.M{"_id": id}).Decode(&item); err != nil {
+		if err := f.pos.Collection("order_items").FindOne(context.Background(), bson.M{"_id": want.id}).Decode(&item); err != nil {
 			t.Fatal(err)
 		}
-		if item.OversoldQty != i || len(item.Stocks) != 1 || item.Stocks[0].StockId != "ADJUST:"+constant.AdjustmentReasonCount {
-			t.Fatalf("FIFO reconciliation incorrect: %+v", item)
+		if item.OversoldQty != want.owed || len(item.Stocks) != 1 || item.Stocks[0] != (entities.OrderItemStock{StockId: stock.Hex(), Quantity: want.drawn}) {
+			t.Fatalf("Line %d not settled FIFO from the Stock: %+v", i, item)
 		}
 	}
 	for _, delta := range []int{0, -6} {
@@ -218,7 +223,7 @@ func TestAdjustmentReconcilesFIFOAndPreservesValidation(t *testing.T) {
 	if _, err := adjustments.ApplyStockAdjustment(req); err == nil {
 		t.Fatal("Stock attributed to another Product")
 	}
-	if f.quantity(stock) != 5 || f.count("stock_adjustments") != 1 {
+	if f.quantity(stock) != 2 || f.count("stock_adjustments") != 1 {
 		t.Fatal("rejected Adjustment changed Stock")
 	}
 }

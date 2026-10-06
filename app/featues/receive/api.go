@@ -68,7 +68,7 @@ func ApplyReceiveAPI(
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.ImportReceiveToStockWithReconciliation(repository.Receive, repository.Product, repository.Order, repository.ProductStock),
+		usecase.ImportReceiveToStock(repository.Receive),
 	)
 
 }

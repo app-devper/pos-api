@@ -52,7 +52,7 @@ func TestImportReceiveToStockReturnsErrorWhenTransactionalImportFails(t *testing
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID.Hex())
 
-	ImportReceiveToStock(receiveRepo, nil)(ctx)
+	ImportReceiveToStock(receiveRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)

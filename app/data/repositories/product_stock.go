@@ -32,7 +32,6 @@ type IProductStock interface {
 	RemoveProductStockById(id string) (*entities.ProductStock, error)
 	GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStocksByProductAndUnitId(productId string, unitId string, branchId string) ([]entities.ProductStock, error)
-	GetProductStocksByProductIdAndReceiveCode(productId string, receiveCode string, branchId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string, branchId string) int
 	GetProductStockBalance(productId string, unitId string, branchId string) int
 	RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error)
@@ -136,33 +135,6 @@ func (entity *productStockEntity) GetProductStockById(id string) (*entities.Prod
 		return nil, err
 	}
 	return &data, nil
-}
-
-func (entity *productStockEntity) GetProductStocksByProductIdAndReceiveCode(productId string, receiveCode string, branchId string) ([]entities.ProductStock, error) {
-	logrus.Info("GetProductStocksByProductIdAndReceiveCode")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	product, err := primitive.ObjectIDFromHex(productId)
-	if err != nil {
-		return nil, err
-	}
-	filter := bson.M{"productId": product, "receiveCode": receiveCode}
-	if branchId != "" {
-		branch, branchErr := primitive.ObjectIDFromHex(branchId)
-		if branchErr != nil {
-			return nil, branchErr
-		}
-		filter["branchId"] = branch
-	}
-	cursor, err := entity.productStockRepo.Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	items := []entities.ProductStock{}
-	if err = cursor.All(ctx, &items); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 func (entity *productStockEntity) GetProductStocksByProductId(productId string, branchId string) (items []entities.ProductStock, err error) {

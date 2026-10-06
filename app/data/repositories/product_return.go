@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/request"
 	"pos/db"
 
@@ -14,7 +15,7 @@ import (
 )
 
 type productReturnEntity struct {
-	recorder          *stockRecorder
+	ledger            *ledger.Ledger
 	productReturnRepo *mongo.Collection
 }
 
@@ -26,7 +27,7 @@ type IProductReturn interface {
 
 func NewProductReturnEntity(resource *db.Resource) IProductReturn {
 	productReturnRepo := resource.PosDb.Collection("product_returns")
-	entity := &productReturnEntity{recorder: newStockRecorder(resource), productReturnRepo: productReturnRepo}
+	entity := &productReturnEntity{ledger: newLedger(resource), productReturnRepo: productReturnRepo}
 	ensureProductReturnIndexes(productReturnRepo)
 	return entity
 }

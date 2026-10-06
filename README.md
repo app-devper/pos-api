@@ -163,6 +163,21 @@ gcloud builds triggers describe deploy-pos-api --project=devperpos --region=glob
 gcloud builds triggers run deploy-pos-api --project=devperpos --region=global --branch=main
 ```
 
+## คำสั่งซ่อมข้อมูล
+
+ทั้งสองคำสั่งอ่าน `MONGO_HOST` และ `MONGO_POS_DB_NAME` จาก environment (ใช้ค่าเดียวกับ service
+`pos-dev-api`) และ **รายงานอย่างเดียว** ถ้าไม่ใส่ `-apply` — รันแบบรายงานก่อนเสมอ
+
+```bash
+go run ./cmd/repair-order-totals            # ยอดของ Order ที่ถูกเขียนทับผิดตอนยกเลิกบรรทัด
+go run ./cmd/repair-cross-unit-oversell     # การ settle Oversell ที่ตัดจาก Stock ต่างหน่วย (ADR-0002)
+go run ./cmd/repair-cross-unit-oversell -apply
+```
+
+`repair-cross-unit-oversell -apply` คืนจำนวนกลับเข้า Stock ที่ถูกตัดผิดหน่วย และทำให้บรรทัดนั้นกลับมาค้างส่ง
+อีกครั้ง โดยเขียนผ่าน Stock ledger (มี history ทุก Stock) การ settle แบบเก่าที่บันทึกเป็น `ADJUST:`
+ไม่มี Stock อ้างอิง จึงตรวจไม่ได้และไม่ถูกแตะ
+
 ## Health Check
 
 | Path | ใช้เมื่อ |
