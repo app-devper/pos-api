@@ -169,28 +169,40 @@ func (b *book) settle(t *touch, incoming int) error {
 // flush writes one history row per Stock touched, with the balance its branch,
 // Product and Unit hold after the whole event.
 func (b *book) flush() error {
+	type place struct{ product, unit, branch primitive.ObjectID }
+	type known struct {
+		unit    entities.ProductUnit
+		balance int
+	}
+	cache := map[place]*known{}
 	now := time.Now()
 	for _, t := range b.touched {
 		st := t.stock
-		var unit entities.ProductUnit
-		if err := b.col("product_units").FindOne(b.ctx, bson.M{"_id": st.UnitId, "productId": st.ProductId}).Decode(&unit); err != nil {
-			return fmt.Errorf("stock unit not found: %w", err)
-		}
-		balance, err := b.balance(st)
-		if err != nil {
-			return err
+		key := place{st.ProductId, st.UnitId, st.BranchId}
+		k, ok := cache[key]
+		if !ok {
+			k = &known{}
+			if err := b.col("product_units").FindOne(b.ctx, bson.M{"_id": st.UnitId, "productId": st.ProductId}).Decode(&k.unit); err != nil {
+				return fmt.Errorf("stock unit not found: %w", err)
+			}
+			balance, err := b.balance(st)
+			if err != nil {
+				return err
+			}
+			k.balance = balance
+			cache[key] = k
 		}
 		h := t.history(t.qty + t.settled)
 		if h.Unit == "" {
-			h.Description += unit.Unit
+			h.Description += k.unit.Unit
 		}
 		if t.settled > 0 {
-			h.Description += " (ส่งของค้างลูกค้า " + strconv.Itoa(t.settled) + " " + unit.Unit + ")"
+			h.Description += " (ส่งของค้างลูกค้า " + strconv.Itoa(t.settled) + " " + k.unit.Unit + ")"
 		}
 		if _, err := b.col("product_histories").InsertOne(b.ctx, entities.ProductHistory{
 			Id: primitive.NewObjectID(), BranchId: st.BranchId, ProductId: st.ProductId,
-			Type: h.Type, Description: h.Description, Unit: unit.Unit, Import: h.Import, Quantity: h.Quantity,
-			CostPrice: h.CostPrice, Price: h.Price, Balance: balance, CreatedBy: h.CreatedBy, CreatedDate: now,
+			Type: h.Type, Description: h.Description, Unit: k.unit.Unit, Import: h.Import, Quantity: h.Quantity,
+			CostPrice: h.CostPrice, Price: h.Price, Balance: k.balance, CreatedBy: h.CreatedBy, CreatedDate: now,
 		}); err != nil {
 			return err
 		}

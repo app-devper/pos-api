@@ -94,7 +94,7 @@ func (b *book) importReceive(id, branch primitive.ObjectID, by string) (*entitie
 
 	after := options.After
 	var result entities.Receive
-	err = b.col("receives").FindOneAndUpdate(b.ctx, bson.M{"_id": id, "status": receive.Status}, bson.M{"$set": bson.M{
+	err = b.col("receives").FindOneAndUpdate(b.ctx, bson.M{"_id": id, "status": bson.M{"$nin": bson.A{constant.IMPORTED, constant.CANCELLED}}}, bson.M{"$set": bson.M{
 		"totalCost": totalCost, "status": constant.IMPORTED, "updatedBy": by, "updatedDate": now,
 	}}, &options.FindOneAndUpdateOptions{ReturnDocument: &after}).Decode(&result)
 	if err == mongo.ErrNoDocuments {

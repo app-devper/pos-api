@@ -68,6 +68,12 @@ func (b *book) recordReturn(req request.ProductReturn, branch, orderID primitive
 	if _, err := b.col("orders").UpdateOne(b.ctx, bson.M{"_id": orderID}, bson.M{"$inc": bson.M{"returnRevision": 1}}); err != nil {
 		return nil, err
 	}
+	// Goods coming back on this Return serve other waiting Lines, never a Line
+	// of this Return: that would give it Stock it never drew.
+	for _, line := range req.Items {
+		id, _ := primitive.ObjectIDFromHex(line.OrderItemId)
+		b.notOwed = append(b.notOwed, id)
+	}
 	data := &entities.ProductReturn{Id: primitive.NewObjectID(), BranchId: branch, OrderId: orderID, CustomerCode: order.CustomerCode,
 		Reason: req.Reason, Note: req.Note, CreatedBy: req.CreatedBy, CreatedDate: time.Now(), Items: []entities.ProductReturnItem{}}
 	for _, line := range req.Items {
@@ -90,9 +96,6 @@ func (b *book) recordReturn(req request.ProductReturn, branch, orderID primitive
 		if line.Refund < 0 || line.Refund > maxRefund+0.005 {
 			return nil, reject("คืนเงินได้สูงสุด %.2f", maxRefund)
 		}
-		// Goods coming back from this Line serve other waiting Lines, never
-		// this Line's own debt: that would give it Stock it never drew.
-		b.notOwed = append(b.notOwed, item.Id)
 		if _, err := b.col("order_items").UpdateOne(b.ctx, bson.M{"_id": id}, bson.M{"$inc": bson.M{"returnedQty": line.Quantity}, "$set": bson.M{"updatedDate": time.Now()}}); err != nil {
 			return nil, err
 		}

@@ -418,3 +418,36 @@ func TestRepairLeavesCancelledLinesAndLinesWithoutAUnitAlone(t *testing.T) {
 		t.Fatalf("report=%+v Stock=%d: cancelled Lines already gave their draws back, and a Line with no Unit cannot be judged", report, f.quantity(boxStock))
 	}
 }
+
+func TestAReturnOfSeveralLinesNeverSettlesAnyOfThemWhateverTheOrder(t *testing.T) {
+	f := newFixture(t)
+	stock := f.stock(f.tab, 1, 0)
+	order, a, b := primitive.NewObjectID(), primitive.NewObjectID(), primitive.NewObjectID()
+	f.insert("orders", entities.Order{Id: order, BranchId: f.branch, Status: constant.CONFIRMED})
+	f.insert("order_items", entities.OrderItem{Id: a, OrderId: order, BranchId: f.branch, ProductId: f.product, UnitId: f.tab, Quantity: 3, Price: 30, Status: constant.CONFIRMED,
+		Stocks: []entities.OrderItemStock{{StockId: stock.Hex(), Quantity: 3}}})
+	f.insert("order_items", entities.OrderItem{Id: b, OrderId: order, BranchId: f.branch, ProductId: f.product, UnitId: f.tab, Quantity: 3, Price: 30, Status: constant.CONFIRMED,
+		OversoldQty: 2, Stocks: []entities.OrderItemStock{{StockId: stock.Hex(), Quantity: 1}}})
+
+	if _, err := f.ledger.Return(context.Background(), request.ProductReturn{OrderId: order.Hex(), BranchId: f.branch.Hex(), Items: []request.ProductReturnItem{
+		{OrderItemId: a.Hex(), Quantity: 2}, {OrderItemId: b.Hex(), Quantity: 1},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.line(b); got.OversoldQty != 2 || len(got.Stocks) != 1 || f.quantity(stock) != 3 {
+		t.Fatalf("Stock=%d B=%+v: goods coming back on this Return paid a Line of the same Return", f.quantity(stock), got)
+	}
+}
+
+func TestImportReceiveWithoutAStatusIsImported(t *testing.T) {
+	f := newFixture(t)
+	id := primitive.NewObjectID()
+	if _, err := f.pos.Collection("receives").InsertOne(context.Background(), bson.M{"_id": id, "branchId": f.branch, "code": "RC-OLD"}); err != nil {
+		t.Fatal(err)
+	}
+	f.insert("receive_items", entities.ReceiveItem{ReceiveId: id, ProductId: f.product, Quantity: 4, CostPrice: 2})
+	got, err := f.ledger.ImportReceive(context.Background(), id.Hex(), f.branch.Hex(), "admin")
+	if err != nil || got.Status != constant.IMPORTED {
+		t.Fatalf("a Receive saved before statuses existed must import, got %+v, %v", got, err)
+	}
+}

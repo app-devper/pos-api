@@ -73,7 +73,11 @@ func (l *Ledger) findCrossUnitDraws(ctx context.Context) ([]CrossUnitDraw, error
 
 func (b *book) undoDraw(d CrossUnitDraw, by string) error {
 	var line entities.OrderItem
-	if err := b.col("order_items").FindOne(b.ctx, bson.M{"_id": d.Line}).Decode(&line); err != nil {
+	err := b.col("order_items").FindOne(b.ctx, bson.M{"_id": d.Line, "$or": confirmedLineStatuses()}).Decode(&line)
+	if err == mongo.ErrNoDocuments {
+		return nil // cancelled since the scan: its draws are already back
+	}
+	if err != nil {
 		return err
 	}
 	remaining := make([]entities.OrderItemStock, 0, len(line.Stocks))

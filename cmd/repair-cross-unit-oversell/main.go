@@ -4,7 +4,9 @@
 // Stock and the Line is owed it again. It reports by default. It reads
 // MONGO_HOST and MONGO_POS_DB_NAME from the environment, and creates no
 // indexes. Settlements recorded with the old "ADJUST:" marker name no Stock,
-// so they cannot be checked and are left alone.
+// so they cannot be checked and are left alone. A Line put back into debt is
+// served by the next Stock of its own Unit to arrive (ADR-0002), not from what
+// that Unit already holds; Lines with no Unit are never touched.
 package main
 
 import (

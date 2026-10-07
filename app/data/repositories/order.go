@@ -1435,13 +1435,15 @@ func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderI
 	return orderTotals{total: result[0].Total, totalCost: result[0].TotalCost, discount: result[0].Discount}, nil
 }
 
+// confirmedOrderItemStatusMatchClauses matches a Line that still stands: no
+// status (older Lines) or one of constant.ConfirmedOrderStatuses — the same
+// rule the Stock ledger settles by.
 func confirmedOrderItemStatusMatchClauses() []bson.M {
-	return []bson.M{
-		{"status": bson.M{"$exists": false}},
-		{"status": ""},
-		{"status": constant.ACTIVE},
-		{"status": constant.CONFIRMED},
+	clauses := []bson.M{{"status": bson.M{"$exists": false}}, {"status": ""}}
+	for _, status := range constant.ConfirmedOrderStatuses() {
+		clauses = append(clauses, bson.M{"status": status})
 	}
+	return clauses
 }
 
 func (entity *orderEntity) getProductStockBalanceWithContext(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId string) (int, error) {
