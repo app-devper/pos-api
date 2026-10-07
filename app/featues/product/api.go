@@ -85,7 +85,7 @@ func ApplyProductAPI(
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.CreateProductStock(repository.ProductStock, repository.Product),
+		usecase.CreateProductStock(repository.ProductStock),
 	)
 
 	productRoute.PUT("/stocks/:stockId",
@@ -99,14 +99,14 @@ func ApplyProductAPI(
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.RemoveProductStockById(repository.ProductStock, repository.Product),
+		usecase.RemoveProductStockById(repository.ProductStock),
 	)
 
 	productRoute.PATCH("/stocks/:stockId/quantity",
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
 		repository.Auth.AtLeast(sessionclient.RoleAdmin),
-		usecase.UpdateProductStockQuantityById(repository.ProductStock, repository.Product),
+		usecase.UpdateProductStockQuantityById(repository.ProductStock),
 	)
 
 	productRoute.PATCH("/stocks/sequence",

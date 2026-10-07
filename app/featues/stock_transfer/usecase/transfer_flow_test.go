@@ -74,7 +74,7 @@ func (s *transferProductStub) CreateProductStock(param request.ProductStock) (*e
 	return s.createStockFn(param)
 }
 
-func (s *transferProductStub) RemoveProductStockById(id string) (*entities.ProductStock, error) {
+func (s *transferProductStub) RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error) {
 	return s.removeStockByID(id)
 }
 

@@ -34,6 +34,9 @@ const (
 	HistoryTypeRemoveOrderItemProduct     = "RemoveOrderItemProduct"
 	HistoryTypeStockAdjustment            = "StockAdjustment"
 	HistoryTypeProductReturn              = "ProductReturn"
+	HistoryTypeTransferStockOut           = "TransferStockOut"
+	HistoryTypeTransferStockIn            = "TransferStockIn"
+	HistoryTypeTransferStockBack          = "TransferStockBack"
 )
 
 const (
