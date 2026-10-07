@@ -137,7 +137,7 @@ func TestImportReceiveToStockRejectsForeignBranch(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	ImportReceiveToStock(repo, nil)(ctx)
+	ImportReceiveToStock(repo)(ctx)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)

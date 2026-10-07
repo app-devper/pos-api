@@ -14,6 +14,7 @@ Oversold quantity was settled two incompatible ways — a Receive import drew it
 
 ## Consequences
 
+- Only what came in is used to settle: a Stock that rises by 3 serves at most 3, and the quantity it already held is not reconsidered.
 - A Line's cost is fixed when it is sold; settlement does not rewrite it, so recorded profit never changes after the fact.
 - A debt lives on its Line until settled; nothing ties it to a particular Stock in the meantime.
 - Cancelling an Order or Line puts its quantity back into every Stock it drew from, settlement draws included; its own unsettled debt disappears.

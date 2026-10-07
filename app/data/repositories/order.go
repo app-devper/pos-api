@@ -54,10 +54,7 @@ type IOrder interface {
 	GetOrderItemByProductId(productId string, branchId string) ([]entities.OrderItem, error)
 	GetOrderItemOrderDetailsByProductId(productId string, branchId string, form request.GetOrderRange) ([]entities.OrderItemOrderDetail, error)
 
-	GetOversoldOrderItemsByProductId(productId string, branchId string) ([]entities.OrderItem, error)
 	UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error)
-	DrainOversoldQtyByOrderItemId(orderItemId string, drain int, stockRef string) (*entities.OrderItem, error)
-	DrainOversoldAgainstLot(orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error)
 	IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error)
 
 	GetPaymentByOrderId(orderId string) (*entities.Payment, error)
@@ -123,6 +120,12 @@ func ensureOrderIndexes(orderRepo *mongo.Collection, orderItemRepo *mongo.Collec
 	})
 	createCollectionIndex(paymentRepo, "payments branchId+orderId", mongo.IndexModel{
 		Keys: bson.D{{Key: "branchId", Value: 1}, {Key: "orderId", Value: 1}},
+	})
+	// The Stock ledger looks up the Lines still owed a Unit, oldest first, on
+	// every Stock rise (ADR-0002); only owed Lines are indexed.
+	createCollectionIndex(orderItemRepo, "order_items owed by branch+product+unit", mongo.IndexModel{
+		Keys:    bson.D{{Key: "branchId", Value: 1}, {Key: "productId", Value: 1}, {Key: "unitId", Value: 1}, {Key: "_id", Value: 1}},
+		Options: options.Index().SetPartialFilterExpression(bson.M{"oversoldQty": bson.M{"$gt": 0}}),
 	})
 }
 
@@ -826,38 +829,6 @@ func (entity *orderEntity) GetOrderItemByProductId(productId string, branchId st
 	return items, nil
 }
 
-func (entity *orderEntity) GetOversoldOrderItemsByProductId(productId string, branchId string) ([]entities.OrderItem, error) {
-	logrus.Info("GetOversoldOrderItemsByProductId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(productId)
-	if err != nil {
-		return nil, err
-	}
-	filter := bson.M{
-		"productId":   objId,
-		"oversoldQty": bson.M{"$gt": 0},
-		"$or":         confirmedOrderItemStatusMatchClauses(),
-	}
-	if branchId != "" {
-		branchObjID, err := primitive.ObjectIDFromHex(branchId)
-		if err != nil {
-			return nil, err
-		}
-		filter["branchId"] = branchObjID
-	}
-	opts := options.Find().SetSort(bson.D{{Key: "_id", Value: 1}})
-	cursor, err := entity.orderItemRepo.Find(ctx, filter, opts)
-	if err != nil {
-		return nil, err
-	}
-	items := []entities.OrderItem{}
-	if err = cursor.All(ctx, &items); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 func (entity *orderEntity) UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error) {
 	logrus.Info("UpdateOrderItemAllocationById")
 	ctx, cancel := utils.InitContext()
@@ -878,102 +849,6 @@ func (entity *orderEntity) UpdateOrderItemAllocationById(orderItemId string, sto
 		return nil, err
 	}
 	return &data, nil
-}
-
-func (entity *orderEntity) DrainOversoldQtyByOrderItemId(orderItemId string, drain int, stockRef string) (*entities.OrderItem, error) {
-	logrus.Info("DrainOversoldQtyByOrderItemId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(orderItemId)
-	if err != nil {
-		return nil, err
-	}
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.OrderItem
-	err = entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{
-		"_id":         objId,
-		"oversoldQty": bson.M{"$gte": drain},
-	}, bson.M{
-		"$inc":  bson.M{"oversoldQty": -drain},
-		"$push": bson.M{"stocks": entities.OrderItemStock{Quantity: drain, StockId: stockRef}},
-		"$set":  bson.M{"updatedDate": time.Now()},
-	}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
-func (entity *orderEntity) DrainOversoldAgainstLot(orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error) {
-	logrus.Info("DrainOversoldAgainstLot")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	if entity.client == nil {
-		return entity.drainOversoldAgainstLotWithContext(ctx, orderItemId, lotId, drain)
-	}
-
-	session, err := entity.client.StartSession()
-	if err != nil {
-		return nil, nil, err
-	}
-	defer session.EndSession(ctx)
-
-	var updatedItem *entities.OrderItem
-	var updatedStock *entities.ProductStock
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		item, stock, txErr := entity.drainOversoldAgainstLotWithContext(sessCtx, orderItemId, lotId, drain)
-		if txErr != nil {
-			return nil, txErr
-		}
-		updatedItem = item
-		updatedStock = stock
-		return item, nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	return updatedItem, updatedStock, nil
-}
-
-func (entity *orderEntity) drainOversoldAgainstLotWithContext(ctx context.Context, orderItemId string, lotId string, drain int) (*entities.OrderItem, *entities.ProductStock, error) {
-	stockObjId, err := primitive.ObjectIDFromHex(lotId)
-	if err != nil {
-		return nil, nil, err
-	}
-	isReturnNewDoc := options.After
-
-	stockOpts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
-	var stock entities.ProductStock
-	if err := entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{
-		"_id":      stockObjId,
-		"quantity": bson.M{"$gte": drain},
-	}, bson.M{
-		"$inc": bson.M{"quantity": -drain},
-	}, stockOpts).Decode(&stock); err != nil {
-		return nil, nil, err
-	}
-
-	itemObjId, err := primitive.ObjectIDFromHex(orderItemId)
-	if err != nil {
-		return nil, nil, err
-	}
-	itemOpts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
-	var item entities.OrderItem
-	if err := entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{
-		"_id":         itemObjId,
-		"oversoldQty": bson.M{"$gte": drain},
-	}, bson.M{
-		"$inc":  bson.M{"oversoldQty": -drain},
-		"$push": bson.M{"stocks": entities.OrderItemStock{Quantity: drain, StockId: lotId}},
-		"$set":  bson.M{"updatedDate": time.Now()},
-	}, itemOpts).Decode(&item); err != nil {
-		return nil, nil, err
-	}
-	return &item, &stock, nil
 }
 
 func (entity *orderEntity) IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error) {
@@ -1560,13 +1435,15 @@ func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderI
 	return orderTotals{total: result[0].Total, totalCost: result[0].TotalCost, discount: result[0].Discount}, nil
 }
 
+// confirmedOrderItemStatusMatchClauses matches a Line that still stands: no
+// status (older Lines) or one of constant.ConfirmedOrderStatuses — the same
+// rule the Stock ledger settles by.
 func confirmedOrderItemStatusMatchClauses() []bson.M {
-	return []bson.M{
-		{"status": bson.M{"$exists": false}},
-		{"status": ""},
-		{"status": constant.ACTIVE},
-		{"status": constant.CONFIRMED},
+	clauses := []bson.M{{"status": bson.M{"$exists": false}}, {"status": ""}}
+	for _, status := range constant.ConfirmedOrderStatuses() {
+		clauses = append(clauses, bson.M{"status": status})
 	}
+	return clauses
 }
 
 func (entity *orderEntity) getProductStockBalanceWithContext(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId string) (int, error) {

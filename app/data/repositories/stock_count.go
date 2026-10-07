@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/request"
 	"pos/db"
 
@@ -14,7 +15,7 @@ import (
 )
 
 type stockCountEntity struct {
-	recorder       *stockRecorder
+	ledger         *ledger.Ledger
 	stockCountRepo *mongo.Collection
 }
 
@@ -26,7 +27,7 @@ type IStockCount interface {
 
 func NewStockCountEntity(resource *db.Resource) IStockCount {
 	stockCountRepo := resource.PosDb.Collection("stock_counts")
-	entity := &stockCountEntity{recorder: newStockRecorder(resource), stockCountRepo: stockCountRepo}
+	entity := &stockCountEntity{ledger: newLedger(resource), stockCountRepo: stockCountRepo}
 	ensureStockCountIndexes(stockCountRepo)
 	return entity
 }

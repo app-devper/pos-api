@@ -3,6 +3,7 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/request"
 	"pos/db"
 
@@ -14,7 +15,7 @@ import (
 )
 
 type stockAdjustmentEntity struct {
-	recorder            *stockRecorder
+	ledger              *ledger.Ledger
 	stockAdjustmentRepo *mongo.Collection
 }
 
@@ -25,7 +26,7 @@ type IStockAdjustment interface {
 
 func NewStockAdjustmentEntity(resource *db.Resource) IStockAdjustment {
 	stockAdjustmentRepo := resource.PosDb.Collection("stock_adjustments")
-	entity := &stockAdjustmentEntity{recorder: newStockRecorder(resource), stockAdjustmentRepo: stockAdjustmentRepo}
+	entity := &stockAdjustmentEntity{ledger: newLedger(resource), stockAdjustmentRepo: stockAdjustmentRepo}
 	ensureStockAdjustmentIndexes(stockAdjustmentRepo)
 	return entity
 }
