@@ -14,6 +14,8 @@ Stock was moved by seven repository files with three transaction settings and fi
 
 ## Consequences
 
+- Product history names a Product and Unit, not a Stock. So a Sale or a cancel writes one history row per Line, as it always has, even when the Line drew from several Stocks or from none (Sold first, Oversell); every other event writes one row per Stock it touched.
+
 - `Sell` owns recording a Sale end to end — the Order, its Lines and payments, the `saleId` repeat check, and the Order code, taken inside the transaction so a rejected Sale no longer burns a code. The repeat check identifies a Sale by its Lines and Customer, not its payments, so a retry with a different tender returns the recorded Order.
 - Rollout is three PRs: (1) the ledger with Receive import, Adjustment, Count and Return; (2) Sale and cancel; (3) Transfer, manual Stock create / delete and set-quantity, after which a test fails any write to `quantity` outside the ledger.
 - The legacy till-priced Order path (`CreateOrder`, requests without `saleId`) is not moved into the ledger; it is deleted once production logs show no till still uses it.

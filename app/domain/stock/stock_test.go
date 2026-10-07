@@ -72,3 +72,17 @@ func TestAllocateReturnNeverExceedsWhatTheLineDrew(t *testing.T) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
+
+func TestCancellationPartsSkipWhatWasReturnedAndSyntheticMarkers(t *testing.T) {
+	first, second := primitive.NewObjectID().Hex(), primitive.NewObjectID().Hex()
+	got := CancellationParts([]entities.OrderItemStock{
+		{StockId: first, Quantity: 2},
+		{StockId: "ADJUST:อื่นๆ", Quantity: 1},
+		{StockId: second, Quantity: 3},
+		{StockId: "", Quantity: 1},
+	}, 3)
+	want := []entities.OrderItemStock{{StockId: second, Quantity: 2}, {StockId: "", Quantity: 1}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}

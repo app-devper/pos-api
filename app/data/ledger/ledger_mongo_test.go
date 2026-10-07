@@ -451,3 +451,216 @@ func TestImportReceiveWithoutAStatusIsImported(t *testing.T) {
 		t.Fatalf("a Receive saved before statuses existed must import, got %+v, %v", got, err)
 	}
 }
+
+// --- Sale and cancel (PR-2) ---
+
+func (f *fixture) priced(unit primitive.ObjectID, price float64) {
+	f.insert("product_prices", entities.ProductPrice{Id: primitive.NewObjectID(), ProductId: f.product, UnitId: unit, CustomerType: "General", Price: price})
+}
+
+func (f *fixture) sale(id string, paid float64, lines ...request.SaleLine) request.Sale {
+	for i := range lines {
+		lines[i].ProductId = f.product.Hex()
+		if lines[i].UnitId == "" {
+			lines[i].UnitId = f.tab.Hex()
+		}
+		if lines[i].PriceType == "" {
+			lines[i].PriceType = "General"
+		}
+	}
+	return request.Sale{SaleId: id, Items: lines, Type: "CASH", BranchId: f.branch.Hex(), CreatedBy: "cashier",
+		Payments: []request.OrderPayment{{Amount: paid, Type: "CASH"}}}
+}
+
+func TestSellRepeatWithADifferentTenderReturnsTheRecordedOrder(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	lot := f.stock(f.tab, 1, 5)
+
+	first, err := f.ledger.Sell(context.Background(), f.sale("s1", 50, request.SaleLine{Quantity: 2}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The reply was lost; the till resends with the cashier's corrected tender.
+	retry := f.sale("s1", 100, request.SaleLine{Quantity: 2})
+	retry.Type, retry.Message = "TRANSFER", "ลูกค้าโอน"
+	again, err := f.ledger.Sell(context.Background(), retry)
+	if err != nil {
+		t.Fatalf("a repeat that differs only in how it was paid must return the Order, got %v", err)
+	}
+	if again.Order.Id != first.Order.Id || f.quantity(lot) != 3 || f.count("orders", bson.M{}) != 1 {
+		t.Fatal("the repeat recorded a second Order or drew Stock again")
+	}
+	if _, err := f.ledger.Sell(context.Background(), f.sale("s1", 50, request.SaleLine{Quantity: 3})); !errors.Is(err, ErrSaleConflict) {
+		t.Fatalf("different Lines under the same id: want ErrSaleConflict, got %v", err)
+	}
+}
+
+func TestSellRecognisesAnOrderRecordedWithTheOldFingerprint(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	f.stock(f.tab, 1, 5)
+	s := f.sale("s-old", 50, request.SaleLine{Quantity: 1})
+	old := primitive.NewObjectID()
+	f.insert("orders", entities.Order{Id: old, BranchId: f.branch, Status: constant.CONFIRMED, SaleId: "s-old", SaleFingerprint: legacyFingerprint(s)})
+
+	got, err := f.ledger.Sell(context.Background(), s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Order.Id != old || f.count("orders", bson.M{}) != 1 {
+		t.Fatal("a Sale recorded before the fingerprint changed was recorded again")
+	}
+}
+
+func TestSellOversoldLineDrawsWhatExistsAndOwesTheRest(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	lot := f.stock(f.tab, 1, 2)
+
+	got, err := f.ledger.Sell(context.Background(), f.sale("s1", 50, request.SaleLine{Quantity: 5, AllowOversell: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := f.line(got.Lines[0].Id)
+	if f.quantity(lot) != 0 || line.OversoldQty != 3 || len(line.Stocks) != 1 || line.Stocks[0].Quantity != 2 {
+		t.Fatalf("Stock=%d Line=%+v", f.quantity(lot), line)
+	}
+	if h := f.histories(); len(h) != 1 || h[0].Quantity != 5 || h[0].Balance != 0 {
+		t.Fatalf("want one history row for the Line, got %+v", h)
+	}
+}
+
+func TestCancelLinePutsBackEveryDrawAndServesOtherWaitingLines(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	lot := f.stock(f.tab, 1, 1)
+	sold, err := f.ledger.Sell(context.Background(), f.sale("s1", 50, request.SaleLine{Quantity: 3, AllowOversell: true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled := sold.Lines[0].Id // drew 1, owes 2
+	if _, err := f.ledger.Adjust(context.Background(), f.adjust(lot, 1)); err != nil {
+		t.Fatal(err) // settles 1 of the 2 owed, from lot
+	}
+	waiting := f.owed(f.branch, f.tab, 2)
+
+	if err := f.ledger.CancelLine(context.Background(), cancelled.Hex(), f.branch.Hex(), "manager", "wrong item"); err != nil {
+		t.Fatal(err)
+	}
+	// The cancelled Line drew 1 at the sale and 1 by settlement: 2 come back,
+	// and both go to the Line still waiting. Its own remaining debt vanishes.
+	if got := f.line(cancelled); got.Status != constant.CANCELLED {
+		t.Fatalf("Line not cancelled: %+v", got)
+	}
+	if f.quantity(lot) != 0 || f.line(waiting).OversoldQty != 0 {
+		t.Fatalf("Stock=%d waiting owed=%d, want 0 and 0", f.quantity(lot), f.line(waiting).OversoldQty)
+	}
+	var rejected *Rejected
+	if err := f.ledger.CancelLine(context.Background(), cancelled.Hex(), f.branch.Hex(), "manager", "again"); !errors.As(err, &rejected) {
+		t.Fatalf("a second cancel must be refused, got %v", err)
+	}
+}
+
+func TestCancelLineRecomputesTheOrderRounded(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	f.stock(f.tab, 1, 10)
+	sold, err := f.ledger.Sell(context.Background(), f.sale("s1", 100,
+		request.SaleLine{Quantity: 1, Discount: 3.333},
+		request.SaleLine{Quantity: 2, Discount: 3.333}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ledger.CancelLine(context.Background(), sold.Lines[0].Id.Hex(), f.branch.Hex(), "manager", ""); err != nil {
+		t.Fatal(err)
+	}
+	var o entities.Order
+	if err := f.pos.Collection("orders").FindOne(context.Background(), bson.M{"_id": sold.Order.Id}).Decode(&o); err != nil {
+		t.Fatal(err)
+	}
+	// What remains: 2 × 10 less 3.333 a unit = 13.334 → 13.33 (as when sold).
+	if o.Total != 13.33 || o.Discount != 6.67 {
+		t.Fatalf("Order after cancel total=%v discount=%v, want 13.33 and 6.67", o.Total, o.Discount)
+	}
+}
+
+func TestCancelOrderGivesSoldFirstBackAndCancelsOnce(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	sold, err := f.ledger.Sell(context.Background(), f.sale("s1", 50, request.SaleLine{Quantity: 2}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p entities.Product
+	_ = f.pos.Collection("products").FindOne(context.Background(), bson.M{"_id": f.product}).Decode(&p)
+	if p.SoldFirst != -2 {
+		t.Fatalf("Sold first = %d after selling 2 with no Stock, want -2", p.SoldFirst)
+	}
+	if err := f.ledger.CancelOrder(context.Background(), sold.Order.Id.Hex(), f.branch.Hex(), "manager", "customer left"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.pos.Collection("products").FindOne(context.Background(), bson.M{"_id": f.product}).Decode(&p)
+	if p.SoldFirst != 0 || f.count("payments", bson.M{"status": constant.CANCELLED}) != 1 || f.count("order_items", bson.M{"status": constant.CANCELLED}) != 1 {
+		t.Fatal("cancel did not give Sold first back or cancel the payment and Line")
+	}
+	var rejected *Rejected
+	if err := f.ledger.CancelOrder(context.Background(), sold.Order.Id.Hex(), f.branch.Hex(), "manager", ""); !errors.As(err, &rejected) {
+		t.Fatalf("a second cancel must be refused, got %v", err)
+	}
+	if err := f.ledger.CancelOrder(context.Background(), sold.Order.Id.Hex(), primitive.NewObjectID().Hex(), "manager", ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("another branch's Order: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestCancelLineSavedWithoutAStatusIsCancelled(t *testing.T) {
+	f := newFixture(t)
+	lot := f.stock(f.tab, 1, 0)
+	order, line := primitive.NewObjectID(), primitive.NewObjectID()
+	f.insert("orders", entities.Order{Id: order, BranchId: f.branch, Status: constant.CONFIRMED})
+	if _, err := f.pos.Collection("order_items").InsertOne(context.Background(), bson.M{"_id": line, "orderId": order, "branchId": f.branch, "productId": f.product, "unitId": f.tab,
+		"quantity": 2, "price": 20.0, "stocks": bson.A{bson.M{"stockid": lot.Hex(), "quantity": 2}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ledger.CancelLine(context.Background(), line.Hex(), f.branch.Hex(), "manager", ""); err != nil {
+		t.Fatalf("an older Line with no status must cancel, got %v", err)
+	}
+	if f.line(line).Status != constant.CANCELLED || f.quantity(lot) != 2 {
+		t.Fatal("Line not cancelled or Stock not put back")
+	}
+}
+
+func TestCancelSkipsAStockDeletedSinceTheSale(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	kept, gone := f.stock(f.tab, 1, 1), f.stock(f.tab, 2, 1)
+	sold, err := f.ledger.Sell(context.Background(), f.sale("s1", 50, request.SaleLine{Quantity: 2}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pos.Collection("product_stocks").DeleteOne(context.Background(), bson.M{"_id": gone}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ledger.CancelOrder(context.Background(), sold.Order.Id.Hex(), f.branch.Hex(), "manager", ""); err != nil {
+		t.Fatalf("a Stock deleted by hand must not block the cancel, got %v", err)
+	}
+	if f.quantity(kept) != 1 {
+		t.Fatal("the Stock that still exists did not get its quantity back")
+	}
+}
+
+func TestSellChangedBuyerDetailsUnderTheSameIdIsADifferentSale(t *testing.T) {
+	f := newFixture(t)
+	f.priced(f.tab, 10)
+	f.stock(f.tab, 1, 5)
+	first := f.sale("s1", 50, request.SaleLine{Quantity: 1})
+	first.BuyerIdCard = "1-1111-11111-11-1"
+	if _, err := f.ledger.Sell(context.Background(), first); err != nil {
+		t.Fatal(err)
+	}
+	corrected := f.sale("s1", 50, request.SaleLine{Quantity: 1})
+	corrected.BuyerIdCard = "1-2222-22222-22-2"
+	if _, err := f.ledger.Sell(context.Background(), corrected); !errors.Is(err, ErrSaleConflict) {
+		t.Fatalf("a resend with different buyer details must not silently return the old record, got %v", err)
+	}
+}

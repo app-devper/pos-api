@@ -19,14 +19,8 @@ import (
 
 type saleRepoStub struct {
 	repositories.IOrder
-	found    *repositories.RecordedSale
-	findErr  error
 	record   func(form request.Sale) (*repositories.RecordedSale, error)
 	recorded []request.Sale
-}
-
-func (s *saleRepoStub) FindSale(form request.Sale) (*repositories.RecordedSale, error) {
-	return s.found, s.findErr
 }
 
 func (s *saleRepoStub) RecordSale(form request.Sale) (*repositories.RecordedSale, error) {
@@ -82,42 +76,27 @@ func TestCreateOrderWithSaleIdRecordsTheSale(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil || resp.Data.Id != order.Id || resp.Stocks == nil {
 		t.Fatalf("response %s (%v)", w.Body.String(), err)
 	}
-	if len(repo.recorded) != 1 || seq.calls != 1 {
-		t.Fatalf("recorded %d sequences %d", len(repo.recorded), seq.calls)
+	// The Stock ledger takes the Order code inside its transaction (ADR-0001).
+	if len(repo.recorded) != 1 || seq.calls != 0 {
+		t.Fatalf("recorded %d, handler took %d sequences", len(repo.recorded), seq.calls)
 	}
 	s := repo.recorded[0]
-	if s.SaleId != "s1" || s.Code == "" || s.CreatedBy != "user-1" || s.BranchId == "" || s.Items[0].PriceType != "General" {
+	if s.SaleId != "s1" || s.CreatedBy != "user-1" || s.BranchId == "" || s.Items[0].PriceType != "General" {
 		t.Fatalf("sale %+v", s)
-	}
-}
-
-func TestCreateOrderRepeatedSaleDoesNotTakeAnOrderCode(t *testing.T) {
-	order := &entities.Order{Id: primitive.NewObjectID()}
-	repo := &saleRepoStub{found: &repositories.RecordedSale{Order: order}}
-	seq := &countingSequence{}
-
-	w := postSale(t, repo, seq, saleBody)
-
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), order.Id.Hex()) {
-		t.Fatalf("status %d %s", w.Code, w.Body.String())
-	}
-	if seq.calls != 0 || len(repo.recorded) != 0 {
-		t.Fatalf("sequences %d recorded %d", seq.calls, len(repo.recorded))
 	}
 }
 
 func TestCreateOrderSaleErrors(t *testing.T) {
 	for name, tc := range map[string]struct {
-		findErr, recordErr error
-		status             int
-		code               string
+		recordErr error
+		status    int
+		code      string
 	}{
-		"id reused on find":   {findErr: repositories.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
-		"id reused on record": {recordErr: repositories.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
-		"rejected":            {recordErr: &repositories.SaleRejected{Reason: "payment too low"}, status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_001},
-		"failed":              {recordErr: errors.New("mongo down"), status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_002},
+		"id reused": {recordErr: repositories.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
+		"rejected":  {recordErr: &repositories.SaleRejected{Reason: "payment too low"}, status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_001},
+		"failed":    {recordErr: errors.New("mongo down"), status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_002},
 	} {
-		repo := &saleRepoStub{findErr: tc.findErr, record: func(form request.Sale) (*repositories.RecordedSale, error) {
+		repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
 			return nil, tc.recordErr
 		}}
 		w := postSale(t, repo, &countingSequence{}, saleBody)
