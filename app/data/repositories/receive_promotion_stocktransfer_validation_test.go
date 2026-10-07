@@ -75,35 +75,10 @@ func TestUpdatePromotionByIdRejectsInvalidProductId(t *testing.T) {
 	}
 }
 
-func TestCreateStockTransferRejectsInvalidBranchId(t *testing.T) {
-	entity := &stockTransferEntity{}
-
-	if _, err := entity.createStockTransferWithContext(nil, request.StockTransfer{
-		FromBranchId: "invalid-branch-id",
-		ToBranchId:   "507f1f77bcf86cd799439011",
-	}); err == nil {
-		t.Fatal("expected invalid branch id error")
-	}
-}
-
 func TestGetStockTransfersRejectsInvalidBranchId(t *testing.T) {
 	entity := &stockTransferEntity{}
 
 	if _, err := entity.GetStockTransfers("invalid-branch-id"); err == nil {
 		t.Fatal("expected invalid branch id error")
-	}
-}
-
-func TestCreateStockTransferRejectsInvalidProductId(t *testing.T) {
-	entity := &stockTransferEntity{}
-
-	if _, err := entity.createStockTransferWithContext(nil, request.StockTransfer{
-		FromBranchId: "507f1f77bcf86cd799439011",
-		ToBranchId:   "507f1f77bcf86cd799439012",
-		Items: []request.StockTransferItem{
-			{ProductId: "invalid-product-id", StockId: "stock-1", Quantity: 1},
-		},
-	}); err == nil {
-		t.Fatal("expected invalid product id error")
 	}
 }

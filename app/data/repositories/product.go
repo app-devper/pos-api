@@ -662,54 +662,6 @@ func (entity *productEntity) updateProductByIdWithContext(ctx context.Context, i
 	return &data, nil
 }
 
-func (entity *productEntity) RemoveQuantityById(id string, quantity int) (*entities.Product, error) {
-	logrus.Info("RemoveQuantityById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Product
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
-		"$inc": bson.M{"quantity": -quantity},
-		"$set": bson.M{"updatedDate": time.Now()},
-	}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
-func (entity *productEntity) AddQuantityById(id string, quantity int) (*entities.Product, error) {
-	logrus.Info("AddQuantityById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Product
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
-		"$inc": bson.M{"quantity": quantity},
-		"$set": bson.M{"updatedDate": time.Now()},
-	}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
 func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 {
 	logrus.Info("GetTotalCostPrice")
 	data, err := entity.GetProductById(id)

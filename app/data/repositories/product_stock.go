@@ -2,9 +2,9 @@ package repositories
 
 import (
 	"context"
-	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
@@ -18,6 +18,7 @@ import (
 )
 
 type productStockEntity struct {
+	ledger             *ledger.Ledger
 	productStockRepo   *mongo.Collection
 	productHistoryRepo *mongo.Collection
 }
@@ -27,9 +28,9 @@ type IProductStock interface {
 	CreateProductStock(param request.ProductStock) (*entities.ProductStock, error)
 	GetProductStockById(id string) (*entities.ProductStock, error)
 	UpdateProductStockById(id string, param request.UpdateProductStock) (*entities.ProductStock, error)
-	UpdateProductStockQuantityById(id string, quantity int) (*entities.ProductStock, error)
+	UpdateProductStockQuantityById(id string, branchId string, quantity int, by string) (*entities.ProductStock, error)
 	UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error)
-	RemoveProductStockById(id string) (*entities.ProductStock, error)
+	RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error)
 	GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStocksByProductAndUnitId(productId string, unitId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string, branchId string) int
@@ -55,6 +56,7 @@ func newProductStockEntity(resource *db.Resource) *productStockEntity {
 	productStockRepo := resource.PosDb.Collection("product_stocks")
 	productHistoryRepo := resource.PosDb.Collection("product_histories")
 	entity := &productStockEntity{
+		ledger:             newLedger(resource),
 		productStockRepo:   productStockRepo,
 		productHistoryRepo: productHistoryRepo,
 	}
@@ -78,13 +80,11 @@ func ensureProductStockIndexes(productStockRepo *mongo.Collection, productHistor
 	})
 }
 
-// --- ProductStock CRUD ---
-
+// CreateProductStock is recorded by the Stock ledger (ADR-0001): the new
+// Stock serves its Unit's waiting Lines and gets its history row.
 func (entity *productStockEntity) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
 	logrus.Info("CreateProductStock")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	return entity.createProductStockWithContext(ctx, param)
+	return entity.ledger.CreateStock(context.Background(), param)
 }
 
 func (entity *productStockEntity) createProductStockWithContext(ctx context.Context, param request.ProductStock) (*entities.ProductStock, error) {
@@ -212,49 +212,17 @@ func (entity *productStockEntity) UpdateProductStockById(id string, param reques
 	return &data, nil
 }
 
-func (entity *productStockEntity) UpdateProductStockQuantityById(id string, quantity int) (*entities.ProductStock, error) {
+// UpdateProductStockQuantityById records what a Stock holds through the Stock
+// ledger: a one-Line Count with its Adjustment and history (ADR-0001).
+func (entity *productStockEntity) UpdateProductStockQuantityById(id string, branchId string, quantity int, by string) (*entities.ProductStock, error) {
 	logrus.Info("UpdateProductStockQuantityById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.ProductStock
-	err = entity.productStockRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"quantity": quantity,
-	}}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
+	return entity.ledger.SetQuantity(context.Background(), id, branchId, quantity, by)
 }
 
-func (entity *productStockEntity) RemoveProductStockById(id string) (*entities.ProductStock, error) {
+// RemoveProductStockById deletes an empty Stock through the Stock ledger.
+func (entity *productStockEntity) RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error) {
 	logrus.Info("RemoveProductStockById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-	var data entities.ProductStock
-	if err = entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data); err != nil {
-		return nil, err
-	}
-	if data.Quantity > 0 {
-		return nil, errors.New("cannot remove stock with remaining quantity")
-	}
-	err = entity.productStockRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
+	return entity.ledger.DeleteStock(context.Background(), id, branchId, by)
 }
 
 func (entity *productStockEntity) UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error) {

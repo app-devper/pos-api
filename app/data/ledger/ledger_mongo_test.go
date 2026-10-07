@@ -664,3 +664,187 @@ func TestSellChangedBuyerDetailsUnderTheSameIdIsADifferentSale(t *testing.T) {
 		t.Fatalf("a resend with different buyer details must not silently return the old record, got %v", err)
 	}
 }
+
+// --- Transfer, manual Stock and set-quantity (PR-3) ---
+
+func (f *fixture) transfer(to primitive.ObjectID, stock primitive.ObjectID, qty int) request.StockTransfer {
+	return request.StockTransfer{FromBranchId: f.branch.Hex(), ToBranchId: to.Hex(), Code: "TR-1", CreatedBy: "admin",
+		Items: []request.StockTransferItem{{ProductId: f.product.Hex(), StockId: stock.Hex(), Quantity: qty}}}
+}
+
+func TestRequestTransferReservesFromTheSourceWithHistory(t *testing.T) {
+	f := newFixture(t)
+	source := f.stock(f.tab, 1, 5)
+	got, err := f.ledger.RequestTransfer(context.Background(), f.transfer(primitive.NewObjectID(), source, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "PENDING" || f.quantity(source) != 2 {
+		t.Fatalf("status %s, source %d: want PENDING and 2 reserved out", got.Status, f.quantity(source))
+	}
+	if h := f.histories(); len(h) != 1 || h[0].Balance != 2 {
+		t.Fatalf("want one history row for the reservation, got %+v", h)
+	}
+	var rejected *Rejected
+	if _, err := f.ledger.RequestTransfer(context.Background(), f.transfer(primitive.NewObjectID(), source, 3)); !errors.As(err, &rejected) {
+		t.Fatalf("reserving more than the source holds: want Rejected, got %v", err)
+	}
+}
+
+func TestApproveTransferOpensStockAtTheDestinationAndSettlesItsLinesOnce(t *testing.T) {
+	f := newFixture(t)
+	dest := primitive.NewObjectID()
+	source := f.stock(f.tab, 7, 5)
+	f.insert("product_stocks", entities.ProductStock{Id: primitive.NewObjectID(), BranchId: dest, ProductId: f.product, UnitId: f.tab, Sequence: 2})
+	waiting := f.owed(dest, f.tab, 1)
+	sourceWaiting := f.owed(f.branch, f.tab, 1)
+	tr, err := f.ledger.RequestTransfer(context.Background(), f.transfer(dest, source, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := f.ledger.ApproveTransfer(context.Background(), tr.Id.Hex(), "manager")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var opened entities.ProductStock
+	if err := f.pos.Collection("product_stocks").FindOne(context.Background(), bson.M{"branchId": dest, "import": 3}).Decode(&opened); err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "APPROVED" || opened.Quantity != 2 || opened.Sequence != 3 || f.line(waiting).OversoldQty != 0 {
+		t.Fatalf("status %s, opened %+v, waiting owed %d", got.Status, opened, f.line(waiting).OversoldQty)
+	}
+	if f.line(sourceWaiting).OversoldQty != 1 {
+		t.Fatal("the source branch's Line was settled by goods leaving it")
+	}
+	var rejected *Rejected
+	if _, err := f.ledger.ApproveTransfer(context.Background(), tr.Id.Hex(), "manager"); !errors.As(err, &rejected) {
+		t.Fatalf("a second approve must be refused, got %v", err)
+	}
+}
+
+func TestRejectTransferPutsTheReservationBackAndSettlesTheSource(t *testing.T) {
+	f := newFixture(t)
+	source := f.stock(f.tab, 1, 3)
+	tr, err := f.ledger.RequestTransfer(context.Background(), f.transfer(primitive.NewObjectID(), source, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting := f.owed(f.branch, f.tab, 1)
+	got, err := f.ledger.RejectTransfer(context.Background(), tr.Id.Hex(), "manager")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "REJECTED" || f.quantity(source) != 2 || f.line(waiting).OversoldQty != 0 {
+		t.Fatalf("status %s, source %d, owed %d: want REJECTED, 3 back less 1 to the waiting Line", got.Status, f.quantity(source), f.line(waiting).OversoldQty)
+	}
+}
+
+func TestCreateStockSettlesWaitingLinesWithOneHistoryRow(t *testing.T) {
+	f := newFixture(t)
+	f.stock(f.box, 4, 0)
+	waiting := f.owed(f.branch, f.box, 2)
+	got, err := f.ledger.CreateStock(context.Background(), request.ProductStock{ProductId: f.product.Hex(), UnitId: f.box.Hex(), BranchId: f.branch.Hex(), Quantity: 5, LotNumber: "B1", UpdatedBy: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Quantity != 3 || got.Import != 5 || got.Sequence != 5 || f.line(waiting).OversoldQty != 0 {
+		t.Fatalf("created %+v, owed %d", got, f.line(waiting).OversoldQty)
+	}
+	if h := f.histories(); len(h) != 1 || h[0].Import != 5 || h[0].Balance != 3 {
+		t.Fatalf("want one history row, got %+v", h)
+	}
+	var rejected *Rejected
+	if _, err := f.ledger.CreateStock(context.Background(), request.ProductStock{ProductId: f.product.Hex(), UnitId: primitive.NewObjectID().Hex(), BranchId: f.branch.Hex(), Quantity: 1}); !errors.As(err, &rejected) {
+		t.Fatalf("a Unit of another Product: want Rejected, got %v", err)
+	}
+}
+
+func TestSetQuantityIsAOneLineCount(t *testing.T) {
+	f := newFixture(t)
+	st := f.stock(f.tab, 1, 5)
+	waiting := f.owed(f.branch, f.tab, 1)
+	got, err := f.ledger.SetQuantity(context.Background(), st.Hex(), f.branch.Hex(), 8, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Quantity != 7 || f.line(waiting).OversoldQty != 0 || f.count("stock_adjustments", bson.M{"stockId": st, "delta": 3}) != 1 {
+		t.Fatalf("Stock %+v: want 8 set, 1 to the waiting Line, one Adjustment of +3", got)
+	}
+	var rejected *Rejected
+	if _, err := f.ledger.SetQuantity(context.Background(), st.Hex(), f.branch.Hex(), -1, "admin"); !errors.As(err, &rejected) {
+		t.Fatalf("a negative quantity: want Rejected, got %v", err)
+	}
+	if _, err := f.ledger.SetQuantity(context.Background(), st.Hex(), primitive.NewObjectID().Hex(), 1, "admin"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("another branch's Stock: want ErrNotFound, got %v", err)
+	}
+}
+
+func TestDeleteStockOnlyWhenEmpty(t *testing.T) {
+	f := newFixture(t)
+	full, empty := f.stock(f.tab, 1, 2), f.stock(f.tab, 2, 0)
+	var rejected *Rejected
+	if _, err := f.ledger.DeleteStock(context.Background(), full.Hex(), f.branch.Hex(), "admin"); !errors.As(err, &rejected) {
+		t.Fatalf("a Stock still holding goods: want Rejected, got %v", err)
+	}
+	if _, err := f.ledger.DeleteStock(context.Background(), empty.Hex(), f.branch.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if f.count("product_stocks", bson.M{"_id": empty}) != 0 || len(f.histories()) != 1 {
+		t.Fatal("the empty Stock was not deleted with one history row")
+	}
+}
+
+func TestDeleteStockRefusesAStockAPendingTransferReserved(t *testing.T) {
+	f := newFixture(t)
+	source := f.stock(f.tab, 1, 3)
+	tr, err := f.ledger.RequestTransfer(context.Background(), f.transfer(primitive.NewObjectID(), source, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rejected *Rejected
+	if _, err := f.ledger.DeleteStock(context.Background(), source.Hex(), f.branch.Hex(), "admin"); !errors.As(err, &rejected) {
+		t.Fatalf("a Stock emptied by a pending Transfer must not be deleted, got %v", err)
+	}
+	if _, err := f.ledger.RejectTransfer(context.Background(), tr.Id.Hex(), "manager"); err != nil || f.quantity(source) != 3 {
+		t.Fatalf("the reservation must still come back, err=%v Stock=%d", err, f.quantity(source))
+	}
+}
+
+func TestRequestTransferRefusesLinesWithoutAStockOrNamingOneTwice(t *testing.T) {
+	f := newFixture(t)
+	source := f.stock(f.tab, 1, 5)
+	var rejected *Rejected
+	twice := f.transfer(primitive.NewObjectID(), source, 1)
+	twice.Items = append(twice.Items, request.StockTransferItem{ProductId: f.product.Hex(), StockId: source.Hex(), Quantity: 2})
+	noStock := f.transfer(primitive.NewObjectID(), source, 1)
+	noStock.Items[0].StockId = ""
+	for name, form := range map[string]request.StockTransfer{"same Stock twice": twice, "no Stock": noStock} {
+		if _, err := f.ledger.RequestTransfer(context.Background(), form); !errors.As(err, &rejected) {
+			t.Fatalf("%s: want Rejected, got %v", name, err)
+		}
+	}
+	if f.quantity(source) != 5 || f.count("stock_transfers", bson.M{}) != 0 {
+		t.Fatal("a refused Transfer reserved Stock or was recorded")
+	}
+}
+
+func TestApprovedTransferHistoryRecordsWhatCameIn(t *testing.T) {
+	f := newFixture(t)
+	dest := primitive.NewObjectID()
+	source := f.stock(f.tab, 1, 4)
+	tr, err := f.ledger.RequestTransfer(context.Background(), f.transfer(dest, source, 4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.ledger.ApproveTransfer(context.Background(), tr.Id.Hex(), "manager"); err != nil {
+		t.Fatal(err)
+	}
+	var in entities.ProductHistory
+	if err := f.pos.Collection("product_histories").FindOne(context.Background(), bson.M{"branchId": dest}).Decode(&in); err != nil {
+		t.Fatal(err)
+	}
+	if in.Import != 4 || in.Quantity != 4 {
+		t.Fatalf("inbound Transfer history %+v, want Import and Quantity 4", in)
+	}
+}
