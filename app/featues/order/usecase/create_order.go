@@ -40,7 +40,7 @@ func CreateOrder(
 			return
 		}
 		if probe.SaleId != "" {
-			recordSale(ctx, orderEntity, sequenceEntity)
+			recordSale(ctx, orderEntity)
 			return
 		}
 

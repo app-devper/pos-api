@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"pos/app/data/entities"
+	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
 
@@ -124,7 +125,7 @@ func (f *saleFixture) sale(id string, paid float64, lines ...request.SaleLine) r
 		SaleId: id, Items: lines, Type: "CASH",
 		Payments:  []request.OrderPayment{{Amount: paid, Type: "CASH"}},
 		BranchId:  f.branchId.Hex(),
-		CreatedBy: "cashier", Code: "ORD-" + id,
+		CreatedBy: "cashier",
 	}
 }
 
@@ -207,12 +208,8 @@ func TestRecordSaleRepeatReturnsTheRecordedOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found, err := f.orders.FindSale(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if again.Order.Id != first.Order.Id || found.Order.Id != first.Order.Id || len(found.Order.Payments) != 1 || len(found.Stocks) != 1 {
-		t.Fatalf("repeat recorded %+v / found %+v", again.Order, found)
+	if again.Order.Id != first.Order.Id || len(again.Order.Payments) != 1 || len(again.Stocks) != 1 {
+		t.Fatalf("repeat recorded %+v", again)
 	}
 	if f.quantity(lot) != 8 || f.count("orders") != 1 {
 		t.Fatalf("stock %d orders %d", f.quantity(lot), f.count("orders"))
@@ -221,9 +218,6 @@ func TestRecordSaleRepeatReturnsTheRecordedOrder(t *testing.T) {
 	other := f.sale("s1", 50, request.SaleLine{Quantity: 3, PriceType: "General"})
 	if _, err := f.orders.RecordSale(other); !errors.Is(err, ErrSaleConflict) {
 		t.Fatalf("expected ErrSaleConflict, got %v", err)
-	}
-	if _, err := f.orders.FindSale(other); !errors.Is(err, ErrSaleConflict) {
-		t.Fatalf("expected ErrSaleConflict from FindSale, got %v", err)
 	}
 }
 
@@ -341,5 +335,71 @@ func TestOrdersSaleIdIsUniqueWhenPresent(t *testing.T) {
 	}
 	if _, err := orders.InsertOne(ctx, bson.M{"_id": primitive.NewObjectID(), "saleId": "s1"}); !mongo.IsDuplicateKeyError(err) {
 		t.Fatalf("expected duplicate key, got %v", err)
+	}
+}
+
+func TestRecordSaleRefusedTakesNoOrderCode(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 10, 4)
+
+	var rejected *SaleRejected
+	if _, err := f.orders.RecordSale(f.sale("refused", 1, request.SaleLine{Quantity: 2, PriceType: "General"})); !errors.As(err, &rejected) {
+		t.Fatalf("expected an underpaid Sale to be refused, got %v", err)
+	}
+	got, err := f.orders.RecordSale(f.sale("accepted", 50, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seq entities.Sequence
+	if err := f.pos.Collection("sequences").FindOne(context.Background(), bson.M{"field": constant.ORDER}).Decode(&seq); err != nil {
+		t.Fatal(err)
+	}
+	if seq.Value != 1 || got.Order.Code != seq.GenerateCode() {
+		t.Fatalf("Order code %q, sequence at %d: the refused Sale must not have taken a code", got.Order.Code, seq.Value)
+	}
+}
+
+func TestRepairOrderTotalsAgreesWithACancelledLine(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 10, 4)
+	got, err := f.orders.RecordSale(f.sale("s1", 100,
+		request.SaleLine{Quantity: 1, PriceType: "General", Discount: 3.333},
+		request.SaleLine{Quantity: 1, PriceType: "General", Discount: 3.333},
+		request.SaleLine{Quantity: 1, PriceType: "General", Discount: 3.333}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := f.items(got.Order.Id)
+	if _, err := f.orders.CancelOrderItemById(items[0].Id.Hex(), "manager", f.branchId.Hex(), ""); err != nil {
+		t.Fatal(err)
+	}
+	report, err := RepairCancelledLineTotals(context.Background(), f.pos, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report) != 0 {
+		t.Fatalf("repair-order-totals flags an Order the cancel just recomputed: %+v", report)
+	}
+}
+
+func TestCancelByOrderAndProductCancelsTheLineStillStanding(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 10, 4)
+	got, err := f.orders.RecordSale(f.sale("s1", 100,
+		request.SaleLine{Quantity: 1, PriceType: "General"},
+		request.SaleLine{Quantity: 2, PriceType: "Wholesaler"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := f.items(got.Order.Id)
+	if _, err := f.orders.CancelOrderItemById(items[0].Id.Hex(), "manager", f.branchId.Hex(), ""); err != nil {
+		t.Fatal(err)
+	}
+	cancelled, err := f.orders.CancelOrderItemByOrderProductId(got.Order.Id.Hex(), f.product.Hex(), "manager", f.branchId.Hex(), "")
+	if err != nil {
+		t.Fatalf("the second Line of the Product must still be cancellable, got %v", err)
+	}
+	if cancelled.Id != items[1].Id || cancelled.Status != constant.CANCELLED {
+		t.Fatalf("cancelled %+v, want the second Line", cancelled)
 	}
 }

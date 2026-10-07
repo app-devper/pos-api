@@ -90,3 +90,25 @@ func AllocateReturn(parts []entities.OrderItemStock, alreadyReturned, qty int) [
 	}
 	return allocations
 }
+
+// CancellationParts is what cancelling a Line puts back: each part it drew,
+// less what earlier Returns already put back into named Stocks. Old synthetic
+// Adjustment markers name no Stock and give nothing back; Sold first parts
+// ("") go back to Sold first.
+func CancellationParts(parts []entities.OrderItemStock, returned int) []entities.OrderItemStock {
+	result := make([]entities.OrderItemStock, 0, len(parts))
+	for _, p := range parts {
+		if strings.HasPrefix(p.StockId, SyntheticPrefix) {
+			continue
+		}
+		if p.StockId != "" {
+			skip := min(returned, p.Quantity)
+			p.Quantity -= skip
+			returned -= skip
+		}
+		if p.Quantity > 0 {
+			result = append(result, p)
+		}
+	}
+	return result
+}

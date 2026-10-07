@@ -2,9 +2,9 @@ package repositories
 
 import (
 	"context"
-	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
@@ -18,21 +18,17 @@ import (
 )
 
 type orderEntity struct {
-	client             *mongo.Client
-	orderRepo          *mongo.Collection
-	orderItemRepo      *mongo.Collection
-	paymentRepo        *mongo.Collection
-	productsRepo       *mongo.Collection
-	productStockRepo   *mongo.Collection
-	productUnitsRepo   *mongo.Collection
-	productHistoryRepo *mongo.Collection
-	productPricesRepo  *mongo.Collection
+	client           *mongo.Client
+	ledger           *ledger.Ledger
+	orderRepo        *mongo.Collection
+	orderItemRepo    *mongo.Collection
+	paymentRepo      *mongo.Collection
+	productStockRepo *mongo.Collection
 }
 
 type IOrder interface {
 	CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error)
 	RecordSale(form request.Sale) (*RecordedSale, error)
-	FindSale(form request.Sale) (*RecordedSale, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
 	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
 	GetOrderById(id string) (*entities.Order, error)
@@ -76,14 +72,9 @@ func newOrderEntity(resource *db.Resource) *orderEntity {
 	orderRepo := resource.PosDb.Collection("orders")
 	orderItemRepo := resource.PosDb.Collection("order_items")
 	paymentRepo := resource.PosDb.Collection("payments")
-	productsRepo := resource.PosDb.Collection("products")
 	productStockRepo := resource.PosDb.Collection("product_stocks")
-	productUnitsRepo := resource.PosDb.Collection("product_units")
-	productHistoryRepo := resource.PosDb.Collection("product_histories")
 	entity := &orderEntity{
-		client: resource.Client, orderRepo: orderRepo, orderItemRepo: orderItemRepo, paymentRepo: paymentRepo,
-		productsRepo: productsRepo, productStockRepo: productStockRepo, productUnitsRepo: productUnitsRepo, productHistoryRepo: productHistoryRepo,
-		productPricesRepo: resource.PosDb.Collection("product_prices"),
+		client: resource.Client, ledger: newLedger(resource), orderRepo: orderRepo, orderItemRepo: orderItemRepo, paymentRepo: paymentRepo, productStockRepo: productStockRepo,
 	}
 	return entity
 }
@@ -499,47 +490,33 @@ func (entity *orderEntity) RemoveOrderById(id string) (*entities.OrderDetail, er
 	return &data, nil
 }
 
+// CancelOrderById is recorded by the Stock ledger (ADR-0001); the response is
+// CancelOrderById is recorded by the Stock ledger (ADR-0001). The Order is
+// read first, so a cancel that committed is never reported as failed.
 func (entity *orderEntity) CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
 	logrus.Info("CancelOrderById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-
-	if entity.client == nil {
-		result, err := entity.cancelOrderByIdWithContext(ctx, id, userId, branchId, reason)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"orderId":  id,
-				"userId":   userId,
-				"branchId": branchId,
-			}).Error("cancel order failed")
-		}
-		return result, err
-	}
-
-	session, err := entity.client.StartSession()
+	order, err := entity.getOrderDetailByIdWithContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer session.EndSession(ctx)
-
-	var result *entities.OrderDetail
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		data, txErr := entity.cancelOrderByIdWithContext(sessCtx, id, userId, branchId, reason)
-		if txErr != nil {
-			return nil, txErr
-		}
-		result = data
-		return data, nil
-	})
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"orderId":  id,
-			"userId":   userId,
-			"branchId": branchId,
-		}).Error("cancel order transaction failed")
+	if err := entity.ledger.CancelOrder(context.Background(), id, branchId, userId, reason); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{"orderId": id, "userId": userId, "branchId": branchId}).Error("cancel order failed")
 		return nil, err
 	}
-	return result, nil
+	now := time.Now()
+	order.Status, order.CancelReason = constant.CANCELLED, reason
+	for i := range order.Items {
+		order.Items[i].Status, order.Items[i].CancelReason, order.Items[i].UpdatedBy, order.Items[i].UpdatedDate = constant.CANCELLED, reason, userId, now
+	}
+	for i := range order.Payments {
+		order.Payments[i].Status, order.Payments[i].CancelReason, order.Payments[i].UpdatedBy, order.Payments[i].UpdatedDate = constant.CANCELLED, reason, userId, now
+	}
+	if len(order.Payments) > 0 {
+		order.Payment = order.Payments[0]
+	}
+	return order, nil
 }
 
 func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]entities.OrderItemProductDetail, error) {
@@ -644,47 +621,23 @@ func (entity *orderEntity) RemoveOrderItemById(id string) (*entities.OrderItemPr
 	return item, nil
 }
 
+// CancelOrderItemById is recorded by the Stock ledger (ADR-0001); the response
+// CancelOrderItemById is recorded by the Stock ledger (ADR-0001). The Line is
+// read first, so a cancel that committed is never reported as failed.
 func (entity *orderEntity) CancelOrderItemById(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-
-	if entity.client == nil {
-		result, err := entity.cancelOrderItemByIdWithContext(ctx, id, userId, branchId, reason)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"orderItemId": id,
-				"userId":      userId,
-				"branchId":    branchId,
-			}).Error("cancel order item failed")
-		}
-		return result, err
-	}
-
-	session, err := entity.client.StartSession()
+	item, err := entity.getOrderItemDetailByIdWithContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	defer session.EndSession(ctx)
-
-	var result *entities.OrderItemProductDetail
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		data, txErr := entity.cancelOrderItemByIdWithContext(sessCtx, id, userId, branchId, reason)
-		if txErr != nil {
-			return nil, txErr
-		}
-		result = data
-		return data, nil
-	})
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"orderItemId": id,
-			"userId":      userId,
-			"branchId":    branchId,
-		}).Error("cancel order item transaction failed")
+	if err := entity.ledger.CancelLine(context.Background(), id, branchId, userId, reason); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{"orderItemId": id, "userId": userId, "branchId": branchId}).Error("cancel order item failed")
 		return nil, err
 	}
-	return result, nil
+	item.Status, item.CancelReason, item.UpdatedBy, item.UpdatedDate = constant.CANCELLED, reason, userId, time.Now()
+	return item, nil
 }
 
 func (entity *orderEntity) GetOrderItemDetailById(id string) (*entities.OrderItemProductDetail, error) {
@@ -964,49 +917,17 @@ func (entity *orderEntity) RemoveOrderItemByOrderProductId(orderId string, produ
 	return item, nil
 }
 
+// CancelOrderItemByOrderProductId cancels an Order's Line of a Product through
+// the Stock ledger.
 func (entity *orderEntity) CancelOrderItemByOrderProductId(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemByOrderProductId")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-
-	if entity.client == nil {
-		result, err := entity.cancelOrderItemByOrderProductIdWithContext(ctx, orderId, productId, userId, branchId, reason)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"orderId":   orderId,
-				"productId": productId,
-				"userId":    userId,
-				"branchId":  branchId,
-			}).Error("cancel order item by product failed")
-		}
-		return result, err
-	}
-
-	session, err := entity.client.StartSession()
+	item, err := entity.getOrderItemDetailByOrderProductIdWithContext(ctx, orderId, productId)
 	if err != nil {
 		return nil, err
 	}
-	defer session.EndSession(ctx)
-
-	var result *entities.OrderItemProductDetail
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		data, txErr := entity.cancelOrderItemByOrderProductIdWithContext(sessCtx, orderId, productId, userId, branchId, reason)
-		if txErr != nil {
-			return nil, txErr
-		}
-		result = data
-		return data, nil
-	})
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"orderId":   orderId,
-			"productId": productId,
-			"userId":    userId,
-			"branchId":  branchId,
-		}).Error("cancel order item by product transaction failed")
-		return nil, err
-	}
-	return result, nil
+	return entity.CancelOrderItemById(item.Id.Hex(), userId, branchId, reason)
 }
 
 func (entity *orderEntity) GetPaymentsByOrderId(orderId string) ([]entities.Payment, error) {
@@ -1066,208 +987,6 @@ func (entity *orderEntity) RemovePaymentByOrderId(orderId string) (*entities.Pay
 		return nil, mongo.ErrNoDocuments
 	}
 	return &payments[0], nil
-}
-
-func (entity *orderEntity) cancelOrderItemByIdWithContext(ctx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
-	item, err := entity.getOrderItemDetailByIdWithContext(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if !constant.IsConfirmedOrderItemStatus(item.Status) {
-		return nil, mongo.ErrNoDocuments
-	}
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	if _, err = entity.orderItemRepo.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"status":       constant.CANCELLED,
-		"cancelReason": reason,
-		"updatedBy":    userId,
-		"updatedDate":  now,
-	}}); err != nil {
-		return nil, err
-	}
-	if err = entity.restoreOrderItemStockAndHistory(ctx, item, userId, branchId); err != nil {
-		return nil, err
-	}
-	if _, err = entity.updateTotalOrderByIdWithContext(ctx, item.OrderId.Hex()); err != nil {
-		return nil, err
-	}
-	item.Status = constant.CANCELLED
-	item.CancelReason = reason
-	item.UpdatedBy = userId
-	item.UpdatedDate = now
-	return item, nil
-}
-
-func (entity *orderEntity) cancelOrderItemByOrderProductIdWithContext(ctx context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
-	item, err := entity.getOrderItemDetailByOrderProductIdWithContext(ctx, orderId, productId)
-	if err != nil {
-		return nil, err
-	}
-	if !constant.IsConfirmedOrderItemStatus(item.Status) {
-		return nil, mongo.ErrNoDocuments
-	}
-	orderObjId, err := primitive.ObjectIDFromHex(orderId)
-	if err != nil {
-		return nil, err
-	}
-	productObjId, err := primitive.ObjectIDFromHex(productId)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	if _, err = entity.orderItemRepo.UpdateOne(ctx, bson.M{"orderId": orderObjId, "productId": productObjId}, bson.M{"$set": bson.M{
-		"status":       constant.CANCELLED,
-		"cancelReason": reason,
-		"updatedBy":    userId,
-		"updatedDate":  now,
-	}}); err != nil {
-		return nil, err
-	}
-	if err = entity.restoreOrderItemStockAndHistory(ctx, item, userId, branchId); err != nil {
-		return nil, err
-	}
-	if _, err = entity.updateTotalOrderByIdWithContext(ctx, orderId); err != nil {
-		return nil, err
-	}
-	item.Status = constant.CANCELLED
-	item.CancelReason = reason
-	item.UpdatedBy = userId
-	item.UpdatedDate = now
-	return item, nil
-}
-
-func (entity *orderEntity) cancelOrderByIdWithContext(ctx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
-	order, err := entity.getOrderDetailByIdWithContext(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if !constant.IsConfirmedOrderStatus(order.Status) {
-		return nil, mongo.ErrNoDocuments
-	}
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range order.Items {
-		if !constant.IsConfirmedOrderItemStatus(order.Items[i].Status) {
-			continue
-		}
-		if err = entity.restoreOrderItemStockAndHistory(ctx, &order.Items[i], userId, branchId); err != nil {
-			return nil, err
-		}
-	}
-
-	now := time.Now()
-	if _, err = entity.orderItemRepo.UpdateMany(ctx, bson.M{"orderId": objId}, bson.M{"$set": bson.M{
-		"status":       constant.CANCELLED,
-		"cancelReason": reason,
-		"updatedBy":    userId,
-		"updatedDate":  now,
-	}}); err != nil {
-		return nil, err
-	}
-	if _, err = entity.paymentRepo.UpdateMany(ctx, bson.M{"orderId": objId}, bson.M{"$set": bson.M{
-		"status":       constant.CANCELLED,
-		"cancelReason": reason,
-		"updatedBy":    userId,
-		"updatedDate":  now,
-	}}); err != nil {
-		return nil, err
-	}
-	if _, err = entity.orderRepo.UpdateOne(ctx, bson.M{"_id": objId}, bson.M{"$set": bson.M{
-		"status":       constant.CANCELLED,
-		"cancelReason": reason,
-		"updatedBy":    userId,
-		"updatedDate":  now,
-	}}); err != nil {
-		return nil, err
-	}
-	order.Status = constant.CANCELLED
-	order.CancelReason = reason
-	for i := range order.Payments {
-		order.Payments[i].Status = constant.CANCELLED
-		order.Payments[i].CancelReason = reason
-		order.Payments[i].UpdatedBy = userId
-		order.Payments[i].UpdatedDate = now
-	}
-	for i := range order.Items {
-		order.Items[i].Status = constant.CANCELLED
-		order.Items[i].CancelReason = reason
-		order.Items[i].UpdatedBy = userId
-		order.Items[i].UpdatedDate = now
-	}
-	if len(order.Payments) > 0 {
-		order.Payment = order.Payments[0]
-	}
-	return order, nil
-}
-
-func (entity *orderEntity) restoreOrderItemStockAndHistory(ctx context.Context, item *entities.OrderItemProductDetail, userId string, branchId string) error {
-	for _, itemStock := range cancellationStock(item.Stocks, item.ReturnedQty) {
-		if itemStock.StockId != "" {
-			stockID, err := primitive.ObjectIDFromHex(itemStock.StockId)
-			if err != nil {
-				return err
-			}
-			if _, err = entity.productStockRepo.UpdateOne(ctx, bson.M{"_id": stockID}, bson.M{
-				"$inc": bson.M{"quantity": itemStock.Quantity},
-			}); err != nil {
-				return err
-			}
-		} else {
-			if _, err := entity.productsRepo.UpdateOne(ctx, bson.M{"_id": item.ProductId}, bson.M{
-				"$inc": bson.M{"soldFirst": itemStock.Quantity},
-			}); err != nil {
-				return err
-			}
-		}
-	}
-
-	unit := entities.ProductUnit{}
-	if err := entity.productUnitsRepo.FindOne(ctx, bson.M{"_id": item.UnitId}).Decode(&unit); err != nil {
-		return orderHistoryUnitLookupError(err)
-	}
-
-	balance, err := entity.getProductStockBalanceWithContext(ctx, item.ProductId, unit.Id, branchId)
-	if err != nil {
-		return err
-	}
-	historyItem := *item
-	historyItem.Quantity = maxInt(0, item.Quantity-item.ReturnedQty)
-	h := request.RemoveOrderItemProductHistory(item.ProductId.Hex(), unit.Unit, &historyItem, balance, userId)
-	branchObjId, err := primitive.ObjectIDFromHex(branchId)
-	if err != nil {
-		return err
-	}
-	history := entities.ProductHistory{
-		Id:          primitive.NewObjectID(),
-		BranchId:    branchObjId,
-		ProductId:   item.ProductId,
-		Type:        h.Type,
-		Description: h.Description,
-		Unit:        h.Unit,
-		Import:      h.Import,
-		Quantity:    h.Quantity,
-		CostPrice:   h.CostPrice,
-		Price:       h.Price,
-		Balance:     h.Balance,
-		CreatedBy:   h.CreatedBy,
-		CreatedDate: time.Now(),
-	}
-	_, err = entity.productHistoryRepo.InsertOne(ctx, history)
-	return err
-}
-
-func orderHistoryUnitLookupError(err error) error {
-	if err == mongo.ErrNoDocuments {
-		return errors.New("product unit not found for order history")
-	}
-	return err
 }
 
 func (entity *orderEntity) getOrderItemDetailByIdWithContext(ctx context.Context, id string) (*entities.OrderItemProductDetail, error) {
@@ -1334,7 +1053,8 @@ func (entity *orderEntity) getOrderItemDetailByOrderProductIdWithContext(ctx con
 		return nil, err
 	}
 	cursor, err := entity.orderItemRepo.Aggregate(ctx, []bson.M{
-		{"$match": bson.M{"orderId": orderObjId, "productId": productObjId}},
+		{"$match": bson.M{"orderId": orderObjId, "productId": productObjId, "$or": confirmedOrderItemStatusMatchClauses()}},
+		{"$sort": bson.M{"_id": 1}},
 		{"$lookup": bson.M{"from": "products", "localField": "productId", "foreignField": "_id", "as": "product"}},
 		{"$unwind": "$product"},
 	})
@@ -1418,7 +1138,7 @@ func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderI
 	}
 	pipeline := []bson.M{
 		{"$match": bson.M{"orderId": objId, "$or": confirmedOrderItemStatusMatchClauses()}},
-		{"$group": bson.M{"_id": nil, "total": bson.M{"$sum": lineTotalExpr()}, "totalCost": bson.M{"$sum": "$costPrice"}, "discount": bson.M{"$sum": lineDiscountExpr()}}},
+		{"$group": bson.M{"_id": nil, "total": bson.M{"$sum": bson.M{"$round": bson.A{lineTotalExpr(), 2}}}, "totalCost": bson.M{"$sum": "$costPrice"}, "discount": bson.M{"$sum": lineDiscountExpr()}}},
 	}
 	cursor, err := entity.orderItemRepo.Aggregate(ctx, pipeline)
 	if err != nil {
@@ -1432,7 +1152,8 @@ func (entity *orderEntity) getOrderTotalsWithContext(ctx context.Context, orderI
 	if err = cursor.All(ctx, &result); err != nil || len(result) == 0 {
 		return orderTotals{}, err
 	}
-	return orderTotals{total: result[0].Total, totalCost: result[0].TotalCost, discount: result[0].Discount}, nil
+	// Each Line is rounded, then the sums: as a Sale records them.
+	return orderTotals{total: roundMoney(result[0].Total), totalCost: roundMoney(result[0].TotalCost), discount: roundMoney(result[0].Discount)}, nil
 }
 
 // confirmedOrderItemStatusMatchClauses matches a Line that still stands: no
@@ -1444,41 +1165,6 @@ func confirmedOrderItemStatusMatchClauses() []bson.M {
 		clauses = append(clauses, bson.M{"status": status})
 	}
 	return clauses
-}
-
-func (entity *orderEntity) getProductStockBalanceWithContext(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId string) (int, error) {
-	match := bson.M{"productId": productId, "unitId": unitId}
-	if branchId != "" {
-		branchObjId, err := primitive.ObjectIDFromHex(branchId)
-		if err != nil {
-			return 0, err
-		}
-		match["branchId"] = branchObjId
-	}
-	cursor, err := entity.productStockRepo.Aggregate(ctx, []bson.M{
-		{"$match": match},
-		{"$group": bson.M{"_id": nil, "balance": bson.M{"$sum": "$quantity"}}},
-	})
-	if err != nil {
-		return 0, err
-	}
-	var results []bson.M
-	if err = cursor.All(ctx, &results); err != nil || len(results) == 0 {
-		if err != nil {
-			return 0, err
-		}
-		return 0, nil
-	}
-	switch v := results[0]["balance"].(type) {
-	case int32:
-		return int(v), nil
-	case int64:
-		return int(v), nil
-	case float64:
-		return int(v), nil
-	default:
-		return 0, nil
-	}
 }
 
 func (entity *orderEntity) GetOrderSummary(form request.GetOrderRange) (*entities.OrderSummary, error) {

@@ -18,29 +18,43 @@ import (
 )
 
 // book is one event's view of Stock inside its transaction. Every quantity
-// change goes through change or open, so the no-negative rule, settlement and
-// history are kept in one place.
+// change goes through move, so the no-negative rule, settlement and history
+// are kept in one place.
 type book struct {
-	l       *Ledger
-	ctx     context.Context
-	touched []*touch
-	byStock map[primitive.ObjectID]*touch
+	l    *Ledger
+	ctx  context.Context
+	rows []*row
+	byID map[primitive.ObjectID]*row
 	// notOwed are Lines this event must not settle — a Return's own Lines,
 	// whose goods are coming back, not going out.
 	notOwed []primitive.ObjectID
 }
 
-// touch is one Stock the event changed. Its history row is written once, at
-// flush, with the net quantity the event moved and the final balance.
-type touch struct {
-	stock   *entities.ProductStock
+// row is one product history row the event writes, once, at flush. Most events
+// write a row per Stock they touch; a Sale or a cancel writes a row per Line,
+// as product history always has (it names a Product and Unit, not a Stock).
+// place is where its balance is read: the Stock's branch, Product and Unit.
+type row struct {
+	place   *entities.ProductStock
 	qty     int
 	history func(qty int) request.ProductHistory
 	settled int
 }
 
 func newBook(l *Ledger, ctx context.Context) *book {
-	return &book{l: l, ctx: ctx, byStock: map[primitive.ObjectID]*touch{}}
+	return &book{l: l, ctx: ctx, byID: map[primitive.ObjectID]*row{}}
+}
+
+// rowFor returns the history row keyed by id, creating it on first use.
+func (b *book) rowFor(id primitive.ObjectID, place *entities.ProductStock, history func(qty int) request.ProductHistory) *row {
+	if r, ok := b.byID[id]; ok {
+		r.place = place
+		return r
+	}
+	r := &row{place: place, history: history}
+	b.byID[id] = r
+	b.rows = append(b.rows, r)
+	return r
 }
 
 func (b *book) col(name string) *mongo.Collection { return b.l.db.Collection(name) }
@@ -58,9 +72,15 @@ func (b *book) stock(id, product, branch primitive.ObjectID) (*entities.ProductS
 	return &st, nil
 }
 
-// change moves a Stock's quantity by delta. The quantity never goes below
-// zero, and a rise settles that Unit's waiting Lines from the Stock.
+// change moves a Stock's quantity by delta under the Stock's own history row.
 func (b *book) change(st *entities.ProductStock, delta int, history func(qty int) request.ProductHistory) error {
+	return b.move(st, delta, b.rowFor(st.Id, st, history))
+}
+
+// move changes a Stock's quantity by delta and counts it on r. The quantity
+// never goes below zero, and a rise settles that Unit's waiting Lines from
+// the Stock.
+func (b *book) move(st *entities.ProductStock, delta int, r *row) error {
 	if delta == 0 {
 		return nil
 	}
@@ -71,10 +91,9 @@ func (b *book) change(st *entities.ProductStock, delta int, history func(qty int
 	if err := b.inc(st, delta); err != nil {
 		return err
 	}
-	t := b.track(st, history)
-	t.qty += delta
+	r.qty += delta
 	if delta > 0 {
-		return b.settle(t, delta)
+		return b.settle(st, delta, r)
 	}
 	return nil
 }
@@ -87,23 +106,25 @@ func (b *book) open(st entities.ProductStock, history func(qty int) request.Prod
 	if _, err := b.col("product_stocks").InsertOne(b.ctx, st); err != nil {
 		return nil, err
 	}
-	t := b.track(&st, history)
-	t.qty += st.Quantity
-	if err := b.settle(t, st.Quantity); err != nil {
+	r := b.rowFor(st.Id, &st, history)
+	r.qty += st.Quantity
+	if err := b.settle(&st, st.Quantity, r); err != nil {
 		return nil, err
 	}
 	return &st, nil
 }
 
-func (b *book) track(st *entities.ProductStock, history func(qty int) request.ProductHistory) *touch {
-	if t, ok := b.byStock[st.Id]; ok {
-		t.stock = st
-		return t
+// soldFirst moves a Product's Sold first balance (ADR-0003): a Sale takes
+// from it, a cancel gives back.
+func (b *book) soldFirst(product primitive.ObjectID, delta int) error {
+	res, err := b.col("products").UpdateOne(b.ctx, bson.M{"_id": product}, bson.M{"$inc": bson.M{"soldFirst": delta}})
+	if err != nil {
+		return err
 	}
-	t := &touch{stock: st, history: history}
-	b.byStock[st.Id] = t
-	b.touched = append(b.touched, t)
-	return t
+	if res.MatchedCount == 0 {
+		return reject("product %s not found", product.Hex())
+	}
+	return nil
 }
 
 // inc applies delta only if the Stock still holds what this event read.
@@ -122,8 +143,7 @@ func (b *book) inc(st *entities.ProductStock, delta int) error {
 // settle serves the oldest Lines still owed the Stock's Unit in its branch out
 // of what just came in, drawing what they get out of the Stock (ADR-0002).
 // Quantity the Stock already held is not reconsidered.
-func (b *book) settle(t *touch, incoming int) error {
-	st := t.stock
+func (b *book) settle(st *entities.ProductStock, incoming int, r *row) error {
 	incoming = min(incoming, st.Quantity)
 	if incoming <= 0 {
 		return nil
@@ -160,8 +180,8 @@ func (b *book) settle(t *touch, incoming int) error {
 		if err := b.inc(st, -s.Qty); err != nil {
 			return err
 		}
-		t.qty -= s.Qty
-		t.settled += s.Qty
+		r.qty -= s.Qty
+		r.settled += s.Qty
 	}
 	return nil
 }
@@ -176,8 +196,8 @@ func (b *book) flush() error {
 	}
 	cache := map[place]*known{}
 	now := time.Now()
-	for _, t := range b.touched {
-		st := t.stock
+	for _, t := range b.rows {
+		st := t.place
 		key := place{st.ProductId, st.UnitId, st.BranchId}
 		k, ok := cache[key]
 		if !ok {
