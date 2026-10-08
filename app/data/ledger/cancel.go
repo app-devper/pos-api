@@ -8,6 +8,7 @@ import (
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
+	"pos/app/domain/sale"
 	"pos/app/domain/stock"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -132,12 +133,12 @@ func (b *book) recomputeOrder(order primitive.ObjectID) error {
 	if err := find(b, "order_items", bson.M{"orderId": order, "$or": confirmedLineStatuses()}, &lines); err != nil {
 		return err
 	}
-	var money lineMoney
+	var money sale.Totals
 	for _, line := range lines {
 		qty := float64(line.Quantity)
-		money.add(roundMoney(line.Price-line.Discount*qty), line.CostPrice, line.Discount*qty)
+		money.Add(sale.Round(line.Price-line.Discount*qty), line.CostPrice, line.Discount*qty)
 	}
-	total, cost, discount := money.rounded()
+	total, cost, discount := money.Rounded()
 	_, err := b.col("orders").UpdateOne(b.ctx, bson.M{"_id": order}, bson.M{"$set": bson.M{
 		"total": total, "totalCost": cost, "discount": discount, "updatedDate": time.Now(),
 	}})

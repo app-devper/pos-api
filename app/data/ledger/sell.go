@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"math"
 	"time"
 
 	"pos/app/data/entities"
@@ -144,7 +143,7 @@ func (b *book) sell(form request.Sale, branch primitive.ObjectID) (*Sold, error)
 	drawnStocks := map[primitive.ObjectID]*entities.ProductStock{}
 	var drawnOrder []primitive.ObjectID
 	lines := make([]entities.OrderItem, 0, len(form.Items))
-	var money lineMoney
+	var money sale.Totals
 
 	for _, line := range form.Items {
 		product, err := primitive.ObjectIDFromHex(line.ProductId)
@@ -205,9 +204,9 @@ func (b *book) sell(form request.Sale, branch primitive.ObjectID) (*Sold, error)
 		lines = append(lines, entities.OrderItem{Id: lineID, BranchId: branch, OrderId: orderID, ProductId: product, UnitId: unit,
 			Status: constant.CONFIRMED, Stocks: drawn, Quantity: line.Quantity, Price: rung.Amount, CostPrice: rung.Cost,
 			Discount: rung.Discount, OversoldQty: rung.Oversold, CreatedBy: form.CreatedBy, CreatedDate: now, UpdatedBy: form.CreatedBy, UpdatedDate: now})
-		money.add(rung.Paid(line.Quantity), rung.Cost, rung.Discount*float64(line.Quantity))
+		money.Add(rung.Paid(line.Quantity), rung.Cost, rung.Discount*float64(line.Quantity))
 	}
-	total, totalCost, discount := money.rounded()
+	total, totalCost, discount := money.Rounded()
 
 	var tendered float64
 	for _, p := range form.Payments {
@@ -216,10 +215,10 @@ func (b *book) sell(form request.Sale, branch primitive.ObjectID) (*Sold, error)
 		}
 		tendered += p.Amount
 	}
-	if roundMoney(tendered) < total {
+	change, covers := sale.Tender(tendered, total)
+	if !covers {
 		return nil, reject("payment %.2f is less than the total %.2f", tendered, total)
 	}
-	change := roundMoney(tendered - total)
 
 	code, err := b.l.codes(b.ctx, constant.ORDER, "")
 	if err != nil {
@@ -267,23 +266,6 @@ func (u *saleUnit) stock(id primitive.ObjectID) *entities.ProductStock {
 	}
 	return nil
 }
-
-// lineMoney sums what an Order's Lines charge, the way a Sale does: each
-// Line's paid amount is rounded by app/domain/sale, the sums are rounded
-// once. A cancel recomputes an Order the same way.
-type lineMoney struct{ total, cost, discount float64 }
-
-func (m *lineMoney) add(paid, cost, discount float64) {
-	m.total += paid
-	m.cost += cost
-	m.discount += discount
-}
-
-func (m lineMoney) rounded() (total, cost, discount float64) {
-	return roundMoney(m.total), roundMoney(m.cost), roundMoney(m.discount)
-}
-
-func roundMoney(v float64) float64 { return math.Round(v*100) / 100 }
 
 // fingerprint identifies a Sale by what was sold to whom: its branch, its
 // Lines, the Customer, and the regulated details of who it was for (patient,
