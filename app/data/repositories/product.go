@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"pos/app/core/utils"
+	"pos/app/data/catalogue"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
@@ -28,6 +29,7 @@ type productEntity struct {
 	branchesRepo      *mongo.Collection
 	receiveRepo       *mongo.Collection
 	receiveItemsRepo  *mongo.Collection
+	orderItemsRepo    *mongo.Collection
 }
 
 type IProduct interface {
@@ -58,10 +60,7 @@ type IProduct interface {
 	CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error)
 	GetProductUnitById(id string) (*entities.ProductUnit, error)
 	GetProductUnitsByIds(ids []string) ([]entities.ProductUnit, error)
-	GetProductUnitByDefault(productId string, unit string) (*entities.ProductUnit, error)
-	GetProductUnitByUnit(productId string, unit string) (*entities.ProductUnit, error)
 	UpdateProductUnitById(id string, param request.ProductUnit) (*entities.ProductUnit, error)
-	RemoveProductUnitById(id string) (*entities.ProductUnit, error)
 	RemoveProductUnitCascade(id string, branchId string, userId string) (*entities.ProductUnit, error)
 	GetProductUnitsByProductId(productId string) ([]entities.ProductUnit, error)
 
@@ -71,7 +70,6 @@ type IProduct interface {
 	CreateProductPrice(param request.ProductPrice) (*entities.ProductPrice, error)
 	RemoveProductPriceCascade(id string, branchId string, userId string) (*entities.ProductPrice, error)
 	RemoveProductPriceById(id string) (*entities.ProductPrice, error)
-	RemoveProductPricesByUnitId(unitId string) error
 	UpdateProductPriceById(id string, param request.ProductPrice) (*entities.ProductPrice, error)
 }
 
@@ -93,6 +91,7 @@ func NewProductEntity(resource *db.Resource) IProduct {
 		branchesRepo:      branchesRepo,
 		receiveRepo:       receiveRepo,
 		receiveItemsRepo:  receiveItemsRepo,
+		orderItemsRepo:    resource.PosDb.Collection("order_items"),
 	}
 	ensureProductCollectionIndexes(productsRepo, productUnitsRepo, productPricesRepo, productLotsRepo)
 	return entity
@@ -390,7 +389,7 @@ func (entity *productEntity) createProductReceiveWithContext(ctx context.Context
 		}
 	}
 
-	unit, err := entity.getProductUnitByDefaultWithContext(ctx, product.Id.Hex(), param.Unit)
+	unit, err := entity.mainUnitWithContext(ctx, *product)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, err
 	}
@@ -435,7 +434,7 @@ func (entity *productEntity) createProductReceiveWithContext(ctx context.Context
 		return product, nil
 	}
 
-	unit, err = entity.getProductUnitByUnitWithContext(ctx, product.Id.Hex(), param.Unit)
+	unit, err = entity.mainUnitWithContext(ctx, *product)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +513,7 @@ func (entity *productEntity) createProductCatalogWithContext(ctx context.Context
 		}
 	}
 
-	unit, err := entity.getProductUnitByDefaultWithContext(ctx, product.Id.Hex(), param.Unit)
+	unit, err := entity.mainUnitWithContext(ctx, *product)
 	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, err
 	}
@@ -1311,19 +1310,6 @@ func (entity *productEntity) removeProductPriceByIDWithContext(ctx context.Conte
 	return &data, nil
 }
 
-func (entity *productEntity) RemoveProductPricesByUnitId(unitId string) error {
-	logrus.Info("RemoveProductPricesByUnitId")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(unitId)
-	if err != nil {
-		return err
-	}
-	_, err = entity.productPricesRepo.DeleteMany(ctx, bson.M{"unitId": objId})
-	return err
-
-}
-
 func (entity *productEntity) CreateProductUnit(param request.ProductUnit) (*entities.ProductUnit, error) {
 	logrus.Info("CreateProductUnit")
 	ctx, cancel := utils.InitContext()
@@ -1400,44 +1386,47 @@ func (entity *productEntity) getProductUnitByIDWithContext(ctx context.Context, 
 	return &data, nil
 }
 
-func (entity *productEntity) GetProductUnitByDefault(productId string, unit string) (*entities.ProductUnit, error) {
-	logrus.Info("GetProductUnitByDefault")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	return entity.getProductUnitByDefaultWithContext(ctx, productId, unit)
+// ErrMainUnitFixed is a change to a Product's main Unit that would stop it
+// being the Unit its Receives are entered in: a new name or size, or removal.
+var ErrMainUnitFixed = errors.New("the main Unit of a Product keeps its name and size and cannot be removed")
+
+// ErrUnitSizeFixed is a new size for a Unit that has Stock: the Stock was
+// counted in the old size.
+var ErrUnitSizeFixed = errors.New("a Unit that has Stock keeps its size")
+
+// ErrUnitInUse is the removal of a Unit that has Stock, or that a Line still
+// owes an Oversell of.
+var ErrUnitInUse = errors.New("a Unit that has Stock or an owed Oversell cannot be removed")
+
+// mainUnitWithContext is the Product's main Unit (catalogue.MainUnit), or
+// mongo.ErrNoDocuments before it is created.
+func (entity *productEntity) mainUnitWithContext(ctx context.Context, product entities.Product) (*entities.ProductUnit, error) {
+	var unit entities.ProductUnit
+	if err := entity.productUnitsRepo.FindOne(ctx, catalogue.MainUnit(product)).Decode(&unit); err != nil {
+		return nil, err
+	}
+	return &unit, nil
 }
 
-func (entity *productEntity) getProductUnitByDefaultWithContext(ctx context.Context, productId string, unit string) (*entities.ProductUnit, error) {
-	product, err := primitive.ObjectIDFromHex(productId)
-	if err != nil {
-		return nil, err
+// unitInUse tells whether unit is the Product's main Unit, and whether any
+// Stock, or any standing Line that still owes an Oversell, is in it.
+func (entity *productEntity) unitInUse(ctx context.Context, unit entities.ProductUnit) (main bool, used bool, err error) {
+	var product entities.Product
+	if err = entity.productsRepo.FindOne(ctx, bson.M{"_id": unit.ProductId}).Decode(&product); err != nil {
+		return false, false, err
 	}
-	data := entities.ProductUnit{}
-	err = entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit, "size": 1}).Decode(&data)
+	filter := catalogue.MainUnit(product)
+	main = filter["unit"] == unit.Unit
+	stocks, err := entity.stock.productStockRepo.CountDocuments(ctx, bson.M{"unitId": unit.Id})
 	if err != nil {
-		return nil, err
+		return main, false, err
 	}
-	return &data, nil
-}
-
-func (entity *productEntity) GetProductUnitByUnit(productId string, unit string) (*entities.ProductUnit, error) {
-	logrus.Info("GetProductUnitByUnit")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	return entity.getProductUnitByUnitWithContext(ctx, productId, unit)
-}
-
-func (entity *productEntity) getProductUnitByUnitWithContext(ctx context.Context, productId string, unit string) (*entities.ProductUnit, error) {
-	product, err := primitive.ObjectIDFromHex(productId)
+	owed, err := entity.orderItemsRepo.CountDocuments(ctx, bson.M{"unitId": unit.Id, "oversoldQty": bson.M{"$gt": 0},
+		"$or": confirmedOrderItemStatusMatchClauses()})
 	if err != nil {
-		return nil, err
+		return main, false, err
 	}
-	data := entities.ProductUnit{}
-	err = entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": product, "unit": unit}).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
+	return main, stocks+owed > 0, nil
 }
 
 func (entity *productEntity) UpdateProductUnitById(id string, param request.ProductUnit) (*entities.ProductUnit, error) {
@@ -1447,6 +1436,20 @@ func (entity *productEntity) UpdateProductUnitById(id string, param request.Prod
 	objId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
+	}
+	var current entities.ProductUnit
+	if err = entity.productUnitsRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&current); err != nil {
+		return nil, err
+	}
+	main, used, err := entity.unitInUse(ctx, current)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case main && (param.Unit != current.Unit || param.Size != current.Size):
+		return nil, ErrMainUnitFixed
+	case used && param.Size != current.Size:
+		return nil, ErrUnitSizeFixed
 	}
 
 	isReturnNewDoc := options.After
@@ -1466,13 +1469,6 @@ func (entity *productEntity) UpdateProductUnitById(id string, param request.Prod
 		return nil, err
 	}
 	return &data, nil
-}
-
-func (entity *productEntity) RemoveProductUnitById(id string) (*entities.ProductUnit, error) {
-	logrus.Info("RemoveProductUnitById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	return entity.removeProductUnitByIDWithContext(ctx, id)
 }
 
 func (entity *productEntity) RemoveProductUnitCascade(id string, branchId string, userId string) (*entities.ProductUnit, error) {
@@ -1573,15 +1569,15 @@ func (entity *productEntity) removeProductUnitByIDWithContext(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
-	if data.Size == 1 {
-		return nil, errors.New("can not remove default unit")
-	}
-	stockCount, err := entity.stock.productStockRepo.CountDocuments(ctx, bson.M{"unitId": objId})
+	main, used, err := entity.unitInUse(ctx, data)
 	if err != nil {
 		return nil, err
 	}
-	if stockCount > 0 {
-		return nil, errors.New("cannot remove unit with stock history")
+	if main {
+		return nil, ErrMainUnitFixed
+	}
+	if used {
+		return nil, ErrUnitInUse
 	}
 	err = entity.productUnitsRepo.FindOneAndDelete(ctx, bson.M{"_id": objId}).Decode(&data)
 	if err != nil {

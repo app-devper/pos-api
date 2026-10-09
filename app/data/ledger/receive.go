@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"pos/app/data/catalogue"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
@@ -72,7 +73,7 @@ func (b *book) importReceive(id, branch primitive.ObjectID, by string) (*entitie
 		}
 		// A Receive is entered in the Product's main Unit.
 		var unit entities.ProductUnit
-		if err := missing(b.col("product_units").FindOne(b.ctx, bson.M{"productId": item.ProductId, "unit": product.Unit}).Decode(&unit), "main Unit of product %s", item.ProductId.Hex()); err != nil {
+		if err := missing(b.col("product_units").FindOne(b.ctx, catalogue.MainUnit(product)).Decode(&unit), "main Unit of product %s", item.ProductId.Hex()); err != nil {
 			return nil, err
 		}
 		sequence, err := b.nextSequence(item.ProductId, unit.Id, branch)
