@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/data/repositories"
+	"pos/app/domain/promotion"
 	"pos/app/domain/request"
 
 	"github.com/gin-gonic/gin"
@@ -30,54 +31,21 @@ func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 			return
 		}
 
-		if promo.MinPurchase > 0 && req.OrderTotal < promo.MinPurchase {
-			logrus.WithFields(logrus.Fields{
+		productIds := make([]string, len(promo.ProductIds))
+		for i, id := range promo.ProductIds {
+			productIds[i] = id.Hex()
+		}
+		terms := promotion.Terms{Type: promo.Type, Value: promo.Value, MinPurchase: promo.MinPurchase,
+			MaxDiscount: promo.MaxDiscount, ProductIds: productIds}
+		discount, err := terms.Discount(req.OrderTotal, req.ProductIds)
+		if err != nil {
+			logrus.WithError(err).WithFields(logrus.Fields{
 				"branchId":      branchId,
 				"promotionCode": req.PromotionCode,
 				"orderTotal":    req.OrderTotal,
-				"minPurchase":   promo.MinPurchase,
-			}).Warn("apply promotion rejected due to minimum purchase")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "order total below minimum purchase")
+			}).Warn("apply promotion rejected")
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
 			return
-		}
-
-		if len(promo.ProductIds) > 0 && len(req.ProductIds) > 0 {
-			promoMap := make(map[string]bool)
-			for _, pid := range promo.ProductIds {
-				promoMap[pid.Hex()] = true
-			}
-			hasMatch := false
-			for _, pid := range req.ProductIds {
-				if promoMap[pid] {
-					hasMatch = true
-					break
-				}
-			}
-			if !hasMatch {
-				logrus.WithFields(logrus.Fields{
-					"branchId":      branchId,
-					"promotionCode": req.PromotionCode,
-					"productIds":    req.ProductIds,
-				}).Warn("apply promotion rejected due to no matching products")
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "no matching products for this promotion")
-				return
-			}
-		}
-
-		var discount float64
-		switch promo.Type {
-		case "PERCENTAGE":
-			discount = req.OrderTotal * promo.Value / 100
-			if promo.MaxDiscount > 0 && discount > promo.MaxDiscount {
-				discount = promo.MaxDiscount
-			}
-		case "FIXED":
-			discount = promo.Value
-			if discount > req.OrderTotal {
-				discount = req.OrderTotal
-			}
-		default:
-			discount = 0
 		}
 
 		result := request.ApplyPromotionResult{

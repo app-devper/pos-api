@@ -69,7 +69,7 @@ func TestUpdatePromotionByIdRejectsInvalidProductId(t *testing.T) {
 	entity := &promotionEntity{}
 
 	if _, err := entity.UpdatePromotionById("507f1f77bcf86cd799439011", "", request.UpdatePromotion{
-		ProductIds: []string{"invalid-product-id"},
+		ProductIds: &[]string{"invalid-product-id"},
 	}); err == nil {
 		t.Fatal("expected invalid product id error")
 	}
