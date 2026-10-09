@@ -18,7 +18,6 @@ type Receive struct {
 type UpdateReceive struct {
 	SupplierId   string        `json:"supplierId" binding:"required"`
 	Reference    string        `json:"reference"`
-	TotalCost    float64       `json:"totalCost"`
 	ReceiveItems []ReceiveItem `json:"items"`
 	UpdatedBy    string
 }
