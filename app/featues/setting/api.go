@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/setting/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,18 +12,16 @@ func ApplySettingAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	settingRoute := route.Group("settings")
+	branchAdmin := policies.BranchAdmin.On(settingRoute)
+	staff := policies.Staff.On(settingRoute)
 
-	settingRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("",
 		usecase.GetSetting(repository.Setting),
 	)
 
-	settingRoute.PUT("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.PUT("",
 		usecase.UpsertSetting(repository.Setting),
 	)
 }

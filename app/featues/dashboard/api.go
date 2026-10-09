@@ -12,59 +12,43 @@ func ApplyDashboardAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	dashboardRoute := route.Group("dashboard")
+	staff := policies.Staff.On(dashboardRoute)
 
-	dashboardRoute.GET("/summary",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/summary",
 		usecase.GetSummary(repository.Order),
 	)
 
-	dashboardRoute.GET("/daily-chart",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/daily-chart",
 		usecase.GetDailyChart(repository.Order),
 	)
 
-	dashboardRoute.GET("/low-stock",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/low-stock",
 		usecase.GetLowStockProducts(repository.ProductStock),
 	)
 
-	dashboardRoute.GET("/stock-report",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/stock-report",
 		usecase.GetStockReport(repository.ProductStock),
 	)
 
-	dashboardRoute.GET("/monthly-chart",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/monthly-chart",
 		usecase.GetMonthlyChart(repository.Order),
 	)
 
-	dashboardRoute.GET("/expiring",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/expiring",
 		usecase.GetExpiringProducts(repository.ProductStock),
 	)
 
-	dashboardRoute.GET("/refill-reminders",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/refill-reminders",
 		usecase.GetRefillReminders(),
 	)
 
-	dashboardRoute.GET("/abc-analysis",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/abc-analysis",
 		usecase.GetABCAnalysis(repository.Order),
 	)
 
-	dashboardRoute.GET("/dead-stock",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/dead-stock",
 		usecase.GetDeadStockProducts(repository.ProductStock),
 	)
 }

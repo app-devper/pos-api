@@ -1,57 +1,46 @@
 package patient
 
 import (
-	"github.com/gin-gonic/gin"
 	"pos/app/domain"
 	"pos/app/featues/patient/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplyPatientAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	patientRoute := route.Group("patients")
+	staff := policies.Staff.On(patientRoute)
 
-	patientRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.POST("",
 		usecase.CreatePatient(repository.Patient),
 	)
 
-	patientRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("",
 		usecase.GetPatients(repository.Patient),
 	)
 
-	patientRoute.GET("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/:id",
 		usecase.GetPatientById(repository.Patient),
 	)
 
-	patientRoute.GET("/customer/:customerCode",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/customer/:customerCode",
 		usecase.GetPatientByCustomerCode(repository.Patient),
 	)
 
-	patientRoute.PUT("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.PUT("/:id",
 		usecase.UpdatePatientById(repository.Patient),
 	)
 
-	patientRoute.DELETE("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.DELETE("/:id",
 		usecase.DeletePatientById(repository.Patient),
 	)
 
-	patientRoute.POST("/:id/allergy-check",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.POST("/:id/allergy-check",
 		usecase.AllergyCheck(repository.Patient, repository.Product),
 	)
 }

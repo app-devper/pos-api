@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/receive/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,61 +12,39 @@ func ApplyReceiveAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	receiveRoute := route.Group("receives")
+	branchAdmin := policies.BranchAdmin.On(receiveRoute)
 
-	receiveRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.POST("",
 		usecase.CreateReceive(repository.Receive, repository.Sequence, repository.Product),
 	)
 
-	receiveRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.GET("",
 		usecase.GetReceivesRange(repository.Receive),
 	)
 
-	receiveRoute.GET("/:receiveId",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.GET("/:receiveId",
 		usecase.GetReceiveById(repository.Receive),
 	)
 
-	receiveRoute.PUT("/:receiveId",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.PUT("/:receiveId",
 		usecase.UpdateReceiveById(repository.Receive, repository.Product),
 	)
 
-	receiveRoute.DELETE("/:receiveId",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.DELETE("/:receiveId",
 		usecase.DeleteReceiveById(repository.Receive),
 	)
 
-	receiveRoute.PATCH("/:receiveId/total-cost",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.PATCH("/:receiveId/total-cost",
 		usecase.UpdateReceiveTotalCostById(repository.Receive),
 	)
 
-	receiveRoute.PATCH("/:receiveId/items",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.PATCH("/:receiveId/items",
 		usecase.UpdateReceiveItemsById(repository.Receive, repository.Product),
 	)
 
-	receiveRoute.PATCH("/:receiveId/import",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.PATCH("/:receiveId/import",
 		usecase.ImportReceiveToStock(repository.Receive),
 	)
 

@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/product_return/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,19 +12,15 @@ func ApplyProductReturnAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	rtRoute := route.Group("product-returns")
+	branchAdmin := policies.BranchAdmin.On(rtRoute)
 
-	rtRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.POST("",
 		usecase.CreateProductReturn(repository.ProductReturn),
 	)
 
-	rtRoute.GET("/order/:orderId",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.GET("/order/:orderId",
 		usecase.GetProductReturnsByOrderId(repository.ProductReturn),
 	)
 }

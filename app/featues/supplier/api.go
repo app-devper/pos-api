@@ -1,55 +1,47 @@
 package supplier
 
 import (
-	"github.com/app-devper/um-api/sessionclient"
-	"github.com/gin-gonic/gin"
 	"pos/app/domain"
 	"pos/app/featues/supplier/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplySupplierAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	supplierRoute := route.Group("suppliers")
+	shopAdmin := policies.ShopAdmin.On(supplierRoute)
+	signedIn := policies.SignedIn.On(supplierRoute)
 
-	supplierRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.POST("",
 		usecase.CreateSupplier(repository.Supplier),
 	)
 
-	supplierRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("",
 		usecase.GetSuppliers(repository.Supplier),
 	)
 
-	supplierRoute.PUT("/info",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PUT("/info",
 		usecase.UpdateSupplierInfo(repository.Supplier),
 	)
 
-	supplierRoute.GET("/info",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("/info",
 		usecase.GetSupplierInfo(repository.Supplier),
 	)
 
-	supplierRoute.GET("/:supplierId",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("/:supplierId",
 		usecase.GetSupplierById(repository.Supplier),
 	)
 
-	supplierRoute.DELETE("/:supplierId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.DELETE("/:supplierId",
 		usecase.DeleteSupplierById(repository.Supplier),
 	)
 
-	supplierRoute.PUT("/:supplierId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PUT("/:supplierId",
 		usecase.UpdateSupplierById(repository.Supplier),
 	)
 
