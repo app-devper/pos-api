@@ -23,7 +23,7 @@ func ImportReceiveToStock(receiveEntity repositories.IReceive) gin.HandlerFunc {
 		}
 		result, err := receiveEntity.ImportReceiveToStock(receiveId, userId, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

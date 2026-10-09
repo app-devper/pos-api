@@ -21,7 +21,7 @@ func CreateProductReturn(records repositories.IProductReturn) gin.HandlerFunc {
 		req.CreatedBy = utils.GetUserId(ctx)
 		result, err := records.RecordProductReturn(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RT_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.RT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

@@ -44,7 +44,7 @@ func CreateStockTransfer(entity repositories.IStockTransfer, productEntity repos
 				"toBranchId":   req.ToBranchId,
 				"code":         req.Code,
 			}).Error("create stock transfer failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 

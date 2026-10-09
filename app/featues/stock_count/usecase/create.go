@@ -21,7 +21,7 @@ func CreateStockCount(records repositories.IStockCount) gin.HandlerFunc {
 		req.CreatedBy = utils.GetUserId(ctx)
 		result, err := records.RecordStockCount(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.SC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
