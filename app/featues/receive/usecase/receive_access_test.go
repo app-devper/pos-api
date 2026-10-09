@@ -43,8 +43,8 @@ func (s *receiveAccessRepoStub) GetReceiveItemsByReceiveId(receiveId string) ([]
 	return nil, nil
 }
 
-func (s *receiveAccessRepoStub) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
-	return s.updateReceiveStatusByIDFn(id, status, updatedBy)
+func (s *receiveAccessRepoStub) CancelReceiveById(id string, updatedBy string) (*entities.Receive, error) {
+	return s.updateReceiveStatusByIDFn(id, constant.CANCELLED, updatedBy)
 }
 
 func (s *receiveAccessRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
@@ -210,8 +210,7 @@ func TestUpdateReceiveItemsByIdRejectsImportedReceive(t *testing.T) {
 			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.IMPORTED}, nil
 		},
 		updateReceiveItemsByIDFn: func(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
-			t.Fatal("update items should not be called for imported receive")
-			return nil, nil
+			return nil, repositories.ErrReceiveLocked
 		},
 	}
 
@@ -229,7 +228,7 @@ func TestUpdateReceiveItemsByIdRejectsImportedReceive(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
+	if !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }
@@ -371,8 +370,7 @@ func TestUpdateReceiveTotalCostByIdRejectsImportedReceive(t *testing.T) {
 			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.IMPORTED}, nil
 		},
 		updateReceiveTotalCostFn: func(id string, totalCost float64) (*entities.Receive, error) {
-			t.Fatal("update total cost should not be called for imported receive")
-			return nil, nil
+			return nil, repositories.ErrReceiveLocked
 		},
 	}
 
@@ -389,7 +387,7 @@ func TestUpdateReceiveTotalCostByIdRejectsImportedReceive(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
+	if !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }

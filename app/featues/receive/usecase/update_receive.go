@@ -6,7 +6,6 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	"pos/app/data/repositories"
-	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"time"
 
@@ -35,52 +34,12 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 			abortReceiveBranchMismatch(ctx)
 			return
 		}
-		if receive.Status == constant.IMPORTED {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot modify imported receive")
+		items, err := receiveItems(productEntity, req.ReceiveItems)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
 			return
 		}
-
-		var totalCost float64
-		filteredItems := make([]request.ReceiveItem, 0, len(req.ReceiveItems))
-		for _, item := range req.ReceiveItems {
-			if item.ProductId == "" || item.Quantity <= 0 {
-				continue
-			}
-			product, pErr := productEntity.GetProductById(item.ProductId)
-			if pErr != nil {
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Errorf("failed to load product %s: %w", item.ProductId, pErr).Error())
-				return
-			}
-			if product == nil {
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Sprintf("product %s not found", item.ProductId))
-				return
-			}
-			productReq := request.Product{
-				Name:         product.Name,
-				SerialNumber: product.SerialNumber,
-				Price:        product.Price,
-				CostPrice:    item.CostPrice,
-				Unit:         product.Unit,
-				Quantity:     item.Quantity,
-				LotNumber:    item.LotNumber,
-				ReceiveId:    id,
-				ReceiveCode:  receive.Code,
-				CreatedBy:    userId,
-				BranchId:     branchId,
-			}
-			expireDate, parseErr := parseReceiveExpireDate(item.ExpireDate)
-			if parseErr != nil {
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, parseErr.Error())
-				return
-			}
-			productReq.ExpireDate = expireDate
-			item.ExpireDate = productReq.ExpireDate.Time.Format(time.RFC3339)
-			filteredItems = append(filteredItems, item)
-			totalCost += item.CostPrice * float64(item.Quantity)
-		}
-
-		req.ReceiveItems = filteredItems
-		req.TotalCost = totalCost
+		req.ReceiveItems = items
 		result, err := receiveEntity.UpdateReceiveById(id, req)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
@@ -108,34 +67,13 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive, productEntity r
 			abortReceiveBranchMismatch(ctx)
 			return
 		}
-		if receive.Status == constant.IMPORTED {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot modify imported receive")
+		req.UpdatedBy = utils.GetUserId(ctx)
+		items, err := receiveItems(productEntity, req.ReceiveItems)
+		if err != nil {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
 			return
 		}
-		req.UpdatedBy = utils.GetUserId(ctx)
-		filteredItems := make([]request.ReceiveItem, 0, len(req.ReceiveItems))
-		for i := range req.ReceiveItems {
-			if req.ReceiveItems[i].ProductId == "" || req.ReceiveItems[i].Quantity <= 0 {
-				continue
-			}
-			product, pErr := productEntity.GetProductById(req.ReceiveItems[i].ProductId)
-			if pErr != nil {
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Errorf("failed to load product %s: %w", req.ReceiveItems[i].ProductId, pErr).Error())
-				return
-			}
-			if product == nil {
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, fmt.Sprintf("product %s not found", req.ReceiveItems[i].ProductId))
-				return
-			}
-			expireDate, parseErr := parseReceiveExpireDate(req.ReceiveItems[i].ExpireDate)
-			if parseErr != nil {
-				errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, parseErr.Error())
-				return
-			}
-			req.ReceiveItems[i].ExpireDate = expireDate.Time.Format(time.RFC3339)
-			filteredItems = append(filteredItems, req.ReceiveItems[i])
-		}
-		req.ReceiveItems = filteredItems
+		req.ReceiveItems = items
 
 		result, err := receiveEntity.UpdateReceiveItemsById(receiveId, req)
 		if err != nil {
@@ -164,11 +102,6 @@ func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.Handler
 			abortReceiveBranchMismatch(ctx)
 			return
 		}
-		if receive.Status == constant.IMPORTED {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot modify imported receive")
-			return
-		}
-
 		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCost)
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
@@ -177,4 +110,30 @@ func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.Handler
 
 		ctx.JSON(http.StatusOK, result)
 	}
+}
+
+// receiveItems keeps the lines that receive something, checks each names a
+// Product, and normalises its expiry date. A Receive's edit and its items
+// edit take items through the same rules.
+func receiveItems(productEntity repositories.IProduct, items []request.ReceiveItem) ([]request.ReceiveItem, error) {
+	kept := make([]request.ReceiveItem, 0, len(items))
+	for _, item := range items {
+		if item.ProductId == "" || item.Quantity <= 0 {
+			continue
+		}
+		product, err := productEntity.GetProductById(item.ProductId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load product %s: %w", item.ProductId, err)
+		}
+		if product == nil {
+			return nil, fmt.Errorf("product %s not found", item.ProductId)
+		}
+		expireDate, err := parseReceiveExpireDate(item.ExpireDate)
+		if err != nil {
+			return nil, err
+		}
+		item.ExpireDate = expireDate.Time.Format(time.RFC3339)
+		kept = append(kept, item)
+	}
+	return kept, nil
 }

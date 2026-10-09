@@ -26,8 +26,8 @@ func (s *deleteReceiveRepoStub) GetReceiveById(id string) (*entities.Receive, er
 	return s.getByIDFn(id)
 }
 
-func (s *deleteReceiveRepoStub) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
-	return s.updateStatusByIDFn(id, status, updatedBy)
+func (s *deleteReceiveRepoStub) CancelReceiveById(id string, updatedBy string) (*entities.Receive, error) {
+	return s.updateStatusByIDFn(id, constant.CANCELLED, updatedBy)
 }
 
 func TestDeleteReceiveByIdReturnsDeletedReceive(t *testing.T) {
@@ -116,8 +116,7 @@ func TestDeleteReceiveByIdRejectsImportedReceive(t *testing.T) {
 			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.IMPORTED}, nil
 		},
 		updateStatusByIDFn: func(id string, status string, updatedBy string) (*entities.Receive, error) {
-			t.Fatal("update status should not be called for imported receive")
-			return nil, nil
+			return nil, repositories.ErrReceiveLocked
 		},
 	}
 
@@ -134,7 +133,7 @@ func TestDeleteReceiveByIdRejectsImportedReceive(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "cannot cancel imported receive") {
+	if !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive error, got %s", w.Body.String())
 	}
 }

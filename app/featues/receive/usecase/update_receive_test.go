@@ -87,9 +87,6 @@ func TestUpdateReceiveByIdFiltersInvalidItemsBeforeTransactionalUpdate(t *testin
 	if len(gotForm.ReceiveItems) != 1 {
 		t.Fatalf("expected only 1 valid item sent to repository, got %d", len(gotForm.ReceiveItems))
 	}
-	if gotForm.TotalCost != 10 {
-		t.Fatalf("expected total cost 10, got %f", gotForm.TotalCost)
-	}
 	if gotForm.UpdatedBy != "user-1" {
 		t.Fatalf("expected UpdatedBy user-1, got %s", gotForm.UpdatedBy)
 	}
@@ -278,8 +275,7 @@ func TestUpdateReceiveByIdRejectsImportedReceive(t *testing.T) {
 			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Code: "RC-001", Status: constant.IMPORTED}, nil
 		},
 		updateByIDFn: func(id string, form request.UpdateReceive) (*entities.Receive, error) {
-			t.Fatal("update receive should not be called for imported receive")
-			return nil, nil
+			return nil, repositories.ErrReceiveLocked
 		},
 	}
 	productRepo := &updateReceiveProductStub{
@@ -303,7 +299,7 @@ func TestUpdateReceiveByIdRejectsImportedReceive(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "cannot modify imported receive") {
+	if !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }

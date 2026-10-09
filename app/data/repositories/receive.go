@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/data/ledger"
@@ -38,8 +39,55 @@ type IReceive interface {
 	GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	DeleteReceiveItemsByReceiveId(receiveId string) error
-	UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error)
+	CancelReceiveById(id string, updatedBy string) (*entities.Receive, error)
 	ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error)
+}
+
+// ErrReceiveLocked is a change to a Receive that is no longer a draft: once
+// imported its Stock exists, and once cancelled it is closed.
+var ErrReceiveLocked = errors.New("receive is imported or cancelled and can no longer change")
+
+// draft matches the Receive only while it can still change. The Stock ledger
+// imports under the same condition, so an edit or cancel and an import cannot
+// both win.
+func draft(id primitive.ObjectID) bson.M {
+	return bson.M{"_id": id, "status": bson.M{"$nin": bson.A{constant.IMPORTED, constant.CANCELLED}}}
+}
+
+// changeDraft applies update to the Receive while it is a draft. It tells a
+// Receive that does not exist (mongo.ErrNoDocuments) from one that is locked.
+func (entity *receiveEntity) changeDraft(ctx context.Context, id primitive.ObjectID, update bson.M) (*entities.Receive, error) {
+	after := options.After
+	data := entities.Receive{}
+	err := entity.receiveRepo.FindOneAndUpdate(ctx, draft(id), update,
+		&options.FindOneAndUpdateOptions{ReturnDocument: &after}).Decode(&data)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		if n, cErr := entity.receiveRepo.CountDocuments(ctx, bson.M{"_id": id}); cErr == nil && n > 0 {
+			return nil, ErrReceiveLocked
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// replaceItems swaps a draft Receive's items. Called after changeDraft in the
+// same transaction, so a locked Receive's items are never touched.
+func (entity *receiveEntity) replaceItems(ctx context.Context, id primitive.ObjectID, items []entities.ReceiveItem) error {
+	if _, err := entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": id}); err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	docs := make([]interface{}, 0, len(items))
+	for _, item := range items {
+		item.ReceiveId = id
+		docs = append(docs, item)
+	}
+	_, err := entity.receiveItemsRepo.InsertMany(ctx, docs)
+	return err
 }
 
 func NewReceiveEntity(resource *db.Resource) IReceive {
@@ -203,19 +251,10 @@ func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost flo
 		return nil, err
 	}
 
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+	return entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
 		"totalCost":   totalCost,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
+	}})
 }
 
 func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error) {
@@ -261,38 +300,21 @@ func (entity *receiveEntity) updateReceiveByIdWithContext(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
-
-	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
-		return nil, err
-	}
-	if len(items) > 0 {
-		docs := make([]interface{}, 0, len(items))
-		for _, item := range items {
-			item.ReceiveId = obId
-			docs = append(docs, item)
-		}
-		if _, err = entity.receiveItemsRepo.InsertMany(ctx, docs); err != nil {
-			return nil, err
-		}
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+	data, err := entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
 		"supplierId":  supplier,
 		"reference":   form.Reference,
-		"totalCost":   form.TotalCost,
+		"totalCost":   calculateReceiveItemsTotalCost(items),
 		"items":       items,
 		"updatedBy":   form.UpdatedBy,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
+	}})
 	if err != nil {
 		return nil, err
 	}
-	return &data, nil
+	if err := entity.replaceItems(ctx, obId, items); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
@@ -334,37 +356,19 @@ func (entity *receiveEntity) updateReceiveItemsByIdWithContext(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	totalCost := calculateReceiveItemsTotalCost(items)
-
-	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
-		return nil, err
-	}
-	if len(items) > 0 {
-		docs := make([]interface{}, 0, len(items))
-		for _, item := range items {
-			item.ReceiveId = obId
-			docs = append(docs, item)
-		}
-		if _, err = entity.receiveItemsRepo.InsertMany(ctx, docs); err != nil {
-			return nil, err
-		}
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+	data, err := entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
 		"items":       items,
-		"totalCost":   totalCost,
+		"totalCost":   calculateReceiveItemsTotalCost(items),
 		"updatedBy":   form.UpdatedBy,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
+	}})
 	if err != nil {
 		return nil, err
 	}
-	return &data, nil
+	if err := entity.replaceItems(ctx, obId, items); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func buildReceiveItems(items []request.ReceiveItem) ([]entities.ReceiveItem, error) {
@@ -518,28 +522,20 @@ func (entity *receiveEntity) DeleteReceiveItemsByReceiveId(receiveId string) err
 	return err
 }
 
-func (entity *receiveEntity) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
-	logrus.Info("UpdateReceiveStatusById")
+// CancelReceiveById closes a draft Receive; an imported one stays imported.
+func (entity *receiveEntity) CancelReceiveById(id string, updatedBy string) (*entities.Receive, error) {
+	logrus.Info("CancelReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	obId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
-		"status":      status,
+	return entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
+		"status":      constant.CANCELLED,
 		"updatedBy":   updatedBy,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
+	}})
 }
 
 // ImportReceiveToStock is recorded by the Stock ledger (ADR-0001): new Stocks,
