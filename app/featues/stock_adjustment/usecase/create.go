@@ -1,12 +1,13 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
 func CreateStockAdjustment(records repositories.IStockAdjustment) gin.HandlerFunc {

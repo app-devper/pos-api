@@ -17,13 +17,8 @@ func ImportReceiveToStock(receiveEntity repositories.IReceive) gin.HandlerFunc {
 
 		userId := utils.GetUserId(ctx)
 		branchId := utils.GetBranchId(ctx)
-		receive, err := receiveEntity.GetReceiveById(receiveId)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureReceiveBranchAccess(receive, branchId); err != nil {
-			abortReceiveBranchMismatch(ctx)
+		if _, err := receiveEntity.GetReceiveById(receiveId, branchId); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		result, err := receiveEntity.ImportReceiveToStock(receiveId, userId, branchId)

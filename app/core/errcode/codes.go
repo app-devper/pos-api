@@ -183,6 +183,7 @@ const (
 // ─── System (SY) ────────────────────────────────────────────────────────────
 const (
 	SY_NOT_FOUND_001 = "SY-404-001" // route not found
+	SY_NOT_FOUND_002 = "SY-404-002" // document not found in the caller's branch
 	SY_FORBIDDEN_001 = "SY-403-001" // invalid request / restricted endpoint
 	SY_FORBIDDEN_002 = "SY-403-002" // no permission
 	SY_INTERNAL_001  = "SY-500-001" // panic recovery / internal server error

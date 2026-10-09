@@ -1,12 +1,13 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
 func CreateStockCount(records repositories.IStockCount) gin.HandlerFunc {
@@ -42,9 +43,9 @@ func GetStockCounts(stockCountEntity repositories.IStockCount) gin.HandlerFunc {
 func GetStockCountById(stockCountEntity repositories.IStockCount) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := stockCountEntity.GetStockCountById(id)
+		result, err := stockCountEntity.GetStockCountById(id, utils.GetBranchId(ctx))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.SC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

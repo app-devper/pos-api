@@ -26,14 +26,9 @@ func GetStockTransfers(entity repositories.IStockTransfer) gin.HandlerFunc {
 func GetStockTransferById(entity repositories.IStockTransfer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := entity.GetStockTransferById(id)
+		result, err := entity.GetStockTransferById(id, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
-			return
-		}
-		branchId := ctx.GetString("BranchId")
-		if result.FromBranchId.Hex() != branchId && result.ToBranchId.Hex() != branchId {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -48,14 +43,16 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			UpdatedBy: utils.GetUserId(ctx),
 		}
 
-		transfer, err := entity.GetStockTransferById(id)
+		branchId := ctx.GetString("BranchId")
+		transfer, err := entity.GetStockTransferById(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
-		branchId := ctx.GetString("BranchId")
-		if transfer.FromBranchId.Hex() != branchId && transfer.ToBranchId.Hex() != branchId {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+		// The branch that receives the Stock approves it; the branch that
+		// asked cannot approve its own request.
+		if transfer.ToBranchId.Hex() != branchId {
+			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "only the receiving branch can approve a transfer")
 			return
 		}
 
@@ -82,14 +79,9 @@ func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			UpdatedBy: utils.GetUserId(ctx),
 		}
 
-		transfer, err := entity.GetStockTransferById(id)
+		transfer, err := entity.GetStockTransferById(id, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
-			return
-		}
-		branchId := ctx.GetString("BranchId")
-		if transfer.FromBranchId.Hex() != branchId && transfer.ToBranchId.Hex() != branchId {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 

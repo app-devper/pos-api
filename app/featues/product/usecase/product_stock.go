@@ -55,13 +55,9 @@ func UpdateProductStockById(productStock repositories.IProductStock, productEnti
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
-		stock, err := productStock.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
-			abortProductBranchMismatch(ctx)
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		userId := ctx.GetString("UserId")
@@ -95,13 +91,9 @@ func UpdateProductStockQuantityById(productStock repositories.IProductStock) gin
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
-		stock, err := productStock.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
-			abortProductBranchMismatch(ctx)
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		// A one-Line Count in the Stock ledger: Adjustment, history, settlement.
@@ -119,13 +111,8 @@ func RemoveProductStockById(productStock repositories.IProductStock) gin.Handler
 		id := ctx.Param("stockId")
 		userId := ctx.GetString("UserId")
 		branchId := ctx.GetString("BranchId")
-		stock, err := productStock.GetProductStockById(id)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
-			abortProductBranchMismatch(ctx)
+		if _, err := productStock.GetProductStockById(id, branchId); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 

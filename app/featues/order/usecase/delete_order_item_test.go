@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type cancelOrderRepoStub struct {
@@ -24,12 +25,26 @@ type cancelOrderRepoStub struct {
 	cancelByOrderProductIDFn func(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
 }
 
-func (s *cancelOrderRepoStub) GetOrderById(id string) (*entities.Order, error) {
-	return s.getOrderByIDFn(id)
+func (s *cancelOrderRepoStub) GetOrderById(id string, branchId string) (*entities.Order, error) {
+	d, err := func() (*entities.Order, error) {
+		return s.getOrderByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
-func (s *cancelOrderRepoStub) GetOrderItemById(id string) (*entities.OrderItem, error) {
-	return s.getOrderItemByIDFn(id)
+func (s *cancelOrderRepoStub) GetOrderItemById(id string, branchId string) (*entities.OrderItem, error) {
+	d, err := func() (*entities.OrderItem, error) {
+		return s.getOrderItemByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *cancelOrderRepoStub) CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {

@@ -26,7 +26,7 @@ type productStockEntity struct {
 type IProductStock interface {
 	// ProductStock
 	CreateProductStock(param request.ProductStock) (*entities.ProductStock, error)
-	GetProductStockById(id string) (*entities.ProductStock, error)
+	GetProductStockById(id string, branchId string) (*entities.ProductStock, error)
 	UpdateProductStockById(id string, param request.UpdateProductStock) (*entities.ProductStock, error)
 	UpdateProductStockQuantityById(id string, branchId string, quantity int, by string) (*entities.ProductStock, error)
 	UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error)
@@ -118,16 +118,16 @@ func (entity *productStockEntity) createProductStockWithContext(ctx context.Cont
 	return &data, nil
 }
 
-func (entity *productStockEntity) GetProductStockById(id string) (*entities.ProductStock, error) {
+func (entity *productStockEntity) GetProductStockById(id string, branchId string) (*entities.ProductStock, error) {
 	logrus.Info("GetProductStockById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
+	filter, err := inBranch(id, branchId)
 	if err != nil {
 		return nil, err
 	}
 	data := entities.ProductStock{}
-	err = entity.productStockRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.productStockRepo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
