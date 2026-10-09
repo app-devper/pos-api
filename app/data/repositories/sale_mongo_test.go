@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
@@ -60,6 +61,11 @@ func newSaleFixture(t *testing.T) *saleFixture {
 	f.insert("product_prices", entities.ProductPrice{Id: primitive.NewObjectID(), ProductId: f.product, UnitId: f.unit, CustomerType: "General", Price: 10})
 	f.insert("product_prices", entities.ProductPrice{Id: primitive.NewObjectID(), ProductId: f.product, UnitId: f.unit, CustomerType: "Wholesaler", Price: 8})
 	return f
+}
+
+// sell records a Sale through the Stock ledger, as the order handler does.
+func (f *saleFixture) sell(form request.Sale) (*ledger.Sold, error) {
+	return newLedger(&db.Resource{Client: f.pos.Client(), PosDb: f.pos}).Sell(context.Background(), form)
 }
 
 func (f *saleFixture) insert(collection string, doc any) {
@@ -134,7 +140,7 @@ func TestRecordSalePricesAndDrawsStockOnTheServer(t *testing.T) {
 	later := f.stock(2, 3, 5)
 	first := f.stock(1, 2, 4)
 
-	got, err := f.orders.RecordSale(f.sale("s1", 100, request.SaleLine{Quantity: 7, PriceType: "General", Discount: 1}))
+	got, err := f.sell(f.sale("s1", 100, request.SaleLine{Quantity: 7, PriceType: "General", Discount: 1}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +169,7 @@ func TestRecordSaleOversellOwesTheLastStock(t *testing.T) {
 	f := newSaleFixture(t)
 	lot := f.stock(1, 2, 4)
 
-	got, err := f.orders.RecordSale(f.sale("s1", 50, request.SaleLine{Quantity: 5, PriceType: "General", AllowOversell: true}))
+	got, err := f.sell(f.sale("s1", 50, request.SaleLine{Quantity: 5, PriceType: "General", AllowOversell: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +186,7 @@ func TestRecordSaleLinesOfOneUnitDrawInTurn(t *testing.T) {
 	f := newSaleFixture(t)
 	lot := f.stock(1, 3, 4)
 
-	got, err := f.orders.RecordSale(f.sale("s1", 100,
+	got, err := f.sell(f.sale("s1", 100,
 		request.SaleLine{Quantity: 2, PriceType: "General"},
 		request.SaleLine{Quantity: 2, PriceType: "Wholesaler"}))
 	if err != nil {
@@ -200,11 +206,11 @@ func TestRecordSaleRepeatReturnsTheRecordedOrder(t *testing.T) {
 	lot := f.stock(1, 10, 4)
 	s := f.sale("s1", 50, request.SaleLine{Quantity: 2, PriceType: "General"})
 
-	first, err := f.orders.RecordSale(s)
+	first, err := f.sell(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := f.orders.RecordSale(s)
+	again, err := f.sell(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +222,7 @@ func TestRecordSaleRepeatReturnsTheRecordedOrder(t *testing.T) {
 	}
 
 	other := f.sale("s1", 50, request.SaleLine{Quantity: 3, PriceType: "General"})
-	if _, err := f.orders.RecordSale(other); !errors.Is(err, ErrSaleConflict) {
+	if _, err := f.sell(other); !errors.Is(err, ledger.ErrSaleConflict) {
 		t.Fatalf("expected ErrSaleConflict, got %v", err)
 	}
 }
@@ -233,7 +239,7 @@ func TestRecordSaleConcurrentRepeatsRecordOneOrder(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			r, err := f.orders.RecordSale(s)
+			r, err := f.sell(s)
 			errs[i] = err
 			if r != nil {
 				ids[i] = r.Order.Id
@@ -262,8 +268,8 @@ func TestRecordSaleRejectedWritesNothing(t *testing.T) {
 	secondLineBad.Items[1].ProductId = primitive.NewObjectID().Hex()
 
 	for name, s := range map[string]request.Sale{"underpaid": underpaid, "wrong unit": wrongUnit, "second line bad": secondLineBad} {
-		var rejected *SaleRejected
-		if _, err := f.orders.RecordSale(s); !errors.As(err, &rejected) {
+		var rejected *ledger.Rejected
+		if _, err := f.sell(s); !errors.As(err, &rejected) {
 			t.Errorf("%s: expected SaleRejected, got %v", name, err)
 		}
 	}
@@ -275,7 +281,7 @@ func TestRecordSaleRejectedWritesNothing(t *testing.T) {
 func TestCancelLineRecomputesOrderMoney(t *testing.T) {
 	f := newSaleFixture(t)
 	f.stock(1, 10, 4)
-	got, err := f.orders.RecordSale(f.sale("s1", 100,
+	got, err := f.sell(f.sale("s1", 100,
 		request.SaleLine{Quantity: 2, PriceType: "General", Discount: 1},
 		request.SaleLine{Quantity: 3, PriceType: "Wholesaler", Discount: 0.5}))
 	if err != nil {
@@ -300,7 +306,7 @@ func TestRecordSaleDrawsOnlyTheBranchStock(t *testing.T) {
 	elsewhere := primitive.NewObjectID()
 	f.insert("product_stocks", entities.ProductStock{Id: elsewhere, BranchId: primitive.NewObjectID(), ProductId: f.product, UnitId: f.unit, Sequence: 0, Quantity: 10, CostPrice: 4})
 
-	if _, err := f.orders.RecordSale(f.sale("s1", 50, request.SaleLine{Quantity: 2, PriceType: "General"})); err != nil {
+	if _, err := f.sell(f.sale("s1", 50, request.SaleLine{Quantity: 2, PriceType: "General"})); err != nil {
 		t.Fatal(err)
 	}
 	if f.quantity(elsewhere) != 10 || f.soldFirst() != -2 {
@@ -315,8 +321,8 @@ func TestRecordSaleRejectsAUnitOfAnotherProduct(t *testing.T) {
 	s := f.sale("s1", 50, request.SaleLine{Quantity: 1, PriceType: "General"})
 	s.Items[0].ProductId = other.Hex()
 
-	var rejected *SaleRejected
-	if _, err := f.orders.RecordSale(s); !errors.As(err, &rejected) {
+	var rejected *ledger.Rejected
+	if _, err := f.sell(s); !errors.As(err, &rejected) {
 		t.Fatalf("expected SaleRejected, got %v", err)
 	}
 }
@@ -342,11 +348,11 @@ func TestRecordSaleRefusedTakesNoOrderCode(t *testing.T) {
 	f := newSaleFixture(t)
 	f.stock(1, 10, 4)
 
-	var rejected *SaleRejected
-	if _, err := f.orders.RecordSale(f.sale("refused", 1, request.SaleLine{Quantity: 2, PriceType: "General"})); !errors.As(err, &rejected) {
+	var rejected *ledger.Rejected
+	if _, err := f.sell(f.sale("refused", 1, request.SaleLine{Quantity: 2, PriceType: "General"})); !errors.As(err, &rejected) {
 		t.Fatalf("expected an underpaid Sale to be refused, got %v", err)
 	}
-	got, err := f.orders.RecordSale(f.sale("accepted", 50, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	got, err := f.sell(f.sale("accepted", 50, request.SaleLine{Quantity: 2, PriceType: "General"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +368,7 @@ func TestRecordSaleRefusedTakesNoOrderCode(t *testing.T) {
 func TestRepairOrderTotalsAgreesWithACancelledLine(t *testing.T) {
 	f := newSaleFixture(t)
 	f.stock(1, 10, 4)
-	got, err := f.orders.RecordSale(f.sale("s1", 100,
+	got, err := f.sell(f.sale("s1", 100,
 		request.SaleLine{Quantity: 1, PriceType: "General", Discount: 3.333},
 		request.SaleLine{Quantity: 1, PriceType: "General", Discount: 3.333},
 		request.SaleLine{Quantity: 1, PriceType: "General", Discount: 3.333}))
@@ -385,7 +391,7 @@ func TestRepairOrderTotalsAgreesWithACancelledLine(t *testing.T) {
 func TestCancelByOrderAndProductCancelsTheLineStillStanding(t *testing.T) {
 	f := newSaleFixture(t)
 	f.stock(1, 10, 4)
-	got, err := f.orders.RecordSale(f.sale("s1", 100,
+	got, err := f.sell(f.sale("s1", 100,
 		request.SaleLine{Quantity: 1, PriceType: "General"},
 		request.SaleLine{Quantity: 2, PriceType: "Wholesaler"}))
 	if err != nil {

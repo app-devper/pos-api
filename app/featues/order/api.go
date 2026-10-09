@@ -18,7 +18,7 @@ func ApplyOrderAPI(
 	staff := policies.Staff.On(orderRoute)
 
 	staff.POST("",
-		usecase.CreateOrder(repository.Order),
+		usecase.CreateOrder(repository.Ledger),
 	)
 
 	staff.GET("",

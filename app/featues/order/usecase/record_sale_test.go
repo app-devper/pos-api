@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"pos/app/core/errcode"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 
@@ -18,12 +20,11 @@ import (
 )
 
 type saleRepoStub struct {
-	repositories.IOrder
-	record   func(form request.Sale) (*repositories.RecordedSale, error)
+	record   func(form request.Sale) (*ledger.Sold, error)
 	recorded []request.Sale
 }
 
-func (s *saleRepoStub) RecordSale(form request.Sale) (*repositories.RecordedSale, error) {
+func (s *saleRepoStub) Sell(_ context.Context, form request.Sale) (*ledger.Sold, error) {
 	s.recorded = append(s.recorded, form)
 	return s.record(form)
 }
@@ -40,7 +41,7 @@ func (s *countingSequence) NextSequence(field string) (*entities.Sequence, error
 
 const saleBody = `{"saleId":"s1","type":"CASH","payments":[{"amount":50,"type":"CASH"}],"items":[{"productId":"p","unitId":"u","quantity":2,"priceType":"General"}]}`
 
-func postSale(t *testing.T, repo repositories.IOrder, seq repositories.ISequence, body string) *httptest.ResponseRecorder {
+func postSale(t *testing.T, repo seller, seq repositories.ISequence, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -55,8 +56,8 @@ func postSale(t *testing.T, repo repositories.IOrder, seq repositories.ISequence
 
 func TestCreateOrderWithSaleIdRecordsTheSale(t *testing.T) {
 	order := &entities.Order{Id: primitive.NewObjectID(), Total: 20}
-	repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
-		return &repositories.RecordedSale{Order: order, Stocks: []entities.ProductStock{}}, nil
+	repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
+		return &ledger.Sold{Order: order, Stocks: []entities.ProductStock{}}, nil
 	}}
 	seq := &countingSequence{}
 
@@ -88,11 +89,11 @@ func TestCreateOrderSaleErrors(t *testing.T) {
 		status    int
 		code      string
 	}{
-		"id reused": {recordErr: repositories.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
-		"rejected":  {recordErr: &repositories.SaleRejected{Reason: "payment too low"}, status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_001},
+		"id reused": {recordErr: ledger.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
+		"rejected":  {recordErr: &ledger.Rejected{Reason: "payment too low"}, status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_001},
 		"failed":    {recordErr: errors.New("mongo down"), status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_002},
 	} {
-		repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
+		repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
 			return nil, tc.recordErr
 		}}
 		w := postSale(t, repo, &countingSequence{}, saleBody)
@@ -109,7 +110,7 @@ func TestCreateOrderSaleRejectsInvalidBody(t *testing.T) {
 		"zero quantity": `{"saleId":"s1","type":"CASH","payments":[{"amount":50,"type":"CASH"}],"items":[{"productId":"p","unitId":"u","quantity":0}]}`,
 		"not json":      `{`,
 	} {
-		repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
+		repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
 			t.Fatalf("%s: recorded", name)
 			return nil, nil
 		}}
@@ -123,7 +124,7 @@ func TestCreateOrderSaleRejectsInvalidBody(t *testing.T) {
 func TestCreateOrderWithoutSaleIdIsRefused(t *testing.T) {
 	// A till that prices the Sale itself (no saleId) is out of date: pos-api
 	// prices every Sale and draws its Stock through the ledger (ADR-0001).
-	repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
+	repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
 		t.Fatal("a Sale without saleId must not be recorded")
 		return nil, nil
 	}}

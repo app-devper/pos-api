@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,8 +37,12 @@ func (s *transferAccessRepoStub) GetStockTransferById(id string, branchId string
 	return d, err
 }
 
-func (s *transferAccessRepoStub) ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
+func (s *transferAccessRepoStub) ApproveTransfer(_ context.Context, id string, updatedBy string) (*entities.StockTransfer, error) {
 	return s.approveFn(id, updatedBy)
+}
+
+func (s *transferAccessRepoStub) RejectTransfer(_ context.Context, id string, updatedBy string) (*entities.StockTransfer, error) {
+	return nil, errors.New("not used here")
 }
 
 func TestGetStockTransferByIdRejectsForeignBranch(t *testing.T) {
@@ -91,7 +97,7 @@ func TestApproveStockTransferRejectsForeignBranch(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	ApproveStockTransfer(repo)(ctx)
+	ApproveStockTransfer(repo, repo)(ctx)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)

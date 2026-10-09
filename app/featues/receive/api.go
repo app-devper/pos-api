@@ -45,7 +45,7 @@ func ApplyReceiveAPI(
 	)
 
 	branchAdmin.PATCH("/:receiveId/import",
-		usecase.ImportReceiveToStock(repository.Receive),
+		usecase.ImportReceiveToStock(repository.Receive, repository.Ledger),
 	)
 
 }

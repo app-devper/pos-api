@@ -4,7 +4,6 @@ import (
 	"context"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
-	"pos/app/data/ledger"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
@@ -18,19 +17,14 @@ import (
 )
 
 type productStockEntity struct {
-	ledger             *ledger.Ledger
 	productStockRepo   *mongo.Collection
 	productHistoryRepo *mongo.Collection
 }
 
 type IProductStock interface {
-	// ProductStock
-	CreateProductStock(param request.ProductStock) (*entities.ProductStock, error)
 	GetProductStockById(id string, branchId string) (*entities.ProductStock, error)
 	UpdateProductStockById(id string, param request.UpdateProductStock) (*entities.ProductStock, error)
-	UpdateProductStockQuantityById(id string, branchId string, quantity int, by string) (*entities.ProductStock, error)
 	UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error)
-	RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error)
 	GetProductStocksByProductId(productId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStocksByProductAndUnitId(productId string, unitId string, branchId string) ([]entities.ProductStock, error)
 	GetProductStockMaxSequence(productId string, unitId string, branchId string) int
@@ -53,7 +47,6 @@ func newProductStockEntity(resource *db.Resource) *productStockEntity {
 	productStockRepo := resource.PosDb.Collection("product_stocks")
 	productHistoryRepo := resource.PosDb.Collection("product_histories")
 	entity := &productStockEntity{
-		ledger:             newLedger(resource),
 		productStockRepo:   productStockRepo,
 		productHistoryRepo: productHistoryRepo,
 	}
@@ -75,13 +68,6 @@ func ensureProductStockIndexes(productStockRepo *mongo.Collection, productHistor
 	createCollectionIndex(productHistoryRepo, "product_histories productId", mongo.IndexModel{
 		Keys: bson.D{{Key: "productId", Value: 1}},
 	})
-}
-
-// CreateProductStock is recorded by the Stock ledger (ADR-0001): the new
-// Stock serves its Unit's waiting Lines and gets its history row.
-func (entity *productStockEntity) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
-	logrus.Info("CreateProductStock")
-	return entity.ledger.CreateStock(context.Background(), param)
 }
 
 func (entity *productStockEntity) createProductStockWithContext(ctx context.Context, param request.ProductStock) (*entities.ProductStock, error) {
@@ -207,19 +193,6 @@ func (entity *productStockEntity) UpdateProductStockById(id string, param reques
 		return nil, err
 	}
 	return &data, nil
-}
-
-// UpdateProductStockQuantityById records what a Stock holds through the Stock
-// ledger: a one-Line Count with its Adjustment and history (ADR-0001).
-func (entity *productStockEntity) UpdateProductStockQuantityById(id string, branchId string, quantity int, by string) (*entities.ProductStock, error) {
-	logrus.Info("UpdateProductStockQuantityById")
-	return entity.ledger.SetQuantity(context.Background(), id, branchId, quantity, by)
-}
-
-// RemoveProductStockById deletes an empty Stock through the Stock ledger.
-func (entity *productStockEntity) RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error) {
-	logrus.Info("RemoveProductStockById")
-	return entity.ledger.DeleteStock(context.Background(), id, branchId, by)
 }
 
 func (entity *productStockEntity) UpdateProductStockSequence(param request.UpdateProductStockSequence) ([]entities.ProductStock, error) {

@@ -3,8 +3,6 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
-	"pos/app/data/ledger"
-	"pos/app/domain/request"
 	"pos/db"
 
 	"github.com/sirupsen/logrus"
@@ -15,18 +13,16 @@ import (
 )
 
 type stockAdjustmentEntity struct {
-	ledger              *ledger.Ledger
 	stockAdjustmentRepo *mongo.Collection
 }
 
 type IStockAdjustment interface {
-	ApplyStockAdjustment(req request.StockAdjustment) (*entities.StockAdjustment, error)
 	GetStockAdjustmentsByProductId(productId string, branchId string) ([]entities.StockAdjustment, error)
 }
 
 func NewStockAdjustmentEntity(resource *db.Resource) IStockAdjustment {
 	stockAdjustmentRepo := resource.PosDb.Collection("stock_adjustments")
-	entity := &stockAdjustmentEntity{ledger: newLedger(resource), stockAdjustmentRepo: stockAdjustmentRepo}
+	entity := &stockAdjustmentEntity{stockAdjustmentRepo: stockAdjustmentRepo}
 	ensureStockAdjustmentIndexes(stockAdjustmentRepo)
 	return entity
 }

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -55,7 +56,7 @@ func (s *receiveAccessRepoStub) CancelReceiveById(id string, updatedBy string) (
 	return s.updateReceiveStatusByIDFn(id, constant.CANCELLED, updatedBy)
 }
 
-func (s *receiveAccessRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
+func (s *receiveAccessRepoStub) ImportReceive(_ context.Context, receiveId, branchId, userId string) (*entities.Receive, error) {
 	return s.importReceiveToStockFn(receiveId, userId, branchId)
 }
 
@@ -145,7 +146,7 @@ func TestImportReceiveToStockRejectsForeignBranch(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 
-	ImportReceiveToStock(repo)(ctx)
+	ImportReceiveToStock(repo, repo)(ctx)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)

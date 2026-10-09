@@ -16,7 +16,11 @@ var ledgers = struct {
 // newLedger is the one Stock ledger (ADR-0001) over this database, shared by
 // every repository that records through it. Its codes follow this
 // database's document sequences, the same series as before.
-func newLedger(resource *db.Resource) *ledger.Ledger {
+func newLedger(resource *db.Resource) *ledger.Ledger { return NewLedger(resource) }
+
+// NewLedger is the one Stock ledger over this database; handlers record
+// through it directly.
+func NewLedger(resource *db.Resource) *ledger.Ledger {
 	ledgers.Lock()
 	defer ledgers.Unlock()
 	if l, ok := ledgers.byResource[resource]; ok {

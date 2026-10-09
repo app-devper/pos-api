@@ -17,7 +17,7 @@ func ApplyStockAdjustmentAPI(
 	branchAdmin := policies.BranchAdmin.On(ajRoute)
 
 	branchAdmin.POST("",
-		usecase.CreateStockAdjustment(repository.StockAdjustment),
+		usecase.CreateStockAdjustment(repository.Ledger),
 	)
 
 	branchAdmin.GET("/product/:productId",

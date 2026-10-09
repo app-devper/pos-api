@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func (s *receiveRepoStub) GetReceiveById(id string, branchId string) (*entities.
 	return d, err
 }
 
-func (s *receiveRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
+func (s *receiveRepoStub) ImportReceive(_ context.Context, receiveId, branchId, userId string) (*entities.Receive, error) {
 	return s.importReceiveToStockFn(receiveId, userId, branchId)
 }
 
@@ -60,7 +61,7 @@ func TestImportReceiveToStockReturnsErrorWhenTransactionalImportFails(t *testing
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID.Hex())
 
-	ImportReceiveToStock(receiveRepo)(ctx)
+	ImportReceiveToStock(receiveRepo, receiveRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)

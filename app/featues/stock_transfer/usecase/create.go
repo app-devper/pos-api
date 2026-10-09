@@ -1,9 +1,11 @@
 package usecase
 
 import (
+	"context"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
@@ -12,7 +14,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CreateStockTransfer(entity repositories.IStockTransfer, productEntity repositories.IProduct, sequenceEntity repositories.ISequence) gin.HandlerFunc {
+// transferRequester asks for a Transfer through the Stock ledger, which
+// reserves its Stock.
+type transferRequester interface {
+	RequestTransfer(ctx context.Context, form request.StockTransfer) (*entities.StockTransfer, error)
+}
+
+func CreateStockTransfer(ledger transferRequester, productEntity repositories.IProduct, sequenceEntity repositories.ISequence) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.StockTransfer{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -37,7 +45,7 @@ func CreateStockTransfer(entity repositories.IStockTransfer, productEntity repos
 		}
 		req.Code = "TF-" + sequence.GenerateCode()
 
-		result, err := entity.CreateStockTransferWithReservation(req)
+		result, err := ledger.RequestTransfer(ctx.Request.Context(), req)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"fromBranchId": req.FromBranchId,

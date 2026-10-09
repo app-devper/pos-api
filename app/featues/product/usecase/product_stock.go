@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"pos/app/core/errcode"
@@ -12,7 +13,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CreateProductStock(productStock repositories.IProductStock) gin.HandlerFunc {
+// stockLedger creates, sets and deletes a Stock through the Stock ledger.
+type stockLedger interface {
+	CreateStock(ctx context.Context, req request.ProductStock) (*entities.ProductStock, error)
+	SetQuantity(ctx context.Context, stockID, branchID string, quantity int, by string) (*entities.ProductStock, error)
+	DeleteStock(ctx context.Context, stockID, branchID, by string) (*entities.ProductStock, error)
+}
+
+func CreateProductStock(ledger stockLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductStock{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -23,7 +31,7 @@ func CreateProductStock(productStock repositories.IProductStock) gin.HandlerFunc
 		req.UpdatedBy = userId
 		req.BranchId = ctx.GetString("BranchId")
 		// The Stock ledger writes its history and settles waiting Lines.
-		stock, err := productStock.CreateProductStock(req)
+		stock, err := ledger.CreateStock(ctx.Request.Context(), req)
 		if err != nil {
 			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
@@ -82,7 +90,7 @@ func UpdateProductStockById(productStock repositories.IProductStock, productEnti
 	}
 }
 
-func UpdateProductStockQuantityById(productStock repositories.IProductStock) gin.HandlerFunc {
+func UpdateProductStockQuantityById(productStock repositories.IProductStock, ledger stockLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockQuantity{}
 		id := ctx.Param("stockId")
@@ -97,7 +105,7 @@ func UpdateProductStockQuantityById(productStock repositories.IProductStock) gin
 			return
 		}
 		// A one-Line Count in the Stock ledger: Adjustment, history, settlement.
-		stock, err = productStock.UpdateProductStockQuantityById(id, branchId, req.Quantity, ctx.GetString("UserId"))
+		stock, err = ledger.SetQuantity(ctx.Request.Context(), id, branchId, req.Quantity, ctx.GetString("UserId"))
 		if err != nil {
 			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
@@ -106,7 +114,7 @@ func UpdateProductStockQuantityById(productStock repositories.IProductStock) gin
 	}
 }
 
-func RemoveProductStockById(productStock repositories.IProductStock) gin.HandlerFunc {
+func RemoveProductStockById(productStock repositories.IProductStock, ledger stockLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("stockId")
 		userId := ctx.GetString("UserId")
@@ -116,7 +124,7 @@ func RemoveProductStockById(productStock repositories.IProductStock) gin.Handler
 			return
 		}
 
-		result, err := productStock.RemoveProductStockById(id, branchId, userId)
+		result, err := ledger.DeleteStock(ctx.Request.Context(), id, branchId, userId)
 		if err != nil {
 			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return

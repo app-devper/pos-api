@@ -17,7 +17,7 @@ func ApplyStockTransferAPI(
 	branchAdmin := policies.BranchAdmin.On(stRoute)
 
 	branchAdmin.POST("",
-		usecase.CreateStockTransfer(repository.StockTransfer, repository.Product, repository.Sequence),
+		usecase.CreateStockTransfer(repository.Ledger, repository.Product, repository.Sequence),
 	)
 
 	branchAdmin.GET("",
@@ -29,10 +29,10 @@ func ApplyStockTransferAPI(
 	)
 
 	branchAdmin.PATCH("/:id/approve",
-		usecase.ApproveStockTransfer(repository.StockTransfer),
+		usecase.ApproveStockTransfer(repository.StockTransfer, repository.Ledger),
 	)
 
 	branchAdmin.PATCH("/:id/reject",
-		usecase.RejectStockTransfer(repository.StockTransfer),
+		usecase.RejectStockTransfer(repository.StockTransfer, repository.Ledger),
 	)
 }

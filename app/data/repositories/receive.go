@@ -5,7 +5,6 @@ import (
 	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
-	"pos/app/data/ledger"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
@@ -20,7 +19,6 @@ import (
 
 type receiveEntity struct {
 	client           *mongo.Client
-	ledger           *ledger.Ledger
 	receiveRepo      *mongo.Collection
 	receiveItemsRepo *mongo.Collection
 }
@@ -40,7 +38,6 @@ type IReceive interface {
 	RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	DeleteReceiveItemsByReceiveId(receiveId string) error
 	CancelReceiveById(id string, updatedBy string) (*entities.Receive, error)
-	ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error)
 }
 
 // ErrReceiveLocked is a change to a Receive that is no longer a draft: once
@@ -95,7 +92,6 @@ func NewReceiveEntity(resource *db.Resource) IReceive {
 	receiveItemsRepo := resource.PosDb.Collection("receive_items")
 	entity := &receiveEntity{
 		client:           resource.Client,
-		ledger:           newLedger(resource),
 		receiveRepo:      receiveRepo,
 		receiveItemsRepo: receiveItemsRepo,
 	}
@@ -536,19 +532,4 @@ func (entity *receiveEntity) CancelReceiveById(id string, updatedBy string) (*en
 		"updatedBy":   updatedBy,
 		"updatedDate": time.Now(),
 	}})
-}
-
-// ImportReceiveToStock is recorded by the Stock ledger (ADR-0001): new Stocks,
-// Oversell settlement and the IMPORTED status commit together.
-func (entity *receiveEntity) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
-	result, err := entity.ledger.ImportReceive(context.Background(), receiveId, branchId, userId)
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"receiveId": receiveId,
-			"userId":    userId,
-			"branchId":  branchId,
-		}).Error("import receive to stock failed")
-		return nil, err
-	}
-	return result, nil
 }
