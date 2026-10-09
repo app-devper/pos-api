@@ -27,7 +27,6 @@ type orderEntity struct {
 }
 
 type IOrder interface {
-	CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error)
 	RecordSale(form request.Sale) (*RecordedSale, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
 	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
@@ -50,7 +49,6 @@ type IOrder interface {
 	GetOrderItemByProductId(productId string, branchId string) ([]entities.OrderItem, error)
 	GetOrderItemOrderDetailsByProductId(productId string, branchId string, form request.GetOrderRange) ([]entities.OrderItemOrderDetail, error)
 
-	UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error)
 	IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error)
 
 	GetPaymentByOrderId(orderId string) (*entities.Payment, error)
@@ -118,161 +116,6 @@ func ensureOrderIndexes(orderRepo *mongo.Collection, orderItemRepo *mongo.Collec
 		Keys:    bson.D{{Key: "branchId", Value: 1}, {Key: "productId", Value: 1}, {Key: "unitId", Value: 1}, {Key: "_id", Value: 1}},
 		Options: options.Index().SetPartialFilterExpression(bson.M{"oversoldQty": bson.M{"$gt": 0}}),
 	})
-}
-
-func (entity *orderEntity) CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error) {
-	logrus.Info("CreateOrder")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	if entity.client == nil {
-		return entity.createOrderWithContext(ctx, form)
-	}
-
-	session, err := entity.client.StartSession()
-	if err != nil {
-		return nil, nil, err
-	}
-	defer session.EndSession(ctx)
-
-	var created *entities.Order
-	var createdItems []entities.OrderItem
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		order, items, txErr := entity.createOrderWithContext(sessCtx, form)
-		if txErr != nil {
-			return nil, txErr
-		}
-		created = order
-		createdItems = items
-		return order, nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	return created, createdItems, nil
-}
-
-func (entity *orderEntity) createOrderWithContext(ctx context.Context, form request.Order) (*entities.Order, []entities.OrderItem, error) {
-	branchId, err := primitive.ObjectIDFromHex(form.BranchId)
-	if err != nil {
-		return nil, nil, err
-	}
-	var orderId = primitive.NewObjectID()
-	data := entities.Order{
-		Id:             orderId,
-		BranchId:       branchId,
-		Code:           form.Code,
-		CustomerCode:   form.CustomerCode,
-		CustomerName:   form.CustomerName,
-		PatientId:      form.PatientId,
-		PharmacistName: form.PharmacistName,
-		LicenseNo:      form.LicenseNo,
-		PrescriberName: form.PrescriberName,
-		BuyerName:      form.BuyerName,
-		BuyerIdCard:    form.BuyerIdCard,
-		Status:         constant.CONFIRMED,
-		Total:          form.Total,
-		TotalCost:      form.TotalCost,
-		Discount:       form.Discount,
-		Type:           form.Type,
-		CreatedBy:      form.CreatedBy,
-		CreatedDate:    time.Now(),
-		UpdatedBy:      form.CreatedBy,
-		UpdatedDate:    time.Now(),
-	}
-	_, err = entity.orderRepo.InsertOne(ctx, data)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	count := len(form.Items)
-	items := make([]entities.OrderItem, count)
-	orderItem := make([]interface{}, count)
-	for i := 0; i < count; i++ {
-		formItem := form.Items[i]
-		productId, err := primitive.ObjectIDFromHex(formItem.ProductId)
-		if err != nil {
-			return nil, nil, err
-		}
-		unitId, err := primitive.ObjectIDFromHex(formItem.UnitId)
-		if err != nil {
-			return nil, nil, err
-		}
-		countStock := len(formItem.Stocks)
-		stocks := make([]entities.OrderItemStock, countStock)
-		for j := 0; j < countStock; j++ {
-			formStock := formItem.Stocks[j]
-			stock := entities.OrderItemStock{
-				Quantity: formStock.Quantity,
-				StockId:  formStock.StockId,
-			}
-			stocks[j] = stock
-		}
-		item := entities.OrderItem{
-			Id:          primitive.NewObjectID(),
-			BranchId:    branchId,
-			OrderId:     orderId,
-			ProductId:   productId,
-			UnitId:      unitId,
-			Status:      constant.CONFIRMED,
-			Stocks:      stocks,
-			Quantity:    formItem.Quantity,
-			Price:       formItem.Price,
-			CostPrice:   formItem.CostPrice,
-			Discount:    formItem.Discount,
-			CreatedBy:   form.CreatedBy,
-			CreatedDate: time.Now(),
-			UpdatedBy:   form.CreatedBy,
-			UpdatedDate: time.Now(),
-		}
-		items[i] = item
-		orderItem[i] = item
-	}
-	_, err = entity.orderItemRepo.InsertMany(ctx, orderItem)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(form.Payments) > 0 {
-		payments := make([]interface{}, len(form.Payments))
-		for i, p := range form.Payments {
-			payments[i] = entities.Payment{
-				Id:          primitive.NewObjectID(),
-				BranchId:    branchId,
-				OrderId:     orderId,
-				Status:      constant.ACTIVE,
-				Amount:      p.Amount,
-				Total:       form.Total,
-				Change:      form.Change,
-				Type:        p.Type,
-				CreatedBy:   form.CreatedBy,
-				CreatedDate: time.Now(),
-				UpdatedBy:   form.CreatedBy,
-				UpdatedDate: time.Now(),
-			}
-		}
-		_, err = entity.paymentRepo.InsertMany(ctx, payments)
-	} else {
-		payment := entities.Payment{
-			Id:          primitive.NewObjectID(),
-			BranchId:    branchId,
-			OrderId:     orderId,
-			Status:      constant.ACTIVE,
-			Amount:      form.Amount,
-			Total:       form.Total,
-			Change:      form.Change,
-			Type:        form.Type,
-			CreatedBy:   form.CreatedBy,
-			CreatedDate: time.Now(),
-			UpdatedBy:   form.CreatedBy,
-			UpdatedDate: time.Now(),
-		}
-		_, err = entity.paymentRepo.InsertOne(ctx, payment)
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	return &data, items, nil
 }
 
 func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities.Order, error) {
@@ -780,28 +623,6 @@ func (entity *orderEntity) GetOrderItemByProductId(productId string, branchId st
 		return nil, err
 	}
 	return items, nil
-}
-
-func (entity *orderEntity) UpdateOrderItemAllocationById(orderItemId string, stocks []entities.OrderItemStock, oversoldQty int) (*entities.OrderItem, error) {
-	logrus.Info("UpdateOrderItemAllocationById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(orderItemId)
-	if err != nil {
-		return nil, err
-	}
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.OrderItem
-	err = entity.orderItemRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
-		"$set": bson.M{"stocks": stocks, "oversoldQty": oversoldQty, "updatedDate": time.Now()},
-	}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
 }
 
 func (entity *orderEntity) IncrementOrderItemReturnedQtyById(orderItemId string, quantity int) (*entities.OrderItem, error) {

@@ -18,7 +18,7 @@ func ApplyOrderAPI(
 	orderRoute.POST("",
 		middlewares.RequireSession(repository.Auth),
 		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		usecase.CreateOrder(repository.Order, repository.Product, repository.ProductStock, repository.Sequence),
+		usecase.CreateOrder(repository.Order),
 	)
 
 	orderRoute.GET("",
