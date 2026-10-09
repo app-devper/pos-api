@@ -23,7 +23,7 @@ type stockTransferEntity struct {
 type IStockTransfer interface {
 	CreateStockTransferWithReservation(form request.StockTransfer) (*entities.StockTransfer, error)
 	GetStockTransfers(branchId string) ([]entities.StockTransfer, error)
-	GetStockTransferById(id string) (*entities.StockTransfer, error)
+	GetStockTransferById(id string, branchId string) (*entities.StockTransfer, error)
 	ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error)
 	RejectStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error)
 }
@@ -95,7 +95,8 @@ func (entity *stockTransferEntity) GetStockTransfers(branchId string) ([]entitie
 	return results, nil
 }
 
-func (entity *stockTransferEntity) GetStockTransferById(id string) (*entities.StockTransfer, error) {
+// GetStockTransferById reads a Transfer that branchId sends or receives.
+func (entity *stockTransferEntity) GetStockTransferById(id string, branchId string) (*entities.StockTransfer, error) {
 	logrus.Info("GetStockTransferById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -103,8 +104,13 @@ func (entity *stockTransferEntity) GetStockTransferById(id string) (*entities.St
 	if err != nil {
 		return nil, err
 	}
+	branch, err := primitive.ObjectIDFromHex(branchId)
+	if err != nil {
+		return nil, err
+	}
 	data := entities.StockTransfer{}
-	err = entity.repo.FindOne(ctx, bson.M{"_id": objectId}).Decode(&data)
+	err = entity.repo.FindOne(ctx, bson.M{"_id": objectId, "$or": bson.A{
+		bson.M{"fromBranchId": branch}, bson.M{"toBranchId": branch}}}).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

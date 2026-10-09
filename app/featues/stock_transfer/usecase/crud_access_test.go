@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type transferAccessRepoStub struct {
@@ -23,8 +24,15 @@ type transferAccessRepoStub struct {
 	createFn  func(form request.StockTransfer) (*entities.StockTransfer, error)
 }
 
-func (s *transferAccessRepoStub) GetStockTransferById(id string) (*entities.StockTransfer, error) {
-	return s.getByIDFn(id)
+func (s *transferAccessRepoStub) GetStockTransferById(id string, branchId string) (*entities.StockTransfer, error) {
+	d, err := func() (*entities.StockTransfer, error) {
+		return s.getByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.FromBranchId.Hex() != branchId && d.ToBranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *transferAccessRepoStub) ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
@@ -53,11 +61,11 @@ func TestGetStockTransferByIdRejectsForeignBranch(t *testing.T) {
 
 	GetStockTransferById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), errcode.SY_FORBIDDEN_002) {
-		t.Fatalf("expected errcode %s in response body, got %s", errcode.SY_FORBIDDEN_002, w.Body.String())
+	if !strings.Contains(w.Body.String(), errcode.SY_NOT_FOUND_002) {
+		t.Fatalf("expected errcode %s in response body, got %s", errcode.SY_NOT_FOUND_002, w.Body.String())
 	}
 }
 
@@ -85,10 +93,10 @@ func TestApproveStockTransferRejectsForeignBranch(t *testing.T) {
 
 	ApproveStockTransfer(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), errcode.SY_FORBIDDEN_002) {
-		t.Fatalf("expected errcode %s in response body, got %s", errcode.SY_FORBIDDEN_002, w.Body.String())
+	if !strings.Contains(w.Body.String(), errcode.SY_NOT_FOUND_002) {
+		t.Fatalf("expected errcode %s in response body, got %s", errcode.SY_NOT_FOUND_002, w.Body.String())
 	}
 }

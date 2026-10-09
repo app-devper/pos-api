@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"errors"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
 	"pos/app/data/entities"
@@ -10,6 +9,8 @@ import (
 	"pos/app/domain/request"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 type recorderStub struct {

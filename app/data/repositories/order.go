@@ -30,14 +30,14 @@ type IOrder interface {
 	RecordSale(form request.Sale) (*RecordedSale, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
 	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
-	GetOrderById(id string) (*entities.Order, error)
+	GetOrderById(id string, branchId string) (*entities.Order, error)
 	GetOrderDetailById(id string) (*entities.OrderDetail, error)
 	UpdateCustomerCodeOrderById(id string, customerCode string) (*entities.Order, error)
 	RemoveOrderById(id string) (*entities.OrderDetail, error)
 	CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error)
 
 	GetOrderItemRange(form request.GetOrderRange) ([]entities.OrderItemProductDetail, error)
-	GetOrderItemById(id string) (*entities.OrderItem, error)
+	GetOrderItemById(id string, branchId string) (*entities.OrderItem, error)
 	UpdateOrderItemById(id string, form request.OrderItem) (*entities.OrderItem, error)
 	RemoveOrderItemById(id string) (*entities.OrderItemProductDetail, error)
 	CancelOrderItemById(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
@@ -232,16 +232,16 @@ func (entity *orderEntity) getPaymentsByOrderIDsWithContext(ctx context.Context,
 	return paymentMap, nil
 }
 
-func (entity *orderEntity) GetOrderById(id string) (*entities.Order, error) {
+func (entity *orderEntity) GetOrderById(id string, branchId string) (*entities.Order, error) {
 	logrus.Info("GetOrderById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
+	filter, err := inBranch(id, branchId)
 	if err != nil {
 		return nil, err
 	}
 	var data entities.Order
-	err = entity.orderRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.orderRepo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -402,16 +402,16 @@ func (entity *orderEntity) GetOrderItemRange(form request.GetOrderRange) ([]enti
 	return items, nil
 }
 
-func (entity *orderEntity) GetOrderItemById(id string) (*entities.OrderItem, error) {
+func (entity *orderEntity) GetOrderItemById(id string, branchId string) (*entities.OrderItem, error) {
 	logrus.Info("GetOrderItemById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
+	filter, err := inBranch(id, branchId)
 	if err != nil {
 		return nil, err
 	}
 	var data entities.OrderItem
-	err = entity.orderItemRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.orderItemRepo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

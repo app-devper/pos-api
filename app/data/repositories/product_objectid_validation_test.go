@@ -97,7 +97,7 @@ func TestCreateProductStockWithContextRejectsInvalidIDs(t *testing.T) {
 func TestGetProductStockByIdRejectsInvalidObjectID(t *testing.T) {
 	entity := &productStockEntity{}
 
-	if _, err := entity.GetProductStockById("invalid-id"); err == nil {
+	if _, err := entity.GetProductStockById("invalid-id", "507f1f77bcf86cd799439011"); err == nil {
 		t.Fatal("expected invalid object id error")
 	}
 }

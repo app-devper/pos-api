@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type receiveRepoStub struct {
@@ -21,8 +22,15 @@ type receiveRepoStub struct {
 	importReceiveToStockFn func(receiveId string, userId string, branchId string) (*entities.Receive, error)
 }
 
-func (s *receiveRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
-	return s.getReceiveByIDFn(id)
+func (s *receiveRepoStub) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
+	d, err := func() (*entities.Receive, error) {
+		return s.getReceiveByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *receiveRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {

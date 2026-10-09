@@ -18,13 +18,8 @@ func DeleteOrderItemById(orderEntity repositories.IOrder, _ repositories.IProduc
 		}
 		itemId := ctx.Param("itemId")
 		userId := ctx.GetString("UserId")
-		item, err := orderEntity.GetOrderItemById(itemId)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureOrderItemBranchAccess(item, ctx.GetString("BranchId")); err != nil {
-			abortOrderBranchMismatch(ctx)
+		if _, err := orderEntity.GetOrderItemById(itemId, ctx.GetString("BranchId")); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 		result, err := orderEntity.CancelOrderItemById(itemId, userId, ctx.GetString("BranchId"), req.Reason)

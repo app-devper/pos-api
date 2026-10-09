@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type updateReceiveRepoStub struct {
@@ -23,8 +24,15 @@ type updateReceiveRepoStub struct {
 	updateByIDFn     func(id string, form request.UpdateReceive) (*entities.Receive, error)
 }
 
-func (s *updateReceiveRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
-	return s.getReceiveByIDFn(id)
+func (s *updateReceiveRepoStub) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
+	d, err := func() (*entities.Receive, error) {
+		return s.getReceiveByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *updateReceiveRepoStub) UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error) {
@@ -209,11 +217,11 @@ func TestUpdateReceiveByIdRejectsForeignBranch(t *testing.T) {
 
 	UpdateReceiveById(receiveRepo, productRepo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), errcode.SY_FORBIDDEN_002) {
-		t.Fatalf("expected errcode %s, got %s", errcode.SY_FORBIDDEN_002, w.Body.String())
+	if !strings.Contains(w.Body.String(), errcode.SY_NOT_FOUND_002) {
+		t.Fatalf("expected errcode %s, got %s", errcode.SY_NOT_FOUND_002, w.Body.String())
 	}
 }
 

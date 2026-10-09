@@ -28,7 +28,7 @@ type receiveEntity struct {
 type IReceive interface {
 	GetReceives(form request.GetReceiveRange) ([]entities.Receive, error)
 	CreateReceive(form request.Receive) (*entities.Receive, error)
-	GetReceiveById(id string) (*entities.Receive, error)
+	GetReceiveById(id string, branchId string) (*entities.Receive, error)
 	RemoveReceiveById(id string) (*entities.Receive, error)
 	UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error)
 	UpdateReceiveTotalCostById(id string, totalCost float64) (*entities.Receive, error)
@@ -179,16 +179,16 @@ func (entity *receiveEntity) CreateReceive(form request.Receive) (*entities.Rece
 	return &data, nil
 }
 
-func (entity *receiveEntity) GetReceiveById(id string) (*entities.Receive, error) {
+func (entity *receiveEntity) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
 	logrus.Info("GetReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
+	filter, err := inBranch(id, branchId)
 	if err != nil {
 		return nil, err
 	}
 	data := entities.Receive{}
-	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.receiveRepo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}

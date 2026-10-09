@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type receiveAccessRepoStub struct {
@@ -32,8 +33,15 @@ type receiveAccessProductStub struct {
 	getProductByIDFn func(id string) (*entities.Product, error)
 }
 
-func (s *receiveAccessRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
-	return s.getReceiveByIDFn(id)
+func (s *receiveAccessRepoStub) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
+	d, err := func() (*entities.Receive, error) {
+		return s.getReceiveByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *receiveAccessRepoStub) GetReceiveItemsByReceiveId(receiveId string) ([]entities.ReceiveItem, error) {
@@ -81,11 +89,11 @@ func TestGetReceiveByIdRejectsForeignBranch(t *testing.T) {
 
 	GetReceiveById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), errcode.SY_FORBIDDEN_002) {
-		t.Fatalf("expected errcode %s, got %s", errcode.SY_FORBIDDEN_002, w.Body.String())
+	if !strings.Contains(w.Body.String(), errcode.SY_NOT_FOUND_002) {
+		t.Fatalf("expected errcode %s, got %s", errcode.SY_NOT_FOUND_002, w.Body.String())
 	}
 }
 
@@ -111,8 +119,8 @@ func TestDeleteReceiveByIdRejectsForeignBranch(t *testing.T) {
 
 	DeleteReceiveById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -139,8 +147,8 @@ func TestImportReceiveToStockRejectsForeignBranch(t *testing.T) {
 
 	ImportReceiveToStock(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -168,8 +176,8 @@ func TestUpdateReceiveItemsByIdRejectsForeignBranch(t *testing.T) {
 
 	UpdateReceiveItemsById(repo, nil)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -196,8 +204,8 @@ func TestUpdateReceiveTotalCostByIdRejectsForeignBranch(t *testing.T) {
 
 	UpdateReceiveTotalCostById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 

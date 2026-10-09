@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type productStockRepoStub struct {
@@ -37,8 +38,15 @@ func (s *productStockRepoStub) CreateProductStock(param request.ProductStock) (*
 	return s.createStockFn(param)
 }
 
-func (s *productStockRepoStub) GetProductStockById(id string) (*entities.ProductStock, error) {
-	return s.getStockByIDFn(id)
+func (s *productStockRepoStub) GetProductStockById(id string, branchId string) (*entities.ProductStock, error) {
+	d, err := func() (*entities.ProductStock, error) {
+		return s.getStockByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *productStockProductStub) GetProductUnitById(id string) (*entities.ProductUnit, error) {
@@ -135,8 +143,8 @@ func TestUpdateProductStockByIdRejectsForeignBranch(t *testing.T) {
 
 	UpdateProductStockById(stockRepo, productRepo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -164,8 +172,8 @@ func TestUpdateProductStockQuantityByIdRejectsForeignBranch(t *testing.T) {
 
 	UpdateProductStockQuantityById(stockRepo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -239,8 +247,8 @@ func TestRemoveProductStockByIdRejectsForeignBranch(t *testing.T) {
 
 	RemoveProductStockById(stockRepo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 

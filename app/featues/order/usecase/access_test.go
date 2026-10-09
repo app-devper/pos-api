@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type orderAccessRepoStub struct {
@@ -29,16 +30,30 @@ type orderAccessRepoStub struct {
 	cancelByOrderProductFn   func(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
 }
 
-func (s *orderAccessRepoStub) GetOrderById(id string) (*entities.Order, error) {
-	return s.getOrderByIDFn(id)
+func (s *orderAccessRepoStub) GetOrderById(id string, branchId string) (*entities.Order, error) {
+	d, err := func() (*entities.Order, error) {
+		return s.getOrderByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *orderAccessRepoStub) GetOrderDetailById(id string) (*entities.OrderDetail, error) {
 	return s.getOrderDetailByIDFn(id)
 }
 
-func (s *orderAccessRepoStub) GetOrderItemById(id string) (*entities.OrderItem, error) {
-	return s.getOrderItemByIDFn(id)
+func (s *orderAccessRepoStub) GetOrderItemById(id string, branchId string) (*entities.OrderItem, error) {
+	d, err := func() (*entities.OrderItem, error) {
+		return s.getOrderItemByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *orderAccessRepoStub) GetOrderItemDetailById(id string) (*entities.OrderItemProductDetail, error) {
@@ -91,11 +106,11 @@ func TestGetOrderByIdRejectsForeignBranch(t *testing.T) {
 
 	GetOrderById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), errcode.SY_FORBIDDEN_002) {
-		t.Fatalf("expected errcode %s, got %s", errcode.SY_FORBIDDEN_002, w.Body.String())
+	if !strings.Contains(w.Body.String(), errcode.SY_NOT_FOUND_002) {
+		t.Fatalf("expected errcode %s, got %s", errcode.SY_NOT_FOUND_002, w.Body.String())
 	}
 }
 
@@ -121,8 +136,8 @@ func TestGetOrderItemByIdRejectsForeignBranch(t *testing.T) {
 
 	GetOrderItemById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -149,8 +164,8 @@ func TestUpdateCustomerCodeOrderByIdRejectsForeignBranch(t *testing.T) {
 
 	UpdateCustomerCodeOrderById(repo)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -177,8 +192,8 @@ func TestDeleteOrderByIdRejectsForeignBranch(t *testing.T) {
 
 	DeleteOrderById(repo, nil)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -205,8 +220,8 @@ func TestDeleteOrderItemByIdRejectsForeignBranch(t *testing.T) {
 
 	DeleteOrderItemById(repo, nil)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 
@@ -236,8 +251,8 @@ func TestDeleteOrderItemByOrderProductIdRejectsForeignBranch(t *testing.T) {
 
 	DeleteOrderItemByOrderProductId(repo, nil)(ctx)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
 

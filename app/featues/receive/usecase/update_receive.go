@@ -25,13 +25,8 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 		branchId := utils.GetBranchId(ctx)
 		req.UpdatedBy = userId
 
-		receive, err := receiveEntity.GetReceiveById(id)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureReceiveBranchAccess(receive, branchId); err != nil {
-			abortReceiveBranchMismatch(ctx)
+		if _, err := receiveEntity.GetReceiveById(id, branchId); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		items, err := receiveItems(productEntity, req.ReceiveItems)
@@ -58,13 +53,8 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive, productEntity r
 			return
 		}
 		receiveId := ctx.Param("receiveId")
-		receive, err := receiveEntity.GetReceiveById(receiveId)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureReceiveBranchAccess(receive, utils.GetBranchId(ctx)); err != nil {
-			abortReceiveBranchMismatch(ctx)
+		if _, err := receiveEntity.GetReceiveById(receiveId, utils.GetBranchId(ctx)); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		req.UpdatedBy = utils.GetUserId(ctx)
@@ -93,13 +83,8 @@ func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.Handler
 			return
 		}
 		id := ctx.Param("receiveId")
-		receive, err := receiveEntity.GetReceiveById(id)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureReceiveBranchAccess(receive, utils.GetBranchId(ctx)); err != nil {
-			abortReceiveBranchMismatch(ctx)
+		if _, err := receiveEntity.GetReceiveById(id, utils.GetBranchId(ctx)); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCost)
