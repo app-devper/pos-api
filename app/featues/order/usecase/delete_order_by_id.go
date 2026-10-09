@@ -24,7 +24,7 @@ func DeleteOrderById(orderEntity repositories.IOrder, _ repositories.IProduct) g
 		}
 		result, err := orderEntity.CancelOrderById(orderId, userId, ctx.GetString("BranchId"), req.Reason)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 

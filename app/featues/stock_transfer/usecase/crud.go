@@ -63,7 +63,7 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 
 		result, err := entity.ApproveStockTransfer(id, req.UpdatedBy)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 
@@ -92,7 +92,7 @@ func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 
 		result, err := entity.RejectStockTransfer(id, req.UpdatedBy)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 

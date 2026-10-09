@@ -21,7 +21,7 @@ func CreateStockAdjustment(records repositories.IStockAdjustment) gin.HandlerFun
 		req.CreatedBy = utils.GetUserId(ctx)
 		result, err := records.ApplyStockAdjustment(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.AJ_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.AJ_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -34,7 +34,7 @@ func GetStockAdjustmentsByProductId(stockAdjustmentEntity repositories.IStockAdj
 		branchId := utils.GetBranchId(ctx)
 		result, err := stockAdjustmentEntity.GetStockAdjustmentsByProductId(productId, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.AJ_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.AJ_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

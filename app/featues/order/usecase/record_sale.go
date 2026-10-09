@@ -32,7 +32,7 @@ func recordSale(ctx *gin.Context, orderEntity repositories.IOrder) {
 	case errors.As(err, &rejected):
 		errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, err.Error())
 	case err != nil:
-		errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+		errcode.AbortLedger(ctx, err, errcode.OR_BAD_REQUEST_002)
 	default:
 		ctx.JSON(http.StatusOK, gin.H{"data": recorded.Order, "stocks": recorded.Stocks})
 	}

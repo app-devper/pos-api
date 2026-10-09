@@ -25,7 +25,7 @@ func CreateProductStock(productStock repositories.IProductStock) gin.HandlerFunc
 		// The Stock ledger writes its history and settles waiting Lines.
 		stock, err := productStock.CreateProductStock(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, stock)
@@ -99,7 +99,7 @@ func UpdateProductStockQuantityById(productStock repositories.IProductStock) gin
 		// A one-Line Count in the Stock ledger: Adjustment, history, settlement.
 		stock, err = productStock.UpdateProductStockQuantityById(id, branchId, req.Quantity, ctx.GetString("UserId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, stock)
@@ -118,7 +118,7 @@ func RemoveProductStockById(productStock repositories.IProductStock) gin.Handler
 
 		result, err := productStock.RemoveProductStockById(id, branchId, userId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
