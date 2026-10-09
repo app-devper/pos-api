@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"math"
 
 	"pos/app/data/entities"
 	"pos/app/data/ledger"
@@ -34,5 +33,3 @@ func (entity *orderEntity) RecordSale(form request.Sale) (*RecordedSale, error) 
 	}
 	return &RecordedSale{Order: sold.Order, Stocks: sold.Stocks}, nil
 }
-
-func roundMoney(v float64) float64 { return math.Round(v*100) / 100 }

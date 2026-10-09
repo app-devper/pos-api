@@ -54,7 +54,6 @@ func RepairCancelledLineTotals(ctx context.Context, pos *mongo.Database, apply b
 		if err != nil {
 			return nil, err
 		}
-		totals = orderTotals{total: roundMoney(totals.total), totalCost: roundMoney(totals.totalCost), discount: roundMoney(totals.discount)}
 		if same(order.Total, totals.total) && same(order.TotalCost, totals.totalCost) && same(order.Discount, totals.discount) {
 			continue
 		}

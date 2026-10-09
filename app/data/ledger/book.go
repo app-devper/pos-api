@@ -149,7 +149,7 @@ func (b *book) settle(st *entities.ProductStock, incoming int, r *row) error {
 		return nil
 	}
 	filter := bson.M{"branchId": st.BranchId, "productId": st.ProductId, "unitId": st.UnitId,
-		"oversoldQty": bson.M{"$gt": 0}, "$or": confirmedLineStatuses()}
+		"oversoldQty": bson.M{"$gt": 0}, "$or": StandingLines()}
 	if len(b.notOwed) > 0 {
 		filter["_id"] = bson.M{"$nin": b.notOwed}
 	}
@@ -266,7 +266,10 @@ func (b *book) nextSequence(product, unit, branch primitive.ObjectID) (int, erro
 
 // confirmedLineStatuses matches a Line that still stands: no status (older
 // Lines) or one of constant.ConfirmedOrderStatuses.
-func confirmedLineStatuses() []bson.M {
+// StandingLines matches a Line that still stands: no status (older Lines)
+// or one of constant.ConfirmedOrderStatuses. Settlement, cancel and every
+// recompute of an Order count only these.
+func StandingLines() []bson.M {
 	clauses := []bson.M{{"status": bson.M{"$exists": false}}, {"status": ""}}
 	for _, status := range constant.ConfirmedOrderStatuses() {
 		clauses = append(clauses, bson.M{"status": status})

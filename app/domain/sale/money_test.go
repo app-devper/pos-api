@@ -2,8 +2,10 @@ package sale
 
 import (
 	"encoding/json"
+
 	"flag"
 	"os"
+	"pos/app/data/entities"
 	"testing"
 )
 
@@ -89,5 +91,20 @@ func TestMoneyCases(t *testing.T) {
 		if err := os.WriteFile(moneyCasesPath, append(out, '\n'), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestOrderMoneyIsWhatAnOrdersStandingLinesCharge(t *testing.T) {
+	lines := []entities.OrderItem{
+		{Quantity: 3, Price: 30, CostPrice: 12, Discount: 0.333},
+		{Quantity: 1, Price: 4.45, CostPrice: 2},
+		{Quantity: 1, Price: 4.45, CostPrice: 2},
+	}
+
+	total, cost, discount := OrderMoney(lines)
+
+	// 30 - 0.999 rounds to 29, then 4.45 twice.
+	if total != 37.9 || cost != 16 || discount != 1 {
+		t.Fatalf("got total %v cost %v discount %v", total, cost, discount)
 	}
 }

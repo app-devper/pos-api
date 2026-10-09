@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetABCAnalysis(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetABCAnalysis(orderEntity repositories.IOrderAnalytics) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		branchId := ctx.GetString("BranchId")
 		result, err := orderEntity.GetABCAnalysis(branchId)
