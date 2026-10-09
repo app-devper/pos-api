@@ -1,9 +1,10 @@
 package domain
 
 import (
-	"github.com/app-devper/um-api/sessionclient/ginauth"
 	"pos/app/data/repositories"
 	"pos/db"
+
+	"github.com/app-devper/um-api/sessionclient/ginauth"
 )
 
 type Repository struct {
@@ -12,6 +13,7 @@ type Repository struct {
 	Sequence        repositories.ISequence
 	Category        repositories.ICategory
 	Order           repositories.IOrder
+	OrderAnalytics  repositories.IOrderAnalytics
 	Product         repositories.IProduct
 	ProductStock    repositories.IProductStock
 	Customer        repositories.ICustomer
@@ -33,6 +35,7 @@ func InitRepository(resource *db.Resource) *Repository {
 	return &Repository{
 		Category:        repositories.NewCategoryEntity(resource),
 		Order:           repositories.NewOrderEntity(resource),
+		OrderAnalytics:  repositories.NewOrderAnalyticsEntity(resource),
 		Sequence:        repositories.NewSequenceEntity(resource),
 		Customer:        repositories.NewCustomerEntity(resource),
 		Product:         repositories.NewProductEntity(resource),

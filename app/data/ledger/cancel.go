@@ -34,7 +34,7 @@ func (l *Ledger) CancelOrder(ctx context.Context, orderID, branchID, by, reason 
 			return nil, reject("บิลนี้ถูกยกเลิกไปแล้ว")
 		}
 		var lines []entities.OrderItem
-		if err := find(b, "order_items", bson.M{"orderId": id, "$or": confirmedLineStatuses()}, &lines); err != nil {
+		if err := find(b, "order_items", bson.M{"orderId": id, "$or": StandingLines()}, &lines); err != nil {
 			return nil, err
 		}
 		cancelled := cancelledBy(by, reason)
@@ -75,7 +75,7 @@ func (l *Ledger) CancelLine(ctx context.Context, lineID, branchID, by, reason st
 		if !constant.IsConfirmedOrderItemStatus(line.Status) {
 			return nil, reject("รายการนี้ถูกยกเลิกไปแล้ว")
 		}
-		res, err := b.col("order_items").UpdateOne(b.ctx, bson.M{"_id": id, "$or": confirmedLineStatuses()}, cancelledBy(by, reason))
+		res, err := b.col("order_items").UpdateOne(b.ctx, bson.M{"_id": id, "$or": StandingLines()}, cancelledBy(by, reason))
 		if err != nil {
 			return nil, err
 		}
@@ -130,15 +130,10 @@ func (b *book) putBack(line *entities.OrderItem, by string) error {
 // way a Sale sums them.
 func (b *book) recomputeOrder(order primitive.ObjectID) error {
 	var lines []entities.OrderItem
-	if err := find(b, "order_items", bson.M{"orderId": order, "$or": confirmedLineStatuses()}, &lines); err != nil {
+	if err := find(b, "order_items", bson.M{"orderId": order, "$or": StandingLines()}, &lines); err != nil {
 		return err
 	}
-	var money sale.Totals
-	for _, line := range lines {
-		qty := float64(line.Quantity)
-		money.Add(sale.Round(line.Price-line.Discount*qty), line.CostPrice, line.Discount*qty)
-	}
-	total, cost, discount := money.Rounded()
+	total, cost, discount := sale.OrderMoney(lines)
 	_, err := b.col("orders").UpdateOne(b.ctx, bson.M{"_id": order}, bson.M{"$set": bson.M{
 		"total": total, "totalCost": cost, "discount": discount, "updatedDate": time.Now(),
 	}})

@@ -43,7 +43,7 @@ func (l *Ledger) findCrossUnitDraws(ctx context.Context) ([]CrossUnitDraw, error
 	cursor, err := l.db.Collection("order_items").Aggregate(ctx, mongo.Pipeline{
 		// A cancelled Line already gave its draws back; a Line without a Unit
 		// cannot be judged.
-		{{Key: "$match", Value: bson.M{"stocks.0": bson.M{"$exists": true}, "$or": confirmedLineStatuses(),
+		{{Key: "$match", Value: bson.M{"stocks.0": bson.M{"$exists": true}, "$or": StandingLines(),
 			"unitId": bson.M{"$exists": true, "$ne": primitive.NilObjectID}}}},
 		{{Key: "$unwind", Value: "$stocks"}},
 		{{Key: "$match", Value: bson.M{"stocks.stockid": bson.M{"$regex": "^[0-9a-f]{24}$"}}}},
@@ -73,7 +73,7 @@ func (l *Ledger) findCrossUnitDraws(ctx context.Context) ([]CrossUnitDraw, error
 
 func (b *book) undoDraw(d CrossUnitDraw, by string) error {
 	var line entities.OrderItem
-	err := b.col("order_items").FindOne(b.ctx, bson.M{"_id": d.Line, "$or": confirmedLineStatuses()}).Decode(&line)
+	err := b.col("order_items").FindOne(b.ctx, bson.M{"_id": d.Line, "$or": StandingLines()}).Decode(&line)
 	if err == mongo.ErrNoDocuments {
 		return nil // cancelled since the scan: its draws are already back
 	}

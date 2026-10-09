@@ -19,8 +19,8 @@ import (
 // every Go file under app/ outside this package and fails on any such write.
 // A function may be listed below only with the reason it is still allowed.
 var allowedOutsideTheLedger = map[string]string{
-	"data/repositories/product_stock.go:createProductStockWithContext":  "opening Stock of a Product created in the same transaction: no Line can owe a Product that did not exist",
-	"data/repositories/product.go:ClearQuantitySoldFirstById":           "clearing Sold first by hand (ADR-0003)",
+	"data/repositories/product_stock.go:createProductStockWithContext": "opening Stock of a Product created in the same transaction: no Line can owe a Product that did not exist",
+	"data/repositories/product.go:ClearQuantitySoldFirstById":          "clearing Sold first by hand (ADR-0003)",
 }
 
 // setsQuantity finds an update document built before the call, e.g. a
