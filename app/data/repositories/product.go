@@ -6,6 +6,7 @@ import (
 	"pos/app/core/utils"
 	"pos/app/data/catalogue"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/domain/constant"
 	"pos/app/domain/request"
 	"pos/db"
@@ -1422,7 +1423,7 @@ func (entity *productEntity) unitInUse(ctx context.Context, unit entities.Produc
 		return main, false, err
 	}
 	owed, err := entity.orderItemsRepo.CountDocuments(ctx, bson.M{"unitId": unit.Id, "oversoldQty": bson.M{"$gt": 0},
-		"$or": confirmedOrderItemStatusMatchClauses()})
+		"$or": ledger.StandingLines()})
 	if err != nil {
 		return main, false, err
 	}

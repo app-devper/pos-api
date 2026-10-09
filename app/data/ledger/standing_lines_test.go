@@ -1,4 +1,4 @@
-package repositories
+package ledger
 
 import (
 	"testing"
@@ -8,8 +8,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestConfirmedOrderItemStatusMatchClausesIncludeLegacyAndConfirmedStatuses(t *testing.T) {
-	clauses := confirmedOrderItemStatusMatchClauses()
+func TestStandingLinesIncludeLegacyAndConfirmedStatuses(t *testing.T) {
+	clauses := StandingLines()
 	if len(clauses) != 4 {
 		t.Fatalf("expected 4 clauses, got %d", len(clauses))
 	}

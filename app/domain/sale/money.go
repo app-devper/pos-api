@@ -1,6 +1,9 @@
 package sale
 
-import "math"
+import (
+	"math"
+	"pos/app/data/entities"
+)
 
 // Money on a Sale. pos-api owns it; the till previews with the same rules
 // (devper-workspace: packages/applications/pos/lib/domain/model/sale/money.dart).
@@ -54,4 +57,18 @@ func Tender(tendered, total float64) (change float64, covers bool) {
 		return 0, false
 	}
 	return Round(offered - total), true
+}
+
+// OrderMoney is an Order's total, total cost and discount from its standing
+// Lines, the way a Sale summed them: a Line's price is its amount before
+// discount and its discount is per unit, so each pays Round(price −
+// discount × quantity). A cancel and the repair command recompute an Order
+// with it.
+func OrderMoney(lines []entities.OrderItem) (total, cost, discount float64) {
+	var totals Totals
+	for _, line := range lines {
+		qty := float64(line.Quantity)
+		totals.Add(Round(line.Price-line.Discount*qty), line.CostPrice, line.Discount*qty)
+	}
+	return totals.Rounded()
 }

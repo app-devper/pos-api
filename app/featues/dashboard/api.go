@@ -17,11 +17,11 @@ func ApplyDashboardAPI(
 	staff := policies.Staff.On(dashboardRoute)
 
 	staff.GET("/summary",
-		usecase.GetSummary(repository.Order),
+		usecase.GetSummary(repository.OrderAnalytics),
 	)
 
 	staff.GET("/daily-chart",
-		usecase.GetDailyChart(repository.Order),
+		usecase.GetDailyChart(repository.OrderAnalytics),
 	)
 
 	staff.GET("/low-stock",
@@ -33,7 +33,7 @@ func ApplyDashboardAPI(
 	)
 
 	staff.GET("/monthly-chart",
-		usecase.GetMonthlyChart(repository.Order),
+		usecase.GetMonthlyChart(repository.OrderAnalytics),
 	)
 
 	staff.GET("/expiring",
@@ -45,7 +45,7 @@ func ApplyDashboardAPI(
 	)
 
 	staff.GET("/abc-analysis",
-		usecase.GetABCAnalysis(repository.Order),
+		usecase.GetABCAnalysis(repository.OrderAnalytics),
 	)
 
 	staff.GET("/dead-stock",
