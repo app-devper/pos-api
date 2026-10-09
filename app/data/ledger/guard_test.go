@@ -20,14 +20,7 @@ import (
 // A function may be listed below only with the reason it is still allowed.
 var allowedOutsideTheLedger = map[string]string{
 	"data/repositories/product_stock.go:createProductStockWithContext":  "opening Stock of a Product created in the same transaction: no Line can owe a Product that did not exist",
-	"data/repositories/product_stock.go:AddProductStockQuantityById":    "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
-	"data/repositories/product_stock.go:RemoveProductStockQuantityById": "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
-	"data/repositories/product_stock.go:DrainProductStockQuantityById":  "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
-	"data/repositories/product.go:RemoveQuantitySoldFirstById":          "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
-	"data/repositories/product.go:AddQuantitySoldFirstById":             "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
 	"data/repositories/product.go:ClearQuantitySoldFirstById":           "clearing Sold first by hand (ADR-0003)",
-	"data/repositories/order.go:createOrderWithContext":                 "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
-	"data/repositories/order.go:UpdateOrderItemAllocationById":          "legacy till-priced CreateOrder (no saleId); deleted with it once no till sends one",
 }
 
 // setsQuantity finds an update document built before the call, e.g. a

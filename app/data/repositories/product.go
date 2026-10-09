@@ -42,8 +42,6 @@ type IProduct interface {
 	CreateProductReceive(param request.Product) (*entities.Product, error)
 	RemoveProductById(id string) (*entities.Product, error)
 	UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error)
-	RemoveQuantitySoldFirstById(id string, quantity int) (*entities.Product, error)
-	AddQuantitySoldFirstById(id string, quantity int) (*entities.Product, error)
 	ClearQuantitySoldFirstById(id string) (*entities.Product, error)
 
 	// ProductLot
@@ -669,54 +667,6 @@ func (entity *productEntity) GetTotalCostPrice(id string, quantity int) float64 
 		return 0
 	}
 	return data.CostPrice * float64(quantity)
-}
-
-func (entity *productEntity) RemoveQuantitySoldFirstById(id string, quantity int) (*entities.Product, error) {
-	logrus.Info("RemoveQuantitySoldFirstById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Product
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
-		"$inc": bson.M{"soldFirst": -quantity},
-		"$set": bson.M{"updatedDate": time.Now()},
-	}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
-func (entity *productEntity) AddQuantitySoldFirstById(id string, quantity int) (*entities.Product, error) {
-	logrus.Info("AddQuantitySoldFirstById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Product
-	err = entity.productsRepo.FindOneAndUpdate(ctx, bson.M{"_id": objId}, bson.M{
-		"$inc": bson.M{"soldFirst": quantity},
-		"$set": bson.M{"updatedDate": time.Now()},
-	}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
 }
 
 func (entity *productEntity) ClearQuantitySoldFirstById(id string) (*entities.Product, error) {

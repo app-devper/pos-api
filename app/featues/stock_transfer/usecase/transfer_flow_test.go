@@ -58,14 +58,6 @@ type transferProductStub struct {
 	removeStockByID func(id string) (*entities.ProductStock, error)
 }
 
-func (s *transferProductStub) RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return s.removeStockFn(stockId, quantity)
-}
-
-func (s *transferProductStub) AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return s.addStockFn(stockId, quantity)
-}
-
 func (s *transferProductStub) GetProductStockById(id string) (*entities.ProductStock, error) {
 	return s.getStockByIDFn(id)
 }

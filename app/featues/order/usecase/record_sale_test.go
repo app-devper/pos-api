@@ -28,10 +28,6 @@ func (s *saleRepoStub) RecordSale(form request.Sale) (*repositories.RecordedSale
 	return s.record(form)
 }
 
-func (s *saleRepoStub) CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error) {
-	return nil, nil, errors.New("old path taken")
-}
-
 type countingSequence struct {
 	repositories.ISequence
 	calls int
@@ -53,7 +49,7 @@ func postSale(t *testing.T, repo repositories.IOrder, seq repositories.ISequence
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
-	CreateOrder(repo, &productStub{}, &productStockStub{}, seq)(ctx)
+	CreateOrder(repo)(ctx)
 	return w
 }
 
@@ -124,13 +120,15 @@ func TestCreateOrderSaleRejectsInvalidBody(t *testing.T) {
 	}
 }
 
-func TestCreateOrderWithoutSaleIdTakesTheOldPath(t *testing.T) {
+func TestCreateOrderWithoutSaleIdIsRefused(t *testing.T) {
+	// A till that prices the Sale itself (no saleId) is out of date: pos-api
+	// prices every Sale and draws its Stock through the ledger (ADR-0001).
 	repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
-		t.Fatal("new path taken")
+		t.Fatal("a Sale without saleId must not be recorded")
 		return nil, nil
 	}}
 	w := postSale(t, repo, &countingSequence{}, `{"items":[],"amount":20,"type":"cash","total":20}`)
-	if !strings.Contains(w.Body.String(), "old path taken") {
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "saleId") {
 		t.Fatalf("status %d %s", w.Code, w.Body.String())
 	}
 }
