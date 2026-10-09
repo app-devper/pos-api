@@ -1,50 +1,43 @@
 package catagory
 
 import (
-	"github.com/app-devper/um-api/sessionclient"
-	"github.com/gin-gonic/gin"
 	"pos/app/domain"
 	"pos/app/featues/catagory/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplyCategoryAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	productRoute := route.Group("categories")
+	shopAdmin := policies.ShopAdmin.On(productRoute)
+	signedIn := policies.SignedIn.On(productRoute)
 
-	productRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("",
 		usecase.GetCategories(repository.Category),
 	)
 
-	productRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.POST("",
 		usecase.CreateCategory(repository.Category),
 	)
 
-	productRoute.GET("/:categoryId",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("/:categoryId",
 		usecase.GetCategoryById(repository.Category),
 	)
 
-	productRoute.PUT("/:categoryId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PUT("/:categoryId",
 		usecase.UpdateCategoryById(repository.Category),
 	)
 
-	productRoute.DELETE("/:categoryId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.DELETE("/:categoryId",
 		usecase.DeleteCategoryById(repository.Category),
 	)
 
-	productRoute.PATCH("/:categoryId/default",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PATCH("/:categoryId/default",
 		usecase.UpdateDefaultCategoryById(repository.Category),
 	)
 }

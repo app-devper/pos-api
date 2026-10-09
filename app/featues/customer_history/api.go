@@ -1,27 +1,26 @@
 package customer_history
 
 import (
-	"github.com/gin-gonic/gin"
 	"pos/app/domain"
 	"pos/app/featues/customer_history/usecase"
 	"pos/middlewares"
+
+	"github.com/gin-gonic/gin"
 )
 
 func ApplyCustomerHistoryAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	chRoute := route.Group("customer-histories")
+	staff := policies.Staff.On(chRoute)
 
-	chRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.POST("",
 		usecase.CreateCustomerHistory(repository.CustomerHistory),
 	)
 
-	chRoute.GET("/:customerCode",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/:customerCode",
 		usecase.GetCustomerHistories(repository.CustomerHistory),
 	)
 }

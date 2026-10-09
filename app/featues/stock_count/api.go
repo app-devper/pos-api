@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/stock_count/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,26 +12,19 @@ func ApplyStockCountAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	scRoute := route.Group("stock-counts")
+	branchAdmin := policies.BranchAdmin.On(scRoute)
 
-	scRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.POST("",
 		usecase.CreateStockCount(repository.StockCount),
 	)
 
-	scRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.GET("",
 		usecase.GetStockCounts(repository.StockCount),
 	)
 
-	scRoute.GET("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.GET("/:id",
 		usecase.GetStockCountById(repository.StockCount),
 	)
 }

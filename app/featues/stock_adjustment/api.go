@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/stock_adjustment/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,19 +12,15 @@ func ApplyStockAdjustmentAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	ajRoute := route.Group("stock-adjustments")
+	branchAdmin := policies.BranchAdmin.On(ajRoute)
 
-	ajRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.POST("",
 		usecase.CreateStockAdjustment(repository.StockAdjustment),
 	)
 
-	ajRoute.GET("/product/:productId",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.GET("/product/:productId",
 		usecase.GetStockAdjustmentsByProductId(repository.StockAdjustment),
 	)
 }
