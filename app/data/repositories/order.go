@@ -28,7 +28,6 @@ type orderEntity struct {
 }
 
 type IOrder interface {
-	RecordSale(form request.Sale) (*RecordedSale, error)
 	GetOrderRange(form request.GetOrderRange) ([]entities.Order, error)
 	GetOrdersByCustomerCode(customerCode string, branchId string) ([]entities.Order, error)
 	GetOrderById(id string, branchId string) (*entities.Order, error)

@@ -3,7 +3,6 @@ package usecase
 import (
 	"net/http"
 	"pos/app/core/errcode"
-	"pos/app/data/repositories"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -12,7 +11,7 @@ import (
 // CreateOrder records a Sale. Every till sends its Sale with a saleId and
 // pos-api prices it and draws its Stock (ADR-0001). A request without one
 // comes from a till that priced the Sale itself, and is refused.
-func CreateOrder(orderEntity repositories.IOrder) gin.HandlerFunc {
+func CreateOrder(sales seller) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var probe struct {
 			SaleId string `json:"saleId"`
@@ -26,6 +25,6 @@ func CreateOrder(orderEntity repositories.IOrder) gin.HandlerFunc {
 				"saleId is required: this till is out of date, reload it")
 			return
 		}
-		recordSale(ctx, orderEntity)
+		recordSale(ctx, sales)
 	}
 }

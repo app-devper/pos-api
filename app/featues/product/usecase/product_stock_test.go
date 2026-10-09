@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +35,7 @@ type productStockProductStub struct {
 	getUnitByIDFn func(id string) (*entities.ProductUnit, error)
 }
 
-func (s *productStockRepoStub) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
+func (s *productStockRepoStub) CreateStock(_ context.Context, param request.ProductStock) (*entities.ProductStock, error) {
 	return s.createStockFn(param)
 }
 
@@ -65,11 +66,11 @@ func (s *productStockRepoStub) UpdateProductStockById(id string, param request.U
 	return s.updateStockFn(id, param)
 }
 
-func (s *productStockRepoStub) UpdateProductStockQuantityById(id string, branchId string, quantity int, by string) (*entities.ProductStock, error) {
+func (s *productStockRepoStub) SetQuantity(_ context.Context, id string, branchId string, quantity int, by string) (*entities.ProductStock, error) {
 	return s.updateQtyFn(id, branchId, quantity, by)
 }
 
-func (s *productStockRepoStub) RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error) {
+func (s *productStockRepoStub) DeleteStock(_ context.Context, id string, branchId string, by string) (*entities.ProductStock, error) {
 	return s.removeStockFn(id, branchId, by)
 }
 
@@ -170,7 +171,7 @@ func TestUpdateProductStockQuantityByIdRejectsForeignBranch(t *testing.T) {
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 	ctx.Set("UserId", "user-1")
 
-	UpdateProductStockQuantityById(stockRepo)(ctx)
+	UpdateProductStockQuantityById(stockRepo, stockRepo)(ctx)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
@@ -245,7 +246,7 @@ func TestRemoveProductStockByIdRejectsForeignBranch(t *testing.T) {
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
 	ctx.Set("UserId", "user-1")
 
-	RemoveProductStockById(stockRepo)(ctx)
+	RemoveProductStockById(stockRepo, stockRepo)(ctx)
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", http.StatusNotFound, w.Code)
@@ -276,7 +277,7 @@ func TestRemoveProductStockByIdReturnsErrorWhenQuantityRemains(t *testing.T) {
 	ctx.Set("BranchId", branchID.Hex())
 	ctx.Set("UserId", "user-1")
 
-	RemoveProductStockById(stockRepo)(ctx)
+	RemoveProductStockById(stockRepo, stockRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)

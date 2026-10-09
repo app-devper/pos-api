@@ -1,11 +1,11 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"pos/app/data/entities"
-	"pos/app/data/repositories"
 	"pos/app/domain/request"
 	"strings"
 	"testing"
@@ -14,13 +14,14 @@ import (
 )
 
 type recorderStub struct {
-	repositories.IStockCount
-	seen  request.StockCount
-	calls int
-	err   error
+	gotCtx context.Context
+	seen   request.StockCount
+	calls  int
+	err    error
 }
 
-func (s *recorderStub) RecordStockCount(req request.StockCount) (*entities.StockCount, error) {
+func (s *recorderStub) Count(ctx context.Context, req request.StockCount) (*entities.StockCount, error) {
+	s.gotCtx = ctx
 	s.seen = req
 	s.calls++
 	return &entities.StockCount{}, s.err
@@ -60,5 +61,25 @@ func TestCreateStockCountRejectsMalformedInputBeforeRecording(t *testing.T) {
 	CreateStockCount(repo)(ctx)
 	if w.Code != http.StatusBadRequest || repo.calls != 0 {
 		t.Fatalf("invalid command recorded: status %d calls %d", w.Code, repo.calls)
+	}
+}
+
+type ctxKey struct{}
+
+// The ledger write runs under the request's context, so a caller that gives
+// up cancels it; it used to run under context.Background().
+func TestCreateStockCountRecordsUnderTheRequestsContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &recorderStub{}
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"items":[{"productId":"p","stockId":"s","counted":1}]}`))
+	ctx.Request = req.WithContext(context.WithValue(req.Context(), ctxKey{}, "request"))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	CreateStockCount(repo)(ctx)
+
+	if repo.gotCtx == nil || repo.gotCtx.Value(ctxKey{}) != "request" {
+		t.Fatalf("the ledger did not get the request's context")
 	}
 }

@@ -17,7 +17,7 @@ func ApplyProductReturnAPI(
 	branchAdmin := policies.BranchAdmin.On(rtRoute)
 
 	branchAdmin.POST("",
-		usecase.CreateProductReturn(repository.ProductReturn),
+		usecase.CreateProductReturn(repository.Ledger),
 	)
 
 	branchAdmin.GET("/order/:orderId",

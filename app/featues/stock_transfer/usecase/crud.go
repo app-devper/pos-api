@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"context"
 	"net/http"
 
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 
@@ -35,7 +37,13 @@ func GetStockTransferById(entity repositories.IStockTransfer) gin.HandlerFunc {
 	}
 }
 
-func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
+// transferDecider approves or rejects a Transfer through the Stock ledger.
+type transferDecider interface {
+	ApproveTransfer(ctx context.Context, transferID, by string) (*entities.StockTransfer, error)
+	RejectTransfer(ctx context.Context, transferID, by string) (*entities.StockTransfer, error)
+}
+
+func ApproveStockTransfer(entity repositories.IStockTransfer, ledger transferDecider) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		req := request.UpdateStockTransfer{
@@ -61,7 +69,7 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			return
 		}
 
-		result, err := entity.ApproveStockTransfer(id, req.UpdatedBy)
+		result, err := ledger.ApproveTransfer(ctx.Request.Context(), id, req.UpdatedBy)
 		if err != nil {
 			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
@@ -71,7 +79,7 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 	}
 }
 
-func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
+func RejectStockTransfer(entity repositories.IStockTransfer, ledger transferDecider) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		req := request.UpdateStockTransfer{
@@ -90,7 +98,7 @@ func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			return
 		}
 
-		result, err := entity.RejectStockTransfer(id, req.UpdatedBy)
+		result, err := ledger.RejectTransfer(ctx.Request.Context(), id, req.UpdatedBy)
 		if err != nil {
 			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return

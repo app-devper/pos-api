@@ -1,11 +1,11 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"pos/app/data/entities"
-	"pos/app/data/repositories"
 	"pos/app/domain/request"
 	"strings"
 	"testing"
@@ -14,13 +14,12 @@ import (
 )
 
 type recorderStub struct {
-	repositories.IProductReturn
 	seen  request.ProductReturn
 	calls int
 	err   error
 }
 
-func (s *recorderStub) RecordProductReturn(req request.ProductReturn) (*entities.ProductReturn, error) {
+func (s *recorderStub) Return(_ context.Context, req request.ProductReturn) (*entities.ProductReturn, error) {
 	s.seen = req
 	s.calls++
 	return &entities.ProductReturn{}, s.err

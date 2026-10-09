@@ -62,7 +62,7 @@ func ApplyProductAPI(
 	)
 
 	branchAdmin.POST("/stocks",
-		usecase.CreateProductStock(repository.ProductStock),
+		usecase.CreateProductStock(repository.Ledger),
 	)
 
 	branchAdmin.PUT("/stocks/:stockId",
@@ -70,11 +70,11 @@ func ApplyProductAPI(
 	)
 
 	branchAdmin.DELETE("/stocks/:stockId",
-		usecase.RemoveProductStockById(repository.ProductStock),
+		usecase.RemoveProductStockById(repository.ProductStock, repository.Ledger),
 	)
 
 	branchAdmin.PATCH("/stocks/:stockId/quantity",
-		usecase.UpdateProductStockQuantityById(repository.ProductStock),
+		usecase.UpdateProductStockQuantityById(repository.ProductStock, repository.Ledger),
 	)
 
 	branchAdmin.PATCH("/stocks/sequence",

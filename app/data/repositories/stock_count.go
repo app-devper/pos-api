@@ -3,8 +3,6 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
-	"pos/app/data/ledger"
-	"pos/app/domain/request"
 	"pos/db"
 
 	"github.com/sirupsen/logrus"
@@ -15,19 +13,17 @@ import (
 )
 
 type stockCountEntity struct {
-	ledger         *ledger.Ledger
 	stockCountRepo *mongo.Collection
 }
 
 type IStockCount interface {
-	RecordStockCount(req request.StockCount) (*entities.StockCount, error)
 	GetStockCountById(id string, branchId string) (*entities.StockCount, error)
 	GetStockCounts(branchId string) ([]entities.StockCount, error)
 }
 
 func NewStockCountEntity(resource *db.Resource) IStockCount {
 	stockCountRepo := resource.PosDb.Collection("stock_counts")
-	entity := &stockCountEntity{ledger: newLedger(resource), stockCountRepo: stockCountRepo}
+	entity := &stockCountEntity{stockCountRepo: stockCountRepo}
 	ensureStockCountIndexes(stockCountRepo)
 	return entity
 }

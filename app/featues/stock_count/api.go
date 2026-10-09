@@ -17,7 +17,7 @@ func ApplyStockCountAPI(
 	branchAdmin := policies.BranchAdmin.On(scRoute)
 
 	branchAdmin.POST("",
-		usecase.CreateStockCount(repository.StockCount),
+		usecase.CreateStockCount(repository.Ledger),
 	)
 
 	branchAdmin.GET("",

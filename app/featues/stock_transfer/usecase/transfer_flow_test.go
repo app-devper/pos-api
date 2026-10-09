@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,7 @@ func (s *stockTransferRepoStub) CreateStockTransfer(form request.StockTransfer) 
 	return s.createFn(form)
 }
 
-func (s *stockTransferRepoStub) CreateStockTransferWithReservation(form request.StockTransfer) (*entities.StockTransfer, error) {
+func (s *stockTransferRepoStub) RequestTransfer(_ context.Context, form request.StockTransfer) (*entities.StockTransfer, error) {
 	return s.createFn(form)
 }
 
@@ -49,11 +50,11 @@ func (s *stockTransferRepoStub) UpdateStockTransferStatus(id string, form reques
 	return s.updateStatusFn(id, form)
 }
 
-func (s *stockTransferRepoStub) ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
+func (s *stockTransferRepoStub) ApproveTransfer(_ context.Context, id string, updatedBy string) (*entities.StockTransfer, error) {
 	return s.approveFn(id, updatedBy)
 }
 
-func (s *stockTransferRepoStub) RejectStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
+func (s *stockTransferRepoStub) RejectTransfer(_ context.Context, id string, updatedBy string) (*entities.StockTransfer, error) {
 	return s.rejectFn(id, updatedBy)
 }
 
@@ -77,11 +78,11 @@ func (s *transferProductStub) GetProductStockById(id string, branchId string) (*
 	return d, err
 }
 
-func (s *transferProductStub) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
+func (s *transferProductStub) CreateStock(_ context.Context, param request.ProductStock) (*entities.ProductStock, error) {
 	return s.createStockFn(param)
 }
 
-func (s *transferProductStub) RemoveProductStockById(id string, branchId string, by string) (*entities.ProductStock, error) {
+func (s *transferProductStub) DeleteStock(_ context.Context, id string, branchId string, by string) (*entities.ProductStock, error) {
 	return s.removeStockByID(id)
 }
 
@@ -239,7 +240,7 @@ func TestApproveStockTransferReturnsErrorWhenTransactionalApproveFails(t *testin
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", receivingBranchID.Hex())
 
-	ApproveStockTransfer(repo)(ctx)
+	ApproveStockTransfer(repo, repo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
@@ -271,7 +272,7 @@ func TestTheBranchThatAskedCannotApproveItsOwnTransfer(t *testing.T) {
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", sourceBranchID.Hex())
 
-	ApproveStockTransfer(repo)(ctx)
+	ApproveStockTransfer(repo, repo)(ctx)
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)

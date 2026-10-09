@@ -1,11 +1,8 @@
 package repositories
 
 import (
-	"context"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
-	"pos/app/data/ledger"
-	"pos/app/domain/request"
 	"pos/db"
 
 	"github.com/sirupsen/logrus"
@@ -16,21 +13,17 @@ import (
 )
 
 type stockTransferEntity struct {
-	ledger *ledger.Ledger
-	repo   *mongo.Collection
+	repo *mongo.Collection
 }
 
 type IStockTransfer interface {
-	CreateStockTransferWithReservation(form request.StockTransfer) (*entities.StockTransfer, error)
 	GetStockTransfers(branchId string) ([]entities.StockTransfer, error)
 	GetStockTransferById(id string, branchId string) (*entities.StockTransfer, error)
-	ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error)
-	RejectStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error)
 }
 
 func NewStockTransferEntity(resource *db.Resource) IStockTransfer {
 	repo := resource.PosDb.Collection("stock_transfers")
-	entity := &stockTransferEntity{ledger: newLedger(resource), repo: repo}
+	entity := &stockTransferEntity{repo: repo}
 	ensureStockTransferIndexes(repo)
 	return entity
 }
@@ -42,27 +35,6 @@ func ensureStockTransferIndexes(repo *mongo.Collection) {
 	createCollectionIndex(repo, "stock_transfers toBranchId+createdDate", mongo.IndexModel{
 		Keys: bson.D{{Key: "toBranchId", Value: 1}, {Key: "createdDate", Value: -1}},
 	})
-}
-
-// CreateStockTransferWithReservation is recorded by the Stock ledger: the
-// source quantity is reserved, with history, as the Transfer is created.
-func (entity *stockTransferEntity) CreateStockTransferWithReservation(form request.StockTransfer) (*entities.StockTransfer, error) {
-	logrus.Info("CreateStockTransferWithReservation")
-	return entity.ledger.RequestTransfer(context.Background(), form)
-}
-
-// ApproveStockTransfer is recorded by the Stock ledger: Stock opens at the
-// destination and serves its waiting Lines; a second approve is refused.
-func (entity *stockTransferEntity) ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
-	logrus.Info("ApproveStockTransfer")
-	return entity.ledger.ApproveTransfer(context.Background(), id, updatedBy)
-}
-
-// RejectStockTransfer is recorded by the Stock ledger: the reservation goes
-// back to its source Stocks.
-func (entity *stockTransferEntity) RejectStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
-	logrus.Info("RejectStockTransfer")
-	return entity.ledger.RejectTransfer(context.Background(), id, updatedBy)
 }
 
 func (entity *stockTransferEntity) GetStockTransfers(branchId string) ([]entities.StockTransfer, error) {
