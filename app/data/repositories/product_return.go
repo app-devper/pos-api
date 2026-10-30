@@ -3,7 +3,6 @@ package repositories
 import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
-	"pos/app/domain/request"
 	"pos/db"
 
 	"github.com/sirupsen/logrus"
@@ -14,19 +13,17 @@ import (
 )
 
 type productReturnEntity struct {
-	recorder          *stockRecorder
 	productReturnRepo *mongo.Collection
 }
 
 type IProductReturn interface {
-	RecordProductReturn(req request.ProductReturn) (*entities.ProductReturn, error)
 	GetProductReturnById(id string) (*entities.ProductReturn, error)
 	GetProductReturnsByOrderId(orderId string, branchId string) ([]entities.ProductReturn, error)
 }
 
 func NewProductReturnEntity(resource *db.Resource) IProductReturn {
 	productReturnRepo := resource.PosDb.Collection("product_returns")
-	entity := &productReturnEntity{recorder: newStockRecorder(resource), productReturnRepo: productReturnRepo}
+	entity := &productReturnEntity{productReturnRepo: productReturnRepo}
 	ensureProductReturnIndexes(productReturnRepo)
 	return entity
 }

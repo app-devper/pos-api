@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetDailyChart(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetDailyChart(orderEntity repositories.IOrderAnalytics) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.GetOrderRange{}
 		if err := ctx.ShouldBindQuery(&req); err != nil {

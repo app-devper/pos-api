@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/branch/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,41 +12,31 @@ func ApplyBranchAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	branchRoute := route.Group("branches")
+	shopAdmin := policies.ShopAdmin.On(branchRoute)
 
-	branchRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.POST("",
 		usecase.CreateBranch(repository.Branch, repository.Sequence),
 	)
 
-	branchRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.GET("",
 		usecase.GetBranches(repository.Branch),
 	)
 
-	branchRoute.GET("/:branchId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.GET("/:branchId",
 		usecase.GetBranchById(repository.Branch),
 	)
 
-	branchRoute.PUT("/:branchId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PUT("/:branchId",
 		usecase.UpdateBranchById(repository.Branch),
 	)
 
-	branchRoute.PATCH("/:branchId/status",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PATCH("/:branchId/status",
 		usecase.UpdateBranchStatusById(repository.Branch),
 	)
 
-	branchRoute.DELETE("/:branchId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.DELETE("/:branchId",
 		usecase.DeleteBranchById(repository.Branch),
 	)
 }

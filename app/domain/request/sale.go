@@ -20,7 +20,6 @@ type Sale struct {
 	BuyerIdCard    string         `json:"buyerIdCard"`
 	Message        string         `json:"message"`
 	CreatedBy      string         `json:"-"`
-	Code           string         `json:"-"`
 	BranchId       string         `json:"-"`
 }
 

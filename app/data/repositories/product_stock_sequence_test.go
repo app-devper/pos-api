@@ -38,21 +38,3 @@ func TestBuildProductStockSequenceFilterRejectsInvalidIDs(t *testing.T) {
 		t.Fatal("expected invalid branch id error")
 	}
 }
-
-func TestBuildReceiveProductStockSequenceMatchIncludesBranchId(t *testing.T) {
-	productID := primitive.NewObjectID()
-	unitID := primitive.NewObjectID()
-	branchID := primitive.NewObjectID()
-
-	match := buildReceiveProductStockSequenceMatch(productID, unitID, branchID)
-
-	if match["productId"] != productID {
-		t.Fatalf("expected productId %s, got %+v", productID.Hex(), match["productId"])
-	}
-	if match["unitId"] != unitID {
-		t.Fatalf("expected unitId %s, got %+v", unitID.Hex(), match["unitId"])
-	}
-	if match["branchId"] != branchID {
-		t.Fatalf("expected branchId %s, got %+v", branchID.Hex(), match["branchId"])
-	}
-}

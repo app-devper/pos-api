@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"context"
 	"net/http"
 
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 
@@ -26,21 +28,22 @@ func GetStockTransfers(entity repositories.IStockTransfer) gin.HandlerFunc {
 func GetStockTransferById(entity repositories.IStockTransfer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := entity.GetStockTransferById(id)
+		result, err := entity.GetStockTransferById(id, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
-			return
-		}
-		branchId := ctx.GetString("BranchId")
-		if result.FromBranchId.Hex() != branchId && result.ToBranchId.Hex() != branchId {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
 	}
 }
 
-func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
+// transferDecider approves or rejects a Transfer through the Stock ledger.
+type transferDecider interface {
+	ApproveTransfer(ctx context.Context, transferID, by string) (*entities.StockTransfer, error)
+	RejectTransfer(ctx context.Context, transferID, by string) (*entities.StockTransfer, error)
+}
+
+func ApproveStockTransfer(entity repositories.IStockTransfer, ledger transferDecider) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		req := request.UpdateStockTransfer{
@@ -48,14 +51,16 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			UpdatedBy: utils.GetUserId(ctx),
 		}
 
-		transfer, err := entity.GetStockTransferById(id)
+		branchId := ctx.GetString("BranchId")
+		transfer, err := entity.GetStockTransferById(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
-		branchId := ctx.GetString("BranchId")
-		if transfer.FromBranchId.Hex() != branchId && transfer.ToBranchId.Hex() != branchId {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+		// The branch that receives the Stock approves it; the branch that
+		// asked cannot approve its own request.
+		if transfer.ToBranchId.Hex() != branchId {
+			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "only the receiving branch can approve a transfer")
 			return
 		}
 
@@ -64,9 +69,9 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			return
 		}
 
-		result, err := entity.ApproveStockTransfer(id, req.UpdatedBy)
+		result, err := ledger.ApproveTransfer(ctx.Request.Context(), id, req.UpdatedBy)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 
@@ -74,7 +79,7 @@ func ApproveStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 	}
 }
 
-func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
+func RejectStockTransfer(entity repositories.IStockTransfer, ledger transferDecider) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		req := request.UpdateStockTransfer{
@@ -82,14 +87,9 @@ func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			UpdatedBy: utils.GetUserId(ctx),
 		}
 
-		transfer, err := entity.GetStockTransferById(id)
+		transfer, err := entity.GetStockTransferById(id, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
-			return
-		}
-		branchId := ctx.GetString("BranchId")
-		if transfer.FromBranchId.Hex() != branchId && transfer.ToBranchId.Hex() != branchId {
-			errcode.Abort(ctx, http.StatusForbidden, errcode.SY_FORBIDDEN_002, "no permission")
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 
@@ -98,9 +98,9 @@ func RejectStockTransfer(entity repositories.IStockTransfer) gin.HandlerFunc {
 			return
 		}
 
-		result, err := entity.RejectStockTransfer(id, req.UpdatedBy)
+		result, err := ledger.RejectTransfer(ctx.Request.Context(), id, req.UpdatedBy)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 

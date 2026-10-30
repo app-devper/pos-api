@@ -21,22 +21,28 @@
 
 - order item หนึ่งบรรทัดสามารถส่ง `allowOversell: true` เพื่อขายเกิน stock ที่มีจริงได้ (เช่น กรณีร้านค้ายอมให้ค้างส่งลูกค้า)
 - เมื่อ stock ของ lot ที่เลือกไม่พอ ระบบจะดึงเท่าที่มี แล้วบันทึกส่วนที่ขาดเป็น `oversoldQty` บน order item นั้น แทนที่จะ reject การขายทั้งบรรทัด
-- ถ้าไม่ได้ส่ง `allowOversell` และ stock ไม่พอ ระบบต้อง reject การสร้าง order ตามพฤติกรรมเดิม
-- `oversoldQty` ที่ค้างอยู่จะถูก "reconcile" (ลดยอดหนี้) โดยอัตโนมัติเมื่อ:
-  - มี receive ใหม่ถูก import เข้า stock สำหรับสินค้าตัวเดียวกัน — reconcile กับ lot จริงที่เพิ่งสร้าง (FIFO ตามลำดับ order item ที่ค้าง)
-  - มี stock adjustment ที่เป็นค่าบวก (`delta > 0`) สำหรับสินค้าตัวเดียวกัน — reconcile กับ marker สังเคราะห์ `ADJUST:<reason>` เพราะไม่มี lot จริงมารองรับ
-- การ reconcile ไม่แตะยอด `ProductStock.quantity` ซ้ำ เพราะ `quantity` ถูกปรับไปแล้วตอน receive/adjustment เกิดขึ้นจริง — reconcile แค่ย้ายภาระจาก `oversoldQty` ไปเป็นรายการใน `stocks[]` ของ order item เพื่อเก็บ audit trail
-- Invariant: `stock ณ เวลาใดๆ ≈ Σ lot.remaining − Σ oversoldQty` ต้องคงอยู่เสมอ
+- ถ้าไม่ได้ส่ง `allowOversell` และไม่มี stock ใดครอบคลุม ส่วนที่ขาดจะไปลง Sold first ของสินค้า (ไม่ reject การขาย) — Sold first แยกจาก Oversell และไม่ถูก settle ด้วยของที่เข้ามา (ADR-0003)
+- `oversoldQty` คือของที่ร้านยังค้างส่งลูกค้า ทุกครั้งที่ stock ของ **Unit เดียวกัน** ในสาขาเดียวกันเพิ่มขึ้น ระบบจะ settle หนี้ก่อน (ADR-0002) — ทางเข้าที่นับได้แก่:
+  - receive import
+  - stock transfer ที่อนุมัติเข้าสาขานี้ หรือ transfer ที่ถูกปฏิเสธ (คืนเข้าสาขาต้นทาง)
+  - stock adjustment / stock count ที่ทำให้ยอดเพิ่ม (`delta > 0`)
+  - การสร้าง stock เอง
+  - product return และการยกเลิก order / order item (คืนของกลับเข้า stock)
+- การ settle **ดึงยอดออกจาก stock ที่เพิ่งเข้ามา** (ส่งให้ลูกค้าที่รอก่อน) แล้วบันทึก `{stockId, qty}` ลงใน `stocks[]` ของ order item และลด `oversoldQty` ในธุรกรรมเดียวกับการรับเข้า — ยอด stock ที่เห็นจึงเป็นของที่ขายได้จริง
+- ต้นทุนของ order item ไม่ถูกแก้ตอน settle (ใช้ต้นทุนที่คิดไว้ตอนขาย)
+- Invariant: `stock ณ เวลาใดๆ ≈ Σ lot.remaining − Σ oversoldQty` ต้องคงอยู่หลังทุกเหตุการณ์
 
 ### Validation Rules
 
-- `oversoldQty` ต้อง reconcile แบบ FIFO ตามลำดับ order item ที่เก่าที่สุดก่อน (เรียงตาม `_id` ของ order item)
-- ห้าม reconcile เกินยอด `oversoldQty` ที่เหลืออยู่ หรือเกินยอด lot/adjustment ที่มีจริง
+- `oversoldQty` ต้อง settle แบบ FIFO ตามลำดับ order item ที่เก่าที่สุดก่อน (เรียงตาม `_id` ของ order item) โดยจำกัดที่สาขา + สินค้า + **Unit** เดียวกัน — ห้าม settle ข้าม Unit
+- ห้าม settle เกินยอด `oversoldQty` ที่เหลืออยู่ หรือเกินยอดของ stock ที่เพิ่งเข้ามา
 
 ### Edge Cases
 
 - สินค้าตัวเดียวกันมีหลาย order item ที่ oversold ค้างพร้อมกัน — ต้องไล่ reconcile ทีละรายการจนกว่า stock ใหม่จะหมดหรือหนี้หมด
-- stock adjustment ที่เป็นค่าลบ (`delta < 0`) จะไม่ trigger การ reconcile ใดๆ
+- stock adjustment ที่เป็นค่าลบ (`delta < 0`) จะไม่ trigger การ settle ใดๆ
+- การยกเลิก order / order item ที่เคย oversell คืนยอดเข้าทุก stock ที่บรรทัดนั้นเคยดึง รวมถึงที่ได้มาจากการ settle ส่วนหนี้ที่ยังค้างอยู่หายไป
+- ข้อมูลเก่าที่เคย settle ข้าม Unit แก้ด้วย `cmd/repair-cross-unit-oversell` (รายงานก่อน, `-apply` เพื่อเขียน)
 
 ## Part B: Stock Adjustment
 

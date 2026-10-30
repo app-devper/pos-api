@@ -12,13 +12,9 @@ import (
 func GetReceiveById(receiveEntity repositories.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("receiveId")
-		result, err := receiveEntity.GetReceiveById(id)
+		result, err := receiveEntity.GetReceiveById(id, utils.GetBranchId(ctx))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureReceiveBranchAccess(result, utils.GetBranchId(ctx)); err != nil {
-			abortReceiveBranchMismatch(ctx)
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		items, err := receiveEntity.GetReceiveItemsByReceiveId(id)

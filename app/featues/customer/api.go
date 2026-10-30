@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/customer/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,44 +12,36 @@ func ApplyCustomerAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	customerRoute := route.Group("customers")
+	shopAdmin := policies.ShopAdmin.On(customerRoute)
+	signedIn := policies.SignedIn.On(customerRoute)
 
-	customerRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.POST("",
 		usecase.CreateCustomer(repository.Customer, repository.Sequence),
 	)
 
-	customerRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("",
 		usecase.GetCustomers(repository.Customer),
 	)
 
-	customerRoute.GET("/:customerId",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("/:customerId",
 		usecase.GetCustomerById(repository.Customer),
 	)
 
-	customerRoute.PUT("/:customerId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PUT("/:customerId",
 		usecase.UpdateCustomerById(repository.Customer),
 	)
 
-	customerRoute.PATCH("/:customerId/status",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PATCH("/:customerId/status",
 		usecase.UpdateCustomerStatusById(repository.Customer),
 	)
 
-	customerRoute.DELETE("/:customerId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.DELETE("/:customerId",
 		usecase.DeleteCustomerById(repository.Customer),
 	)
 
-	customerRoute.GET("/code/:customerCode",
-		middlewares.RequireSession(repository.Auth),
+	signedIn.GET("/code/:customerCode",
 		usecase.GetCustomerByCode(repository.Customer),
 	)
 

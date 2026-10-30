@@ -11,13 +11,8 @@ import (
 func GetOrderItemById(orderEntity repositories.IOrder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		itemId := ctx.Param("itemId")
-		item, err := orderEntity.GetOrderItemById(itemId)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureOrderItemBranchAccess(item, ctx.GetString("BranchId")); err != nil {
-			abortOrderBranchMismatch(ctx)
+		if _, err := orderEntity.GetOrderItemById(itemId, ctx.GetString("BranchId")); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 		result, err := orderEntity.GetOrderItemDetailById(itemId)

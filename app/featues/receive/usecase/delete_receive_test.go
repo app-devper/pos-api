@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type deleteReceiveRepoStub struct {
@@ -22,12 +23,19 @@ type deleteReceiveRepoStub struct {
 	updateStatusByIDFn func(id string, status string, updatedBy string) (*entities.Receive, error)
 }
 
-func (s *deleteReceiveRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
-	return s.getByIDFn(id)
+func (s *deleteReceiveRepoStub) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
+	d, err := func() (*entities.Receive, error) {
+		return s.getByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
-func (s *deleteReceiveRepoStub) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
-	return s.updateStatusByIDFn(id, status, updatedBy)
+func (s *deleteReceiveRepoStub) CancelReceiveById(id string, updatedBy string) (*entities.Receive, error) {
+	return s.updateStatusByIDFn(id, constant.CANCELLED, updatedBy)
 }
 
 func TestDeleteReceiveByIdReturnsDeletedReceive(t *testing.T) {
@@ -116,8 +124,7 @@ func TestDeleteReceiveByIdRejectsImportedReceive(t *testing.T) {
 			return &entities.Receive{Id: primitive.NewObjectID(), BranchId: branchID, Status: constant.IMPORTED}, nil
 		},
 		updateStatusByIDFn: func(id string, status string, updatedBy string) (*entities.Receive, error) {
-			t.Fatal("update status should not be called for imported receive")
-			return nil, nil
+			return nil, repositories.ErrReceiveLocked
 		},
 	}
 
@@ -134,7 +141,7 @@ func TestDeleteReceiveByIdRejectsImportedReceive(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "cannot cancel imported receive") {
+	if !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive error, got %s", w.Body.String())
 	}
 }

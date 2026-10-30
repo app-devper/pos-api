@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/promotion/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,44 +12,32 @@ func ApplyPromotionAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	promoRoute := route.Group("promotions")
+	branchAdmin := policies.BranchAdmin.On(promoRoute)
+	staff := policies.Staff.On(promoRoute)
 
-	promoRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.POST("",
 		usecase.CreatePromotion(repository.Promotion),
 	)
 
-	promoRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("",
 		usecase.GetPromotions(repository.Promotion),
 	)
 
-	promoRoute.GET("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.GET("/:id",
 		usecase.GetPromotionById(repository.Promotion),
 	)
 
-	promoRoute.PUT("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.PUT("/:id",
 		usecase.UpdatePromotionById(repository.Promotion),
 	)
 
-	promoRoute.DELETE("/:id",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	branchAdmin.DELETE("/:id",
 		usecase.DeletePromotionById(repository.Promotion),
 	)
 
-	promoRoute.POST("/apply",
-		middlewares.RequireSession(repository.Auth),
-		middlewares.RequireBranch(repository.Employee, repository.Branch),
+	staff.POST("/apply",
 		usecase.ApplyPromotion(repository.Promotion),
 	)
 }

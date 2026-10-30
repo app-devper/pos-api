@@ -5,7 +5,6 @@ import (
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
 	"pos/app/data/repositories"
-	"pos/app/domain/constant"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,20 +12,11 @@ import (
 func DeleteReceiveById(receiveEntity repositories.IReceive) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("receiveId")
-		receive, err := receiveEntity.GetReceiveById(id)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+		if _, err := receiveEntity.GetReceiveById(id, utils.GetBranchId(ctx)); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
-		if err := ensureReceiveBranchAccess(receive, utils.GetBranchId(ctx)); err != nil {
-			abortReceiveBranchMismatch(ctx)
-			return
-		}
-		if receive.Status == constant.IMPORTED {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, "cannot cancel imported receive")
-			return
-		}
-		result, err := receiveEntity.UpdateReceiveStatusById(id, constant.CANCELLED, utils.GetUserId(ctx))
+		result, err := receiveEntity.CancelReceiveById(id, utils.GetUserId(ctx))
 		if err != nil {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
 			return

@@ -2,7 +2,7 @@ package repositories
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -18,19 +18,15 @@ import (
 )
 
 type receiveEntity struct {
-	client             *mongo.Client
-	receiveRepo        *mongo.Collection
-	receiveItemsRepo   *mongo.Collection
-	productsRepo       *mongo.Collection
-	productUnitsRepo   *mongo.Collection
-	productStockRepo   *mongo.Collection
-	productHistoryRepo *mongo.Collection
+	client           *mongo.Client
+	receiveRepo      *mongo.Collection
+	receiveItemsRepo *mongo.Collection
 }
 
 type IReceive interface {
 	GetReceives(form request.GetReceiveRange) ([]entities.Receive, error)
 	CreateReceive(form request.Receive) (*entities.Receive, error)
-	GetReceiveById(id string) (*entities.Receive, error)
+	GetReceiveById(id string, branchId string) (*entities.Receive, error)
 	RemoveReceiveById(id string) (*entities.Receive, error)
 	UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error)
 	UpdateReceiveTotalCostById(id string, totalCost float64) (*entities.Receive, error)
@@ -41,25 +37,63 @@ type IReceive interface {
 	GetReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	RemoveReceiveItemByLotId(lotId string) (*entities.ReceiveItem, error)
 	DeleteReceiveItemsByReceiveId(receiveId string) error
-	UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error)
-	ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error)
+	CancelReceiveById(id string, updatedBy string) (*entities.Receive, error)
+}
+
+// ErrReceiveLocked is a change to a Receive that is no longer a draft: once
+// imported its Stock exists, and once cancelled it is closed.
+var ErrReceiveLocked = errors.New("receive is imported or cancelled and can no longer change")
+
+// draft matches the Receive only while it can still change. The Stock ledger
+// imports under the same condition, so an edit or cancel and an import cannot
+// both win.
+func draft(id primitive.ObjectID) bson.M {
+	return bson.M{"_id": id, "status": bson.M{"$nin": bson.A{constant.IMPORTED, constant.CANCELLED}}}
+}
+
+// changeDraft applies update to the Receive while it is a draft. It tells a
+// Receive that does not exist (mongo.ErrNoDocuments) from one that is locked.
+func (entity *receiveEntity) changeDraft(ctx context.Context, id primitive.ObjectID, update bson.M) (*entities.Receive, error) {
+	after := options.After
+	data := entities.Receive{}
+	err := entity.receiveRepo.FindOneAndUpdate(ctx, draft(id), update,
+		&options.FindOneAndUpdateOptions{ReturnDocument: &after}).Decode(&data)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		if n, cErr := entity.receiveRepo.CountDocuments(ctx, bson.M{"_id": id}); cErr == nil && n > 0 {
+			return nil, ErrReceiveLocked
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// replaceItems swaps a draft Receive's items. Called after changeDraft in the
+// same transaction, so a locked Receive's items are never touched.
+func (entity *receiveEntity) replaceItems(ctx context.Context, id primitive.ObjectID, items []entities.ReceiveItem) error {
+	if _, err := entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": id}); err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	docs := make([]interface{}, 0, len(items))
+	for _, item := range items {
+		item.ReceiveId = id
+		docs = append(docs, item)
+	}
+	_, err := entity.receiveItemsRepo.InsertMany(ctx, docs)
+	return err
 }
 
 func NewReceiveEntity(resource *db.Resource) IReceive {
 	receiveRepo := resource.PosDb.Collection("receives")
 	receiveItemsRepo := resource.PosDb.Collection("receive_items")
-	productsRepo := resource.PosDb.Collection("products")
-	productUnitsRepo := resource.PosDb.Collection("product_units")
-	productStockRepo := resource.PosDb.Collection("product_stocks")
-	productHistoryRepo := resource.PosDb.Collection("product_histories")
 	entity := &receiveEntity{
-		client:             resource.Client,
-		receiveRepo:        receiveRepo,
-		receiveItemsRepo:   receiveItemsRepo,
-		productsRepo:       productsRepo,
-		productUnitsRepo:   productUnitsRepo,
-		productStockRepo:   productStockRepo,
-		productHistoryRepo: productHistoryRepo,
+		client:           resource.Client,
+		receiveRepo:      receiveRepo,
+		receiveItemsRepo: receiveItemsRepo,
 	}
 	ensureReceiveIndexes(receiveRepo, receiveItemsRepo)
 	return entity
@@ -141,16 +175,16 @@ func (entity *receiveEntity) CreateReceive(form request.Receive) (*entities.Rece
 	return &data, nil
 }
 
-func (entity *receiveEntity) GetReceiveById(id string) (*entities.Receive, error) {
+func (entity *receiveEntity) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
 	logrus.Info("GetReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
+	filter, err := inBranch(id, branchId)
 	if err != nil {
 		return nil, err
 	}
 	data := entities.Receive{}
-	err = entity.receiveRepo.FindOne(ctx, bson.M{"_id": objId}).Decode(&data)
+	err = entity.receiveRepo.FindOne(ctx, filter).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -213,19 +247,10 @@ func (entity *receiveEntity) UpdateReceiveTotalCostById(id string, totalCost flo
 		return nil, err
 	}
 
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+	return entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
 		"totalCost":   totalCost,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
+	}})
 }
 
 func (entity *receiveEntity) UpdateReceiveById(id string, form request.UpdateReceive) (*entities.Receive, error) {
@@ -271,38 +296,21 @@ func (entity *receiveEntity) updateReceiveByIdWithContext(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
-
-	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
-		return nil, err
-	}
-	if len(items) > 0 {
-		docs := make([]interface{}, 0, len(items))
-		for _, item := range items {
-			item.ReceiveId = obId
-			docs = append(docs, item)
-		}
-		if _, err = entity.receiveItemsRepo.InsertMany(ctx, docs); err != nil {
-			return nil, err
-		}
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+	data, err := entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
 		"supplierId":  supplier,
 		"reference":   form.Reference,
-		"totalCost":   form.TotalCost,
+		"totalCost":   calculateReceiveItemsTotalCost(items),
 		"items":       items,
 		"updatedBy":   form.UpdatedBy,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
+	}})
 	if err != nil {
 		return nil, err
 	}
-	return &data, nil
+	if err := entity.replaceItems(ctx, obId, items); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (entity *receiveEntity) UpdateReceiveItemsById(id string, form request.UpdateReceiveItems) (*entities.Receive, error) {
@@ -344,37 +352,19 @@ func (entity *receiveEntity) updateReceiveItemsByIdWithContext(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	totalCost := calculateReceiveItemsTotalCost(items)
-
-	if _, err = entity.receiveItemsRepo.DeleteMany(ctx, bson.M{"receiveId": obId}); err != nil {
-		return nil, err
-	}
-	if len(items) > 0 {
-		docs := make([]interface{}, 0, len(items))
-		for _, item := range items {
-			item.ReceiveId = obId
-			docs = append(docs, item)
-		}
-		if _, err = entity.receiveItemsRepo.InsertMany(ctx, docs); err != nil {
-			return nil, err
-		}
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
+	data, err := entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
 		"items":       items,
-		"totalCost":   totalCost,
+		"totalCost":   calculateReceiveItemsTotalCost(items),
 		"updatedBy":   form.UpdatedBy,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
+	}})
 	if err != nil {
 		return nil, err
 	}
-	return &data, nil
+	if err := entity.replaceItems(ctx, obId, items); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func buildReceiveItems(items []request.ReceiveItem) ([]entities.ReceiveItem, error) {
@@ -528,251 +518,18 @@ func (entity *receiveEntity) DeleteReceiveItemsByReceiveId(receiveId string) err
 	return err
 }
 
-func (entity *receiveEntity) UpdateReceiveStatusById(id string, status string, updatedBy string) (*entities.Receive, error) {
-	logrus.Info("UpdateReceiveStatusById")
+// CancelReceiveById closes a draft Receive; an imported one stays imported.
+func (entity *receiveEntity) CancelReceiveById(id string, updatedBy string) (*entities.Receive, error) {
+	logrus.Info("CancelReceiveById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
 	obId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	data := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": obId}, bson.M{"$set": bson.M{
-		"status":      status,
+	return entity.changeDraft(ctx, obId, bson.M{"$set": bson.M{
+		"status":      constant.CANCELLED,
 		"updatedBy":   updatedBy,
 		"updatedDate": time.Now(),
-	}}, opts).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
-}
-
-func (entity *receiveEntity) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
-	logrus.Info("ImportReceiveToStock")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-
-	if entity.client == nil {
-		result, err := entity.importReceiveToStockWithContext(ctx, receiveId, userId, branchId)
-		if err != nil {
-			logrus.WithError(err).WithFields(logrus.Fields{
-				"receiveId": receiveId,
-				"userId":    userId,
-				"branchId":  branchId,
-			}).Error("import receive to stock failed")
-		}
-		return result, err
-	}
-
-	session, err := entity.client.StartSession()
-	if err != nil {
-		return nil, err
-	}
-	defer session.EndSession(ctx)
-
-	var result *entities.Receive
-	_, err = session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-		data, txErr := entity.importReceiveToStockWithContext(sessCtx, receiveId, userId, branchId)
-		if txErr != nil {
-			return nil, txErr
-		}
-		result = data
-		return data, nil
-	})
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"receiveId": receiveId,
-			"userId":    userId,
-			"branchId":  branchId,
-		}).Error("import receive to stock transaction failed")
-		return nil, err
-	}
-	return result, nil
-}
-
-func (entity *receiveEntity) importReceiveToStockWithContext(ctx context.Context, receiveId string, userId string, branchId string) (*entities.Receive, error) {
-	receiveObjID, err := primitive.ObjectIDFromHex(receiveId)
-	if err != nil {
-		return nil, err
-	}
-	branchObjID, err := primitive.ObjectIDFromHex(branchId)
-	if err != nil {
-		return nil, err
-	}
-
-	receive := entities.Receive{}
-	if err := entity.receiveRepo.FindOne(ctx, bson.M{"_id": receiveObjID}).Decode(&receive); err != nil {
-		return nil, err
-	}
-	if receive.Status == constant.IMPORTED {
-		return nil, fmt.Errorf("receive already imported")
-	}
-
-	cursor, err := entity.receiveItemsRepo.Find(ctx, bson.M{"receiveId": receiveObjID})
-	if err != nil {
-		return nil, err
-	}
-	items := []entities.ReceiveItem{}
-	if err = cursor.All(ctx, &items); err != nil {
-		return nil, err
-	}
-
-	var totalCost float64
-	now := time.Now()
-	for _, item := range items {
-		product := entities.Product{}
-		if err := entity.productsRepo.FindOne(ctx, bson.M{"_id": item.ProductId}).Decode(&product); err != nil {
-			return nil, fmt.Errorf("failed to import receive item for product %s: %w", item.ProductId.Hex(), err)
-		}
-
-		unit := entities.ProductUnit{}
-		if err := entity.productUnitsRepo.FindOne(ctx, bson.M{"productId": item.ProductId, "unit": product.Unit}).Decode(&unit); err != nil {
-			return nil, fmt.Errorf("failed to import receive item for product %s: %w", item.ProductId.Hex(), err)
-		}
-
-		if item.Quantity > 0 {
-			sequence, err := entity.getNextReceiveProductStockSequence(ctx, item.ProductId, unit.Id, branchObjID)
-			if err != nil {
-				return nil, err
-			}
-
-			stock := entities.ProductStock{
-				Id:          primitive.NewObjectID(),
-				BranchId:    branchObjID,
-				ProductId:   item.ProductId,
-				UnitId:      unit.Id,
-				ReceiveCode: receive.Code,
-				Sequence:    sequence,
-				LotNumber:   item.LotNumber,
-				CostPrice:   item.CostPrice,
-				Import:      item.Quantity,
-				Quantity:    item.Quantity,
-				ExpireDate:  item.ExpireDate,
-				ImportDate:  now,
-			}
-			if _, err := entity.productStockRepo.InsertOne(ctx, stock); err != nil {
-				return nil, fmt.Errorf("failed to create stock for product %s: %w", item.ProductId.Hex(), err)
-			}
-
-			balance, err := entity.getReceiveProductStockBalance(ctx, item.ProductId, unit.Id, branchObjID)
-			if err != nil {
-				return nil, err
-			}
-
-			history := request.AddProductStockHistory(item.ProductId.Hex(), product.Unit, request.ProductStock{
-				ProductId:   item.ProductId.Hex(),
-				UnitId:      unit.Id.Hex(),
-				ReceiveCode: receive.Code,
-				Quantity:    item.Quantity,
-				CostPrice:   item.CostPrice,
-				LotNumber:   item.LotNumber,
-				ExpireDate:  request.NewFlexibleTime(item.ExpireDate),
-				ImportDate:  request.NewFlexibleTime(now),
-				UpdatedBy:   userId,
-				BranchId:    branchId,
-			}, balance)
-			history.BranchId = branchId
-
-			historyDoc := entities.ProductHistory{
-				Id:          primitive.NewObjectID(),
-				BranchId:    branchObjID,
-				ProductId:   item.ProductId,
-				Type:        history.Type,
-				Description: history.Description,
-				Unit:        history.Unit,
-				Import:      history.Import,
-				Quantity:    history.Quantity,
-				CostPrice:   history.CostPrice,
-				Price:       history.Price,
-				Balance:     history.Balance,
-				CreatedBy:   history.CreatedBy,
-				CreatedDate: now,
-			}
-			if _, err := entity.productHistoryRepo.InsertOne(ctx, historyDoc); err != nil {
-				return nil, fmt.Errorf("failed to create stock history for product %s: %w", item.ProductId.Hex(), err)
-			}
-		}
-
-		totalCost += item.CostPrice * float64(item.Quantity)
-	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
-	result := entities.Receive{}
-	err = entity.receiveRepo.FindOneAndUpdate(ctx, bson.M{"_id": receiveObjID}, bson.M{"$set": bson.M{
-		"totalCost":   totalCost,
-		"status":      constant.IMPORTED,
-		"updatedBy":   userId,
-		"updatedDate": now,
-	}}, opts).Decode(&result)
-	if err != nil {
-		return nil, err
-	}
-	result.Items = items
-	return &result, nil
-}
-
-func (entity *receiveEntity) getNextReceiveProductStockSequence(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId primitive.ObjectID) (int, error) {
-	pipeline := []bson.M{
-		{"$match": buildReceiveProductStockSequenceMatch(productId, unitId, branchId)},
-		{"$group": bson.M{"_id": nil, "maxSequence": bson.M{"$max": "$sequence"}}},
-	}
-	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
-	if err != nil {
-		return 0, err
-	}
-	var results []bson.M
-	if err = cursor.All(ctx, &results); err != nil || len(results) == 0 {
-		if err != nil {
-			return 0, err
-		}
-		return 1, nil
-	}
-	switch v := results[0]["maxSequence"].(type) {
-	case int32:
-		return int(v) + 1, nil
-	case int64:
-		return int(v) + 1, nil
-	case float64:
-		return int(v) + 1, nil
-	default:
-		return 1, nil
-	}
-}
-
-func buildReceiveProductStockSequenceMatch(productId primitive.ObjectID, unitId primitive.ObjectID, branchId primitive.ObjectID) bson.M {
-	return bson.M{"productId": productId, "unitId": unitId, "branchId": branchId}
-}
-
-func (entity *receiveEntity) getReceiveProductStockBalance(ctx context.Context, productId primitive.ObjectID, unitId primitive.ObjectID, branchId primitive.ObjectID) (int, error) {
-	pipeline := []bson.M{
-		{"$match": bson.M{"productId": productId, "unitId": unitId, "branchId": branchId}},
-		{"$group": bson.M{"_id": nil, "balance": bson.M{"$sum": "$quantity"}}},
-	}
-	cursor, err := entity.productStockRepo.Aggregate(ctx, pipeline)
-	if err != nil {
-		return 0, err
-	}
-	var results []bson.M
-	if err = cursor.All(ctx, &results); err != nil || len(results) == 0 {
-		if err != nil {
-			return 0, err
-		}
-		return 0, nil
-	}
-	switch v := results[0]["balance"].(type) {
-	case int32:
-		return int(v), nil
-	case int64:
-		return int(v), nil
-	case float64:
-		return int(v), nil
-	default:
-		return 0, nil
-	}
+	}})
 }

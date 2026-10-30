@@ -1,9 +1,11 @@
 package domain
 
 import (
-	"github.com/app-devper/um-api/sessionclient/ginauth"
+	"pos/app/data/ledger"
 	"pos/app/data/repositories"
 	"pos/db"
+
+	"github.com/app-devper/um-api/sessionclient/ginauth"
 )
 
 type Repository struct {
@@ -12,6 +14,7 @@ type Repository struct {
 	Sequence        repositories.ISequence
 	Category        repositories.ICategory
 	Order           repositories.IOrder
+	OrderAnalytics  repositories.IOrderAnalytics
 	Product         repositories.IProduct
 	ProductStock    repositories.IProductStock
 	Customer        repositories.ICustomer
@@ -27,12 +30,15 @@ type Repository struct {
 	StockAdjustment repositories.IStockAdjustment
 	StockCount      repositories.IStockCount
 	ProductReturn   repositories.IProductReturn
+	// Ledger records every Stock movement (ADR-0001).
+	Ledger *ledger.Ledger
 }
 
 func InitRepository(resource *db.Resource) *Repository {
 	return &Repository{
 		Category:        repositories.NewCategoryEntity(resource),
 		Order:           repositories.NewOrderEntity(resource),
+		OrderAnalytics:  repositories.NewOrderAnalyticsEntity(resource),
 		Sequence:        repositories.NewSequenceEntity(resource),
 		Customer:        repositories.NewCustomerEntity(resource),
 		Product:         repositories.NewProductEntity(resource),
@@ -49,5 +55,6 @@ func InitRepository(resource *db.Resource) *Repository {
 		StockAdjustment: repositories.NewStockAdjustmentEntity(resource),
 		StockCount:      repositories.NewStockCountEntity(resource),
 		ProductReturn:   repositories.NewProductReturnEntity(resource),
+		Ledger:          repositories.NewLedger(resource),
 	}
 }

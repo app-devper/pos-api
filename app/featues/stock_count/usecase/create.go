@@ -1,15 +1,23 @@
 package usecase
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
+	"pos/app/data/entities"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
+
+	"github.com/gin-gonic/gin"
 )
 
-func CreateStockCount(records repositories.IStockCount) gin.HandlerFunc {
+// countRecorder records a Count through the Stock ledger.
+type countRecorder interface {
+	Count(ctx context.Context, req request.StockCount) (*entities.StockCount, error)
+}
+
+func CreateStockCount(ledger countRecorder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.StockCount{}
 		if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -18,9 +26,9 @@ func CreateStockCount(records repositories.IStockCount) gin.HandlerFunc {
 		}
 		req.BranchId = utils.GetBranchId(ctx)
 		req.CreatedBy = utils.GetUserId(ctx)
-		result, err := records.RecordStockCount(req)
+		result, err := ledger.Count(ctx.Request.Context(), req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.SC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -42,9 +50,9 @@ func GetStockCounts(stockCountEntity repositories.IStockCount) gin.HandlerFunc {
 func GetStockCountById(stockCountEntity repositories.IStockCount) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		result, err := stockCountEntity.GetStockCountById(id)
+		result, err := stockCountEntity.GetStockCountById(id, utils.GetBranchId(ctx))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.SC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type stockTransferRepoStub struct {
@@ -29,23 +31,30 @@ func (s *stockTransferRepoStub) CreateStockTransfer(form request.StockTransfer) 
 	return s.createFn(form)
 }
 
-func (s *stockTransferRepoStub) CreateStockTransferWithReservation(form request.StockTransfer) (*entities.StockTransfer, error) {
+func (s *stockTransferRepoStub) RequestTransfer(_ context.Context, form request.StockTransfer) (*entities.StockTransfer, error) {
 	return s.createFn(form)
 }
 
-func (s *stockTransferRepoStub) GetStockTransferById(id string) (*entities.StockTransfer, error) {
-	return s.getByIDFn(id)
+func (s *stockTransferRepoStub) GetStockTransferById(id string, branchId string) (*entities.StockTransfer, error) {
+	d, err := func() (*entities.StockTransfer, error) {
+		return s.getByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.FromBranchId.Hex() != branchId && d.ToBranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
 func (s *stockTransferRepoStub) UpdateStockTransferStatus(id string, form request.UpdateStockTransfer) (*entities.StockTransfer, error) {
 	return s.updateStatusFn(id, form)
 }
 
-func (s *stockTransferRepoStub) ApproveStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
+func (s *stockTransferRepoStub) ApproveTransfer(_ context.Context, id string, updatedBy string) (*entities.StockTransfer, error) {
 	return s.approveFn(id, updatedBy)
 }
 
-func (s *stockTransferRepoStub) RejectStockTransfer(id string, updatedBy string) (*entities.StockTransfer, error) {
+func (s *stockTransferRepoStub) RejectTransfer(_ context.Context, id string, updatedBy string) (*entities.StockTransfer, error) {
 	return s.rejectFn(id, updatedBy)
 }
 
@@ -58,23 +67,22 @@ type transferProductStub struct {
 	removeStockByID func(id string) (*entities.ProductStock, error)
 }
 
-func (s *transferProductStub) RemoveProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return s.removeStockFn(stockId, quantity)
+func (s *transferProductStub) GetProductStockById(id string, branchId string) (*entities.ProductStock, error) {
+	d, err := func() (*entities.ProductStock, error) {
+		return s.getStockByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
-func (s *transferProductStub) AddProductStockQuantityById(stockId string, quantity int) (*entities.ProductStock, error) {
-	return s.addStockFn(stockId, quantity)
-}
-
-func (s *transferProductStub) GetProductStockById(id string) (*entities.ProductStock, error) {
-	return s.getStockByIDFn(id)
-}
-
-func (s *transferProductStub) CreateProductStock(param request.ProductStock) (*entities.ProductStock, error) {
+func (s *transferProductStub) CreateStock(_ context.Context, param request.ProductStock) (*entities.ProductStock, error) {
 	return s.createStockFn(param)
 }
 
-func (s *transferProductStub) RemoveProductStockById(id string) (*entities.ProductStock, error) {
+func (s *transferProductStub) DeleteStock(_ context.Context, id string, branchId string, by string) (*entities.ProductStock, error) {
 	return s.removeStockByID(id)
 }
 
@@ -208,6 +216,7 @@ func TestApproveStockTransferReturnsErrorWhenTransactionalApproveFails(t *testin
 	gin.SetMode(gin.TestMode)
 
 	sourceBranchID := primitive.NewObjectID()
+	receivingBranchID := primitive.NewObjectID()
 	transferID := primitive.NewObjectID()
 
 	repo := &stockTransferRepoStub{
@@ -215,7 +224,7 @@ func TestApproveStockTransferReturnsErrorWhenTransactionalApproveFails(t *testin
 			return &entities.StockTransfer{
 				Id:           transferID,
 				FromBranchId: sourceBranchID,
-				ToBranchId:   primitive.NewObjectID(),
+				ToBranchId:   receivingBranchID,
 				Status:       "PENDING",
 			}, nil
 		},
@@ -229,14 +238,43 @@ func TestApproveStockTransferReturnsErrorWhenTransactionalApproveFails(t *testin
 	ctx.Request = req
 	ctx.Params = gin.Params{{Key: "id", Value: transferID.Hex()}}
 	ctx.Set("UserId", "user-1")
-	ctx.Set("BranchId", sourceBranchID.Hex())
+	ctx.Set("BranchId", receivingBranchID.Hex())
 
-	ApproveStockTransfer(repo)(ctx)
+	ApproveStockTransfer(repo, repo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
 	}
 	if !strings.Contains(w.Body.String(), errcode.TR_BAD_REQUEST_002) {
 		t.Fatalf("expected errcode %s in response body, got %s", errcode.TR_BAD_REQUEST_002, w.Body.String())
+	}
+}
+
+func TestTheBranchThatAskedCannotApproveItsOwnTransfer(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	sourceBranchID := primitive.NewObjectID()
+	transferID := primitive.NewObjectID()
+	repo := &stockTransferRepoStub{
+		getByIDFn: func(id string) (*entities.StockTransfer, error) {
+			return &entities.StockTransfer{Id: transferID, FromBranchId: sourceBranchID,
+				ToBranchId: primitive.NewObjectID(), Status: "PENDING"}, nil
+		},
+		approveFn: func(id string, updatedBy string) (*entities.StockTransfer, error) {
+			t.Fatal("the asking branch approved its own transfer")
+			return nil, nil
+		},
+	}
+	w := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(w)
+	ctx.Request = httptest.NewRequest(http.MethodPatch, "/stock-transfers/"+transferID.Hex()+"/approve", nil)
+	ctx.Params = gin.Params{{Key: "id", Value: transferID.Hex()}}
+	ctx.Set("UserId", "user-1")
+	ctx.Set("BranchId", sourceBranchID.Hex())
+
+	ApproveStockTransfer(repo, repo)(ctx)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d, got %d", http.StatusForbidden, w.Code)
 	}
 }

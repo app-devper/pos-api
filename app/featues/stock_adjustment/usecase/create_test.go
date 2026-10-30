@@ -1,25 +1,25 @@
 package usecase
 
 import (
+	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
 	"pos/app/data/entities"
-	"pos/app/data/repositories"
 	"pos/app/domain/request"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
 
 type recorderStub struct {
-	repositories.IStockAdjustment
 	seen  request.StockAdjustment
 	calls int
 	err   error
 }
 
-func (s *recorderStub) ApplyStockAdjustment(req request.StockAdjustment) (*entities.StockAdjustment, error) {
+func (s *recorderStub) Adjust(_ context.Context, req request.StockAdjustment) (*entities.StockAdjustment, error) {
 	s.seen = req
 	s.calls++
 	return &entities.StockAdjustment{}, s.err

@@ -5,7 +5,6 @@ import (
 	"pos/app/featues/employee/usecase"
 	"pos/middlewares"
 
-	"github.com/app-devper/um-api/sessionclient"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,41 +12,31 @@ func ApplyEmployeeAPI(
 	route *gin.RouterGroup,
 	repository *domain.Repository,
 ) {
+	policies := middlewares.NewPolicies(repository.Auth, repository.Employee, repository.Branch)
 	employeeRoute := route.Group("employees")
+	shopAdmin := policies.ShopAdmin.On(employeeRoute)
 
-	employeeRoute.POST("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.POST("",
 		usecase.CreateEmployee(repository.Employee),
 	)
 
-	employeeRoute.GET("",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.GET("",
 		usecase.GetEmployees(repository.Employee),
 	)
 
-	employeeRoute.GET("/:employeeId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.GET("/:employeeId",
 		usecase.GetEmployeeById(repository.Employee),
 	)
 
-	employeeRoute.PUT("/:employeeId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.PUT("/:employeeId",
 		usecase.UpdateEmployeeById(repository.Employee),
 	)
 
-	employeeRoute.DELETE("/:employeeId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.DELETE("/:employeeId",
 		usecase.DeleteEmployeeById(repository.Employee),
 	)
 
-	employeeRoute.GET("/branch/:branchId",
-		middlewares.RequireSession(repository.Auth),
-		repository.Auth.AtLeast(sessionclient.RoleAdmin),
+	shopAdmin.GET("/branch/:branchId",
 		usecase.GetEmployeesByBranchId(repository.Employee),
 	)
 }

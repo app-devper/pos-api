@@ -1,37 +1,39 @@
 package request
 
 type Promotion struct {
-	Code        string    `json:"code" binding:"required"`
-	Name        string    `json:"name" binding:"required"`
-	Description string    `json:"description"`
-	Type        string    `json:"type" binding:"required"`
-	Value       float64   `json:"value" binding:"required"`
-	MinPurchase float64   `json:"minPurchase"`
-	MaxDiscount float64   `json:"maxDiscount"`
-	ProductIds  []string  `json:"productIds"`
+	Code        string       `json:"code" binding:"required"`
+	Name        string       `json:"name" binding:"required"`
+	Description string       `json:"description"`
+	Type        string       `json:"type" binding:"required"`
+	Value       float64      `json:"value" binding:"required"`
+	MinPurchase float64      `json:"minPurchase"`
+	MaxDiscount float64      `json:"maxDiscount"`
+	ProductIds  []string     `json:"productIds"`
 	StartDate   FlexibleTime `json:"startDate" binding:"required"`
 	EndDate     FlexibleTime `json:"endDate" binding:"required"`
 	CreatedBy   string
 	BranchId    string
 }
 
+// UpdatePromotion changes only the fields it carries: a field left out of
+// the request keeps its value.
 type UpdatePromotion struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Type        string    `json:"type"`
-	Value       float64   `json:"value"`
-	MinPurchase float64   `json:"minPurchase"`
-	MaxDiscount float64   `json:"maxDiscount"`
-	ProductIds  []string  `json:"productIds"`
-	StartDate   FlexibleTime `json:"startDate"`
-	EndDate     FlexibleTime `json:"endDate"`
-	Status      string    `json:"status"`
+	Name        *string       `json:"name"`
+	Description *string       `json:"description"`
+	Type        *string       `json:"type"`
+	Value       *float64      `json:"value"`
+	MinPurchase *float64      `json:"minPurchase"`
+	MaxDiscount *float64      `json:"maxDiscount"`
+	ProductIds  *[]string     `json:"productIds"`
+	StartDate   *FlexibleTime `json:"startDate"`
+	EndDate     *FlexibleTime `json:"endDate"`
+	Status      string        `json:"status"`
 	UpdatedBy   string
 }
 
 type ApplyPromotion struct {
-	PromotionCode string  `json:"promotionCode" binding:"required"`
-	OrderTotal    float64 `json:"orderTotal" binding:"required"`
+	PromotionCode string   `json:"promotionCode" binding:"required"`
+	OrderTotal    float64  `json:"orderTotal" binding:"required"`
 	ProductIds    []string `json:"productIds"`
 }
 

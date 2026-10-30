@@ -1,0 +1,246 @@
+{
+  "note": "Owned by pos-api (app/domain/sale/money.go). Regenerate with `go test ./app/domain/sale -run TestMoneyCases -update`, then copy this file unchanged to devper-workspace packages/applications/pos/test/fixtures/sale_money_cases.json.",
+  "lines": [
+    {
+      "name": "whole baht",
+      "unitPrice": 25,
+      "quantity": 2,
+      "discount": 0,
+      "want": {
+        "Amount": 50,
+        "Discount": 0,
+        "Paid": 50
+      }
+    },
+    {
+      "name": "satang",
+      "unitPrice": 12.5,
+      "quantity": 3,
+      "discount": 0,
+      "want": {
+        "Amount": 37.5,
+        "Discount": 0,
+        "Paid": 37.5
+      }
+    },
+    {
+      "name": "price with 3 decimals rounds the Line",
+      "unitPrice": 4.445,
+      "quantity": 1,
+      "discount": 0,
+      "want": {
+        "Amount": 4.45,
+        "Discount": 0,
+        "Paid": 4.45
+      }
+    },
+    {
+      "name": "3 decimals times quantity",
+      "unitPrice": 1.335,
+      "quantity": 3,
+      "discount": 0,
+      "want": {
+        "Amount": 4.01,
+        "Discount": 0,
+        "Paid": 4.01
+      }
+    },
+    {
+      "name": "float product below the half",
+      "unitPrice": 1.005,
+      "quantity": 1,
+      "discount": 0,
+      "want": {
+        "Amount": 1,
+        "Discount": 0,
+        "Paid": 1
+      }
+    },
+    {
+      "name": "discount per unit",
+      "unitPrice": 30,
+      "quantity": 2,
+      "discount": 5,
+      "want": {
+        "Amount": 60,
+        "Discount": 5,
+        "Paid": 50
+      }
+    },
+    {
+      "name": "fractional discount",
+      "unitPrice": 10,
+      "quantity": 3,
+      "discount": 0.333,
+      "want": {
+        "Amount": 30,
+        "Discount": 0.333,
+        "Paid": 29
+      }
+    },
+    {
+      "name": "discount above the price is the price",
+      "unitPrice": 20,
+      "quantity": 2,
+      "discount": 25,
+      "want": {
+        "Amount": 40,
+        "Discount": 20,
+        "Paid": 0
+      }
+    },
+    {
+      "name": "negative discount is none",
+      "unitPrice": 20,
+      "quantity": 1,
+      "discount": -3,
+      "want": {
+        "Amount": 20,
+        "Discount": 0,
+        "Paid": 20
+      }
+    },
+    {
+      "name": "price per tablet",
+      "unitPrice": 0.8333,
+      "quantity": 12,
+      "discount": 0,
+      "want": {
+        "Amount": 10,
+        "Discount": 0,
+        "Paid": 10
+      }
+    }
+  ],
+  "sales": [
+    {
+      "name": "one Line",
+      "lines": [
+        {
+          "unitPrice": 25,
+          "quantity": 2,
+          "discount": 0
+        }
+      ],
+      "wantTotal": 50
+    },
+    {
+      "name": "three Lines at 4.445",
+      "lines": [
+        {
+          "unitPrice": 4.445,
+          "quantity": 1,
+          "discount": 0
+        },
+        {
+          "unitPrice": 4.445,
+          "quantity": 1,
+          "discount": 0
+        },
+        {
+          "unitPrice": 4.445,
+          "quantity": 1,
+          "discount": 0
+        }
+      ],
+      "wantTotal": 13.35
+    },
+    {
+      "name": "two Lines at 1.335",
+      "lines": [
+        {
+          "unitPrice": 1.335,
+          "quantity": 1,
+          "discount": 0
+        },
+        {
+          "unitPrice": 1.335,
+          "quantity": 1,
+          "discount": 0
+        }
+      ],
+      "wantTotal": 2.68
+    },
+    {
+      "name": "0.1 + 0.2",
+      "lines": [
+        {
+          "unitPrice": 0.1,
+          "quantity": 1,
+          "discount": 0
+        },
+        {
+          "unitPrice": 0.2,
+          "quantity": 1,
+          "discount": 0
+        }
+      ],
+      "wantTotal": 0.3
+    },
+    {
+      "name": "discounts across Lines",
+      "lines": [
+        {
+          "unitPrice": 10,
+          "quantity": 3,
+          "discount": 0.333
+        },
+        {
+          "unitPrice": 30,
+          "quantity": 2,
+          "discount": 5
+        },
+        {
+          "unitPrice": 0.8333,
+          "quantity": 12,
+          "discount": 0
+        }
+      ],
+      "wantTotal": 89
+    }
+  ],
+  "tenders": [
+    {
+      "name": "exact",
+      "total": 13.32,
+      "tendered": 13.32,
+      "wantCovers": true,
+      "wantChange": 0
+    },
+    {
+      "name": "one satang short",
+      "total": 13.32,
+      "tendered": 13.31,
+      "wantCovers": false,
+      "wantChange": 0
+    },
+    {
+      "name": "a float that rounds up to the total",
+      "total": 8.9,
+      "tendered": 8.895,
+      "wantCovers": true,
+      "wantChange": 0
+    },
+    {
+      "name": "more than the total",
+      "total": 13.32,
+      "tendered": 20,
+      "wantCovers": true,
+      "wantChange": 6.68
+    },
+    {
+      "name": "unrounded sum of the Lines",
+      "total": 13.32,
+      "tendered": 13.335,
+      "wantCovers": true,
+      "wantChange": 0.02
+    },
+    {
+      "name": "zero total",
+      "total": 0,
+      "tendered": 0,
+      "wantCovers": true,
+      "wantChange": 0
+    }
+  ]
+}

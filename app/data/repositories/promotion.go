@@ -4,6 +4,7 @@ import (
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
+	"pos/app/domain/promotion"
 	"pos/app/domain/request"
 	"pos/db"
 	"time"
@@ -54,6 +55,10 @@ func (entity *promotionEntity) CreatePromotion(form request.Promotion) (*entitie
 	if err != nil {
 		return nil, err
 	}
+	terms := promotion.Terms{Type: form.Type, Value: form.Value, MinPurchase: form.MinPurchase, MaxDiscount: form.MaxDiscount}
+	if err := terms.Validate(); err != nil {
+		return nil, err
+	}
 	productIds := make([]primitive.ObjectID, len(form.ProductIds))
 	for i, id := range form.ProductIds {
 		productIds[i], err = primitive.ObjectIDFromHex(id)
@@ -68,7 +73,7 @@ func (entity *promotionEntity) CreatePromotion(form request.Promotion) (*entitie
 		Code:        form.Code,
 		Name:        form.Name,
 		Description: form.Description,
-		Type:        form.Type,
+		Type:        promotion.Kind(form.Type),
 		Value:       form.Value,
 		MinPurchase: form.MinPurchase,
 		MaxDiscount: form.MaxDiscount,
@@ -188,34 +193,61 @@ func (entity *promotionEntity) UpdatePromotionById(id string, branchId string, f
 		filter["branchId"] = branchObjId
 	}
 
-	productIds := make([]primitive.ObjectID, len(form.ProductIds))
-	for i, pid := range form.ProductIds {
-		productIds[i], err = primitive.ObjectIDFromHex(pid)
-		if err != nil {
-			return nil, err
+	var productIds []primitive.ObjectID
+	if form.ProductIds != nil {
+		productIds = make([]primitive.ObjectID, len(*form.ProductIds))
+		for i, pid := range *form.ProductIds {
+			if productIds[i], err = primitive.ObjectIDFromHex(pid); err != nil {
+				return nil, err
+			}
 		}
 	}
-
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
-
-	update := bson.M{
-		"name":        form.Name,
-		"description": form.Description,
-		"type":        form.Type,
-		"value":       form.Value,
-		"minPurchase": form.MinPurchase,
-		"maxDiscount": form.MaxDiscount,
-		"productIds":  productIds,
-		"startDate":   form.StartDate.Time,
-		"endDate":     form.EndDate.Time,
-		"updatedBy":   form.UpdatedBy,
-		"updatedDate": time.Now(),
+	var current entities.Promotion
+	if err := entity.repo.FindOne(ctx, filter).Decode(&current); err != nil {
+		return nil, err
+	}
+	update := bson.M{"updatedBy": form.UpdatedBy, "updatedDate": time.Now()}
+	terms := promotion.Terms{Type: current.Type, Value: current.Value, MinPurchase: current.MinPurchase, MaxDiscount: current.MaxDiscount}
+	if form.Name != nil {
+		update["name"] = *form.Name
+	}
+	if form.Description != nil {
+		update["description"] = *form.Description
+	}
+	if form.Type != nil {
+		terms.Type = promotion.Kind(*form.Type)
+		update["type"] = terms.Type
+	}
+	if form.Value != nil {
+		terms.Value = *form.Value
+		update["value"] = terms.Value
+	}
+	if form.MinPurchase != nil {
+		terms.MinPurchase = *form.MinPurchase
+		update["minPurchase"] = terms.MinPurchase
+	}
+	if form.MaxDiscount != nil {
+		terms.MaxDiscount = *form.MaxDiscount
+		update["maxDiscount"] = terms.MaxDiscount
+	}
+	if productIds != nil {
+		update["productIds"] = productIds
+	}
+	if form.StartDate != nil {
+		update["startDate"] = form.StartDate.Time
+	}
+	if form.EndDate != nil {
+		update["endDate"] = form.EndDate.Time
 	}
 	if form.Status != "" {
 		update["status"] = form.Status
 	}
+	if err := terms.Validate(); err != nil {
+		return nil, err
+	}
 
+	isReturnNewDoc := options.After
+	opts := &options.FindOneAndUpdateOptions{ReturnDocument: &isReturnNewDoc}
 	data := entities.Promotion{}
 	err = entity.repo.FindOneAndUpdate(ctx, filter, bson.M{"$set": update}, opts).Decode(&data)
 	if err != nil {

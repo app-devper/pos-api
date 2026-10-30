@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"pos/app/core/errcode"
@@ -12,7 +13,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CreateProductStock(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
+// stockLedger creates, sets and deletes a Stock through the Stock ledger.
+type stockLedger interface {
+	CreateStock(ctx context.Context, req request.ProductStock) (*entities.ProductStock, error)
+	SetQuantity(ctx context.Context, stockID, branchID string, quantity int, by string) (*entities.ProductStock, error)
+	DeleteStock(ctx context.Context, stockID, branchID, by string) (*entities.ProductStock, error)
+}
+
+func CreateProductStock(ledger stockLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.ProductStock{}
 		if err := ctx.ShouldBind(&req); err != nil {
@@ -22,22 +30,12 @@ func CreateProductStock(productStock repositories.IProductStock, productEntity r
 		userId := ctx.GetString("UserId")
 		req.UpdatedBy = userId
 		req.BranchId = ctx.GetString("BranchId")
-		stock, err := productStock.CreateProductStock(req)
+		// The Stock ledger writes its history and settles waiting Lines.
+		stock, err := ledger.CreateStock(ctx.Request.Context(), req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
-
-		if err := appendProductStockHistory(req.BranchId, productEntity, productStock, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productStock.GetProductStockBalance(req.ProductId, unit.Id.Hex(), branchId)
-			history := request.AddProductStockHistory(req.ProductId, unit.Unit, req, balance)
-			history.BranchId = branchId
-			return history
-		}); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-
 		ctx.JSON(http.StatusOK, stock)
 	}
 }
@@ -65,13 +63,9 @@ func UpdateProductStockById(productStock repositories.IProductStock, productEnti
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
-		stock, err := productStock.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
-			abortProductBranchMismatch(ctx)
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		userId := ctx.GetString("UserId")
@@ -96,7 +90,7 @@ func UpdateProductStockById(productStock repositories.IProductStock, productEnti
 	}
 }
 
-func UpdateProductStockQuantityById(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
+func UpdateProductStockQuantityById(productStock repositories.IProductStock, ledger stockLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.UpdateProductStockQuantity{}
 		id := ctx.Param("stockId")
@@ -105,68 +99,36 @@ func UpdateProductStockQuantityById(productStock repositories.IProductStock, pro
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_001, err.Error())
 			return
 		}
-		stock, err := productStock.GetProductStockById(id)
+		stock, err := productStock.GetProductStockById(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
-		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
-			abortProductBranchMismatch(ctx)
-			return
-		}
-		userId := ctx.GetString("UserId")
-		req.UpdatedBy = userId
-
-		stock, err = productStock.UpdateProductStockQuantityById(id, req.Quantity)
+		// A one-Line Count in the Stock ledger: Adjustment, history, settlement.
+		stock, err = ledger.SetQuantity(ctx.Request.Context(), id, branchId, req.Quantity, ctx.GetString("UserId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
-		if err := appendProductStockHistory(branchId, productEntity, productStock, stock.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productStock.GetProductStockBalance(stock.ProductId.Hex(), unit.Id.Hex(), branchId)
-			qtyHistory := request.UpdateProductStockQuantityHistory(stock.ProductId.Hex(), unit.Unit, req, balance)
-			qtyHistory.BranchId = branchId
-			return qtyHistory
-		}); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-
 		ctx.JSON(http.StatusOK, stock)
 	}
 }
 
-func RemoveProductStockById(productStock repositories.IProductStock, productEntity repositories.IProduct) gin.HandlerFunc {
+func RemoveProductStockById(productStock repositories.IProductStock, ledger stockLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("stockId")
 		userId := ctx.GetString("UserId")
 		branchId := ctx.GetString("BranchId")
-		stock, err := productStock.GetProductStockById(id)
+		if _, err := productStock.GetProductStockById(id, branchId); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
+			return
+		}
+
+		result, err := ledger.DeleteStock(ctx.Request.Context(), id, branchId, userId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
-		if err := ensureProductStockBranchAccess(stock, branchId); err != nil {
-			abortProductBranchMismatch(ctx)
-			return
-		}
-
-		result, err := productStock.RemoveProductStockById(id)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-
-		if err := appendProductStockHistory(branchId, productEntity, productStock, result.UnitId.Hex(), func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
-			balance := productStock.GetProductStockBalance(result.ProductId.Hex(), unit.Id.Hex(), branchId)
-			removeHistory := request.RemoveProductStockHistory(result.ProductId.Hex(), unit.Unit, result, balance, userId)
-			removeHistory.BranchId = branchId
-			return removeHistory
-		}); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
-			return
-		}
-
 		ctx.JSON(http.StatusOK, result)
 	}
 }

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type receiveRepoStub struct {
@@ -21,11 +23,18 @@ type receiveRepoStub struct {
 	importReceiveToStockFn func(receiveId string, userId string, branchId string) (*entities.Receive, error)
 }
 
-func (s *receiveRepoStub) GetReceiveById(id string) (*entities.Receive, error) {
-	return s.getReceiveByIDFn(id)
+func (s *receiveRepoStub) GetReceiveById(id string, branchId string) (*entities.Receive, error) {
+	d, err := func() (*entities.Receive, error) {
+		return s.getReceiveByIDFn(id)
+	}()
+	// The repository reads with the branch in the query.
+	if err == nil && d != nil && d.BranchId.Hex() != branchId {
+		return nil, mongo.ErrNoDocuments
+	}
+	return d, err
 }
 
-func (s *receiveRepoStub) ImportReceiveToStock(receiveId string, userId string, branchId string) (*entities.Receive, error) {
+func (s *receiveRepoStub) ImportReceive(_ context.Context, receiveId, branchId, userId string) (*entities.Receive, error) {
 	return s.importReceiveToStockFn(receiveId, userId, branchId)
 }
 
@@ -52,7 +61,7 @@ func TestImportReceiveToStockReturnsErrorWhenTransactionalImportFails(t *testing
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", branchID.Hex())
 
-	ImportReceiveToStock(receiveRepo, nil)(ctx)
+	ImportReceiveToStock(receiveRepo, receiveRepo)(ctx)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)

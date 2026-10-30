@@ -9,7 +9,6 @@
 package sale
 
 import (
-	"math"
 	"sort"
 
 	"pos/app/data/entities"
@@ -62,7 +61,7 @@ type Rung struct {
 }
 
 // Paid is what the customer pays for the Line.
-func (r Rung) Paid(quantity int) float64 { return round(r.Amount - r.Discount*float64(quantity)) }
+func (r Rung) Paid(quantity int) float64 { return Round(r.Amount - r.Discount*float64(quantity)) }
 
 // Ring prices a Line and draws its quantity from the Catalog's Stock, as the
 // till previews it:
@@ -84,8 +83,8 @@ func Ring(l Line, c Catalog) Rung {
 
 	r := Rung{}
 	r.PriceType, r.UnitPrice = price(l, c.Prices, first)
-	r.Amount = round(r.UnitPrice * float64(l.Quantity))
-	r.Discount = math.Min(math.Max(l.Discount, 0), r.UnitPrice)
+	charge := ChargeFor(r.UnitPrice, l.Quantity, l.Discount)
+	r.Amount, r.Discount = charge.Amount, charge.Discount
 	r.Parts, r.Oversold = allocate(l, stocks, first)
 
 	costs := map[string]float64{"": c.UnitCost}
@@ -98,7 +97,7 @@ func Ring(l Line, c Catalog) Rung {
 	for _, p := range r.Parts {
 		r.Cost += costs[p.StockId] * float64(p.Quantity)
 	}
-	r.Cost = round(r.Cost)
+	r.Cost = Round(r.Cost)
 	return r
 }
 
@@ -175,5 +174,3 @@ func allocate(l Line, stocks []entities.ProductStock, first *entities.ProductSto
 	}
 	return kept, oversold
 }
-
-func round(v float64) float64 { return math.Round(v*100) / 100 }

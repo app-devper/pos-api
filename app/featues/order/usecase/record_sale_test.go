@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"pos/app/core/errcode"
 	"pos/app/data/entities"
+	"pos/app/data/ledger"
 	"pos/app/data/repositories"
 	"pos/app/domain/request"
 
@@ -18,24 +20,13 @@ import (
 )
 
 type saleRepoStub struct {
-	repositories.IOrder
-	found    *repositories.RecordedSale
-	findErr  error
-	record   func(form request.Sale) (*repositories.RecordedSale, error)
+	record   func(form request.Sale) (*ledger.Sold, error)
 	recorded []request.Sale
 }
 
-func (s *saleRepoStub) FindSale(form request.Sale) (*repositories.RecordedSale, error) {
-	return s.found, s.findErr
-}
-
-func (s *saleRepoStub) RecordSale(form request.Sale) (*repositories.RecordedSale, error) {
+func (s *saleRepoStub) Sell(_ context.Context, form request.Sale) (*ledger.Sold, error) {
 	s.recorded = append(s.recorded, form)
 	return s.record(form)
-}
-
-func (s *saleRepoStub) CreateOrder(form request.Order) (*entities.Order, []entities.OrderItem, error) {
-	return nil, nil, errors.New("old path taken")
 }
 
 type countingSequence struct {
@@ -50,7 +41,7 @@ func (s *countingSequence) NextSequence(field string) (*entities.Sequence, error
 
 const saleBody = `{"saleId":"s1","type":"CASH","payments":[{"amount":50,"type":"CASH"}],"items":[{"productId":"p","unitId":"u","quantity":2,"priceType":"General"}]}`
 
-func postSale(t *testing.T, repo repositories.IOrder, seq repositories.ISequence, body string) *httptest.ResponseRecorder {
+func postSale(t *testing.T, repo seller, seq repositories.ISequence, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -59,14 +50,14 @@ func postSale(t *testing.T, repo repositories.IOrder, seq repositories.ISequence
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	ctx.Set("UserId", "user-1")
 	ctx.Set("BranchId", primitive.NewObjectID().Hex())
-	CreateOrder(repo, &productStub{}, &productStockStub{}, seq)(ctx)
+	CreateOrder(repo)(ctx)
 	return w
 }
 
 func TestCreateOrderWithSaleIdRecordsTheSale(t *testing.T) {
 	order := &entities.Order{Id: primitive.NewObjectID(), Total: 20}
-	repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
-		return &repositories.RecordedSale{Order: order, Stocks: []entities.ProductStock{}}, nil
+	repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
+		return &ledger.Sold{Order: order, Stocks: []entities.ProductStock{}}, nil
 	}}
 	seq := &countingSequence{}
 
@@ -82,42 +73,27 @@ func TestCreateOrderWithSaleIdRecordsTheSale(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil || resp.Data.Id != order.Id || resp.Stocks == nil {
 		t.Fatalf("response %s (%v)", w.Body.String(), err)
 	}
-	if len(repo.recorded) != 1 || seq.calls != 1 {
-		t.Fatalf("recorded %d sequences %d", len(repo.recorded), seq.calls)
+	// The Stock ledger takes the Order code inside its transaction (ADR-0001).
+	if len(repo.recorded) != 1 || seq.calls != 0 {
+		t.Fatalf("recorded %d, handler took %d sequences", len(repo.recorded), seq.calls)
 	}
 	s := repo.recorded[0]
-	if s.SaleId != "s1" || s.Code == "" || s.CreatedBy != "user-1" || s.BranchId == "" || s.Items[0].PriceType != "General" {
+	if s.SaleId != "s1" || s.CreatedBy != "user-1" || s.BranchId == "" || s.Items[0].PriceType != "General" {
 		t.Fatalf("sale %+v", s)
-	}
-}
-
-func TestCreateOrderRepeatedSaleDoesNotTakeAnOrderCode(t *testing.T) {
-	order := &entities.Order{Id: primitive.NewObjectID()}
-	repo := &saleRepoStub{found: &repositories.RecordedSale{Order: order}}
-	seq := &countingSequence{}
-
-	w := postSale(t, repo, seq, saleBody)
-
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), order.Id.Hex()) {
-		t.Fatalf("status %d %s", w.Code, w.Body.String())
-	}
-	if seq.calls != 0 || len(repo.recorded) != 0 {
-		t.Fatalf("sequences %d recorded %d", seq.calls, len(repo.recorded))
 	}
 }
 
 func TestCreateOrderSaleErrors(t *testing.T) {
 	for name, tc := range map[string]struct {
-		findErr, recordErr error
-		status             int
-		code               string
+		recordErr error
+		status    int
+		code      string
 	}{
-		"id reused on find":   {findErr: repositories.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
-		"id reused on record": {recordErr: repositories.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
-		"rejected":            {recordErr: &repositories.SaleRejected{Reason: "payment too low"}, status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_001},
-		"failed":              {recordErr: errors.New("mongo down"), status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_002},
+		"id reused": {recordErr: ledger.ErrSaleConflict, status: http.StatusConflict, code: errcode.OR_CONFLICT_001},
+		"rejected":  {recordErr: &ledger.Rejected{Reason: "payment too low"}, status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_001},
+		"failed":    {recordErr: errors.New("mongo down"), status: http.StatusBadRequest, code: errcode.OR_BAD_REQUEST_002},
 	} {
-		repo := &saleRepoStub{findErr: tc.findErr, record: func(form request.Sale) (*repositories.RecordedSale, error) {
+		repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
 			return nil, tc.recordErr
 		}}
 		w := postSale(t, repo, &countingSequence{}, saleBody)
@@ -134,7 +110,7 @@ func TestCreateOrderSaleRejectsInvalidBody(t *testing.T) {
 		"zero quantity": `{"saleId":"s1","type":"CASH","payments":[{"amount":50,"type":"CASH"}],"items":[{"productId":"p","unitId":"u","quantity":0}]}`,
 		"not json":      `{`,
 	} {
-		repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
+		repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
 			t.Fatalf("%s: recorded", name)
 			return nil, nil
 		}}
@@ -145,13 +121,15 @@ func TestCreateOrderSaleRejectsInvalidBody(t *testing.T) {
 	}
 }
 
-func TestCreateOrderWithoutSaleIdTakesTheOldPath(t *testing.T) {
-	repo := &saleRepoStub{record: func(form request.Sale) (*repositories.RecordedSale, error) {
-		t.Fatal("new path taken")
+func TestCreateOrderWithoutSaleIdIsRefused(t *testing.T) {
+	// A till that prices the Sale itself (no saleId) is out of date: pos-api
+	// prices every Sale and draws its Stock through the ledger (ADR-0001).
+	repo := &saleRepoStub{record: func(form request.Sale) (*ledger.Sold, error) {
+		t.Fatal("a Sale without saleId must not be recorded")
 		return nil, nil
 	}}
 	w := postSale(t, repo, &countingSequence{}, `{"items":[],"amount":20,"type":"cash","total":20}`)
-	if !strings.Contains(w.Body.String(), "old path taken") {
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "saleId") {
 		t.Fatalf("status %d %s", w.Code, w.Body.String())
 	}
 }

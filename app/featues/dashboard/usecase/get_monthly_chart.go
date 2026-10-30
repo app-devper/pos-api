@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetMonthlyChart(orderEntity repositories.IOrder) gin.HandlerFunc {
+func GetMonthlyChart(orderEntity repositories.IOrderAnalytics) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		branchId := ctx.GetString("BranchId")
 		result, err := orderEntity.GetOrderMonthlyChart(branchId)

@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/core/utils"
@@ -11,107 +12,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func ImportReceiveToStock(receiveEntity repositories.IReceive, productEntity repositories.IProduct) gin.HandlerFunc {
-	return ImportReceiveToStockWithReconciliation(receiveEntity, productEntity, nil, nil)
+// ImportReceiveToStock moves a Receive into Stock. Oversell settlement happens
+// inside the same transaction, in the Stock ledger (ADR-0002).
+// receiveImporter imports a Receive through the Stock ledger.
+type receiveImporter interface {
+	ImportReceive(ctx context.Context, receiveID, branchID, by string) (*entities.Receive, error)
 }
 
-func ImportReceiveToStockWithReconciliation(
-	receiveEntity repositories.IReceive,
-	_ repositories.IProduct,
-	orderEntity repositories.IOrder,
-	productStock repositories.IProductStock,
-) gin.HandlerFunc {
+func ImportReceiveToStock(receiveEntity repositories.IReceive, ledger receiveImporter) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		receiveId := ctx.Param("receiveId")
 
 		userId := utils.GetUserId(ctx)
 		branchId := utils.GetBranchId(ctx)
-		receive, err := receiveEntity.GetReceiveById(receiveId)
+		if _, err := receiveEntity.GetReceiveById(receiveId, branchId); err != nil {
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
+			return
+		}
+		result, err := ledger.ImportReceive(ctx.Request.Context(), receiveId, branchId, userId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"receiveId": receiveId, "userId": userId, "branchId": branchId,
+			}).Error("import receive to stock failed")
+			errcode.AbortLedger(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
-		if err := ensureReceiveBranchAccess(receive, branchId); err != nil {
-			abortReceiveBranchMismatch(ctx)
-			return
-		}
-		result, err := receiveEntity.ImportReceiveToStock(receiveId, userId, branchId)
-		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
-			return
-		}
-
-		if orderEntity != nil && productStock != nil {
-			reconcileOversoldFromImport(orderEntity, productStock, result, branchId)
-		}
-
 		ctx.JSON(http.StatusOK, result)
-	}
-}
-
-func reconcileOversoldFromImport(
-	orderEntity repositories.IOrder,
-	productStock repositories.IProductStock,
-	receive *entities.Receive,
-	branchId string,
-) {
-	if receive == nil {
-		return
-	}
-	for _, item := range receive.Items {
-		if item.Quantity <= 0 {
-			continue
-		}
-		productId := item.ProductId.Hex()
-		oversoldItems, err := orderEntity.GetOversoldOrderItemsByProductId(productId, branchId)
-		if err != nil {
-			logrus.WithError(err).WithField("productId", productId).Warn("failed to look up oversold order items during import reconciliation")
-			continue
-		}
-		if len(oversoldItems) == 0 {
-			continue
-		}
-		lots, err := productStock.GetProductStocksByProductIdAndReceiveCode(productId, receive.Code, branchId)
-		if err != nil {
-			logrus.WithError(err).WithField("productId", productId).Warn("failed to look up newly imported lots during import reconciliation")
-			continue
-		}
-		drainOversoldAgainstLots(orderEntity, oversoldItems, lots)
-	}
-}
-
-func drainOversoldAgainstLots(
-	orderEntity repositories.IOrder,
-	oversoldItems []entities.OrderItem,
-	lots []entities.ProductStock,
-) {
-	for i := range lots {
-		available := lots[i].Quantity
-		if available <= 0 {
-			continue
-		}
-		lotId := lots[i].Id.Hex()
-		for j := range oversoldItems {
-			if available <= 0 {
-				break
-			}
-			remaining := oversoldItems[j].OversoldQty
-			if remaining <= 0 {
-				continue
-			}
-			drain := remaining
-			if available < drain {
-				drain = available
-			}
-			if _, _, err := orderEntity.DrainOversoldAgainstLot(oversoldItems[j].Id.Hex(), lotId, drain); err != nil {
-				logrus.WithError(err).WithFields(logrus.Fields{
-					"orderItemId": oversoldItems[j].Id.Hex(),
-					"stockId":     lotId,
-				}).Warn("failed to reconcile oversold quantity against lot")
-				continue
-			}
-			available -= drain
-			oversoldItems[j].OversoldQty -= drain
-		}
 	}
 }

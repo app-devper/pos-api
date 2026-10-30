@@ -1,0 +1,308 @@
+{
+  "note": "Owned by pos-api (app/domain/sale/sale.go: firstStock, price). Regenerate with `go test ./app/domain/sale -run TestRingCases -update`, then copy unchanged to devper-workspace packages/applications/pos/test/fixtures/ring_cases.json.",
+  "cases": [
+    {
+      "name": "a customer type with its own price list",
+      "priceType": "Wholesaler",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        },
+        {
+          "customerType": "Wholesaler",
+          "price": 8
+        }
+      ],
+      "want": {
+        "priceType": "Wholesaler",
+        "unitPrice": 8,
+        "firstStock": "a"
+      }
+    },
+    {
+      "name": "a customer type with no price list charges the first one",
+      "priceType": "Member",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        },
+        {
+          "customerType": "Wholesaler",
+          "price": 8
+        }
+      ],
+      "want": {
+        "priceType": "General",
+        "unitPrice": 10,
+        "firstStock": "a"
+      }
+    },
+    {
+      "name": "Stock price from the Stock that sells first",
+      "priceType": "Stock",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "b",
+          "sequence": 2,
+          "quantity": 5,
+          "price": 15
+        },
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "Stock",
+        "unitPrice": 12,
+        "firstStock": "a"
+      }
+    },
+    {
+      "name": "Stock price skips a Stock that holds none",
+      "priceType": "Stock",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 0,
+          "price": 12
+        },
+        {
+          "id": "b",
+          "sequence": 2,
+          "quantity": 5,
+          "price": 15
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "Stock",
+        "unitPrice": 15,
+        "firstStock": "b"
+      }
+    },
+    {
+      "name": "Stock price from the chosen Stock",
+      "priceType": "Stock",
+      "stockId": "b",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        },
+        {
+          "id": "b",
+          "sequence": 2,
+          "quantity": 5,
+          "price": 15
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "Stock",
+        "unitPrice": 15,
+        "firstStock": "b"
+      }
+    },
+    {
+      "name": "a chosen Stock that holds none still prices the Line",
+      "priceType": "Stock",
+      "stockId": "b",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        },
+        {
+          "id": "b",
+          "sequence": 2,
+          "quantity": 0,
+          "price": 15
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "Stock",
+        "unitPrice": 15,
+        "firstStock": "b"
+      }
+    },
+    {
+      "name": "a Stock with no price falls back to the price list",
+      "priceType": "Stock",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 0
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "General",
+        "unitPrice": 10,
+        "firstStock": "a"
+      }
+    },
+    {
+      "name": "Stock price with no Stock holding any falls back to the price list",
+      "priceType": "Stock",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 0,
+          "price": 12
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "General",
+        "unitPrice": 10,
+        "firstStock": ""
+      }
+    },
+    {
+      "name": "no price list and no Stock price charges nothing",
+      "priceType": "General",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 0
+        }
+      ],
+      "prices": [],
+      "want": {
+        "priceType": "",
+        "unitPrice": 0,
+        "firstStock": "a"
+      }
+    },
+    {
+      "name": "two Stocks share a sequence: the first listed sells first",
+      "priceType": "Stock",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        },
+        {
+          "id": "b",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 15
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "Stock",
+        "unitPrice": 12,
+        "firstStock": "a"
+      }
+    },
+    {
+      "name": "two Stocks share a sequence, listed the other way",
+      "priceType": "Stock",
+      "stockId": "",
+      "stocks": [
+        {
+          "id": "b",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 15
+        },
+        {
+          "id": "a",
+          "sequence": 1,
+          "quantity": 5,
+          "price": 12
+        }
+      ],
+      "prices": [
+        {
+          "customerType": "General",
+          "price": 10
+        }
+      ],
+      "want": {
+        "priceType": "Stock",
+        "unitPrice": 15,
+        "firstStock": "b"
+      }
+    }
+  ]
+}

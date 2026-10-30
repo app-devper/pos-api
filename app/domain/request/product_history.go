@@ -138,18 +138,6 @@ func RemoveProductStockHistory(productId string, unit string, stock *entities.Pr
 	}
 }
 
-func UpdateProductStockQuantityHistory(productId string, unit string, stock UpdateProductStockQuantity, balance int) ProductHistory {
-	return ProductHistory{
-		ProductId:   productId,
-		Type:        constant.HistoryTypeUpdateProductStockQuantity,
-		Description: "แก้ไขจำนวนสต็อกสินค้า" + " จำนวน " + strconv.Itoa(stock.Quantity) + " " + unit,
-		Unit:        unit,
-		Quantity:    stock.Quantity,
-		Balance:     balance,
-		CreatedBy:   stock.UpdatedBy,
-	}
-}
-
 func AdjustStockHistory(productId string, unit string, adjustment StockAdjustment, balance int) ProductHistory {
 	return ProductHistory{
 		ProductId:   productId,
@@ -200,4 +188,21 @@ func RemoveOrderItemProductHistory(productId string, unit string, item *entities
 		Balance:     balance,
 		CreatedBy:   createdBy,
 	}
+}
+
+// TransferStockHistory is one step of a Transfer at one Stock: reserved out of
+// the source, opened at the destination (an import), or put back on reject.
+func TransferStockHistory(productId string, historyType string, code string, quantity int, createdBy string) ProductHistory {
+	h := ProductHistory{ProductId: productId, Type: historyType, Quantity: quantity, CreatedBy: createdBy}
+	switch historyType {
+	case constant.HistoryTypeTransferStockOut:
+		h.Description = "โอนสต็อกออก "
+	case constant.HistoryTypeTransferStockIn:
+		h.Description = "รับโอนสต็อก "
+		h.Import = quantity
+	case constant.HistoryTypeTransferStockBack:
+		h.Description = "คืนสต็อกจากใบโอนที่ถูกปฏิเสธ "
+	}
+	h.Description += code + " จำนวน " + strconv.Itoa(quantity) + " "
+	return h
 }
