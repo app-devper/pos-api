@@ -88,3 +88,11 @@
 - Database/resource initialization happens in `db/init.go`; avoid introducing startup behavior that requires external services in unit tests.
 - Some tests are pure unit tests around repository helpers and validation; preserve that style unless integration coverage is explicitly needed.
 - The `dispensing` feature package exists but is currently empty — do not wire routes for it without explicit direction.
+
+## Agent skills
+
+The generic Claude Code / Codex skills (`coding-standards`, `tdd-workflow`,
+`grilling`, …) and the `ecc` rules are not in this repo. Every app-devper
+repo shares them from [app-devper/agent-skills](https://github.com/app-devper/agent-skills):
+clone it and run its `install.sh` once per machine. Only the skills about this
+repo live in `.claude/skills/`: `dev-flow`, `git-flow`, `pr`.
