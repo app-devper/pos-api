@@ -13,6 +13,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
 )
 
 // stockCommands is the Stock ledger that records Returns, Adjustments and
@@ -118,7 +119,7 @@ func TestReturnRecordingRejectsDuplicateAndCancelledLines(t *testing.T) {
 	if f.quantity(lot) != 2 || returnedQuantity(f, item.Id) != 0 {
 		t.Fatal("duplicate Line changed Stock")
 	}
-	if _, err := f.orders.CancelOrderItemById(item.Id.Hex(), "admin", f.branchId.Hex(), "cancel"); err != nil {
+	if _, err := f.orders.CancelOrderItemById(context.Background(), item.Id.Hex(), "admin", f.branchId.Hex(), "cancel"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := returns.Return(context.Background(), returnRequest(f, order.Order.Id, item.Id, 1, 0)); err == nil {
@@ -345,7 +346,7 @@ func TestCancelAfterReturnRestoresOnlyRemainingQuantity(t *testing.T) {
 	if _, err := returns.Return(context.Background(), returnRequest(f, order.Order.Id, item.Id, 4, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.orders.CancelOrderById(order.Order.Id.Hex(), "admin", f.branchId.Hex(), "cancel remainder"); err != nil {
+	if _, err := f.orders.CancelOrderById(context.Background(), order.Order.Id.Hex(), "admin", f.branchId.Hex(), "cancel remainder"); err != nil {
 		t.Fatal(err)
 	}
 	if f.quantity(first) != 3 || f.quantity(second) != 3 {
@@ -353,6 +354,80 @@ func TestCancelAfterReturnRestoresOnlyRemainingQuantity(t *testing.T) {
 	}
 	if _, err := returns.Return(context.Background(), returnRequest(f, order.Order.Id, item.Id, 1, 0)); err == nil {
 		t.Fatal("cancelled Order accepted a Return")
+	}
+}
+
+func TestCancelHonoursTheRequestContext(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 3, 3)
+	order, err := f.sell(f.sale("cancel-after-request-ended", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := f.items(order.Order.Id)[0]
+	ended, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := f.orders.CancelOrderItemById(ended, item.Id.Hex(), "admin", f.branchId.Hex(), "late"); err == nil {
+		t.Fatal("a Line was cancelled after its request had ended")
+	}
+	if _, err := f.orders.CancelOrderById(ended, order.Order.Id.Hex(), "admin", f.branchId.Hex(), "late"); err == nil {
+		t.Fatal("an Order was cancelled after its request had ended")
+	}
+	if got := f.items(order.Order.Id)[0].Status; got == constant.CANCELLED {
+		t.Fatal("the Line was recorded as cancelled although its request had ended")
+	}
+}
+
+type requestMarker struct{}
+
+// TestCancelWritesUnderTheRequestContext marks the request's context and
+// checks that every write the ledger issues while cancelling carries the
+// mark: a ledger handed its own context would still pass the test above,
+// because the read before it fails first, but not this one.
+func TestCancelWritesUnderTheRequestContext(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 6, 3)
+	lineOrder, err := f.sell(f.sale("cancel-line-under-request", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wholeOrder, err := f.sell(f.sale("cancel-order-under-request", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := f.items(lineOrder.Order.Id)[0]
+
+	var mu sync.Mutex
+	writes, outsideRequest := 0, 0
+	f.watchCommands(func(ctx context.Context, e *event.CommandStartedEvent) {
+		if e.CommandName != "update" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		writes++
+		if ctx.Value(requestMarker{}) == nil {
+			outsideRequest++
+		}
+	})
+	defer f.watchCommands(nil)
+
+	requestCtx := context.WithValue(context.Background(), requestMarker{}, true)
+	if _, err := f.orders.CancelOrderItemById(requestCtx, line.Id.Hex(), "admin", f.branchId.Hex(), "under request"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.orders.CancelOrderById(requestCtx, wholeOrder.Order.Id.Hex(), "admin", f.branchId.Hex(), "under request"); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if writes == 0 {
+		t.Fatal("the cancels issued no write at all")
+	}
+	if outsideRequest > 0 {
+		t.Fatalf("%d of %d ledger writes ran outside the request's context", outsideRequest, writes)
 	}
 }
 

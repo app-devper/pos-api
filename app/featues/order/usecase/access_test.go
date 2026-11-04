@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,15 +73,15 @@ func (s *orderAccessRepoStub) UpdateCustomerCodeOrderById(id string, customerCod
 	return s.updateCustomerCodeFn(id, customerCode)
 }
 
-func (s *orderAccessRepoStub) CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
+func (s *orderAccessRepoStub) CancelOrderById(_ context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
 	return s.cancelOrderByIDFn(id, userId, branchId, reason)
 }
 
-func (s *orderAccessRepoStub) CancelOrderItemById(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+func (s *orderAccessRepoStub) CancelOrderItemById(_ context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	return s.cancelItemByIDFn(id, userId, branchId, reason)
 }
 
-func (s *orderAccessRepoStub) CancelOrderItemByOrderProductId(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+func (s *orderAccessRepoStub) CancelOrderItemByOrderProductId(_ context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	return s.cancelByOrderProductFn(orderId, productId, userId, branchId, reason)
 }
 
