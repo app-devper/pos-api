@@ -17,6 +17,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -30,6 +31,9 @@ type saleFixture struct {
 	branchId primitive.ObjectID
 	product  primitive.ObjectID
 	unit     primitive.ObjectID
+
+	hookMu    sync.Mutex
+	onCommand func(context.Context, *event.CommandStartedEvent)
 }
 
 func newSaleFixture(t *testing.T) *saleFixture {
@@ -39,7 +43,14 @@ func newSaleFixture(t *testing.T) *saleFixture {
 		t.Skip("MONGO_TEST_URI not set")
 	}
 	ctx := context.Background()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	f := &saleFixture{
+		t:        t,
+		branchId: primitive.NewObjectID(),
+		product:  primitive.NewObjectID(),
+		unit:     primitive.NewObjectID(),
+	}
+	monitor := &event.CommandMonitor{Started: f.commandStarted}
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMonitor(monitor))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,19 +59,30 @@ func newSaleFixture(t *testing.T) *saleFixture {
 		_ = pos.Drop(ctx)
 		_ = client.Disconnect(ctx)
 	})
-	f := &saleFixture{
-		t:        t,
-		pos:      pos,
-		orders:   NewOrderEntity(&db.Resource{Client: client, PosDb: pos}).(*orderEntity),
-		branchId: primitive.NewObjectID(),
-		product:  primitive.NewObjectID(),
-		unit:     primitive.NewObjectID(),
-	}
+	f.pos = pos
+	f.orders = NewOrderEntity(&db.Resource{Client: client, PosDb: pos}).(*orderEntity)
 	f.insert("products", bson.M{"_id": f.product, "name": "Paracetamol", "soldFirst": 0})
 	f.insert("product_units", entities.ProductUnit{Id: f.unit, ProductId: f.product, Unit: "TAB", CostPrice: 3})
 	f.insert("product_prices", entities.ProductPrice{Id: primitive.NewObjectID(), ProductId: f.product, UnitId: f.unit, CustomerType: "General", Price: 10})
 	f.insert("product_prices", entities.ProductPrice{Id: primitive.NewObjectID(), ProductId: f.product, UnitId: f.unit, CustomerType: "Wholesaler", Price: 8})
 	return f
+}
+
+// watchCommands calls hook, with the context the driver ran it under, for
+// every command sent from now on; nil stops watching.
+func (f *saleFixture) watchCommands(hook func(context.Context, *event.CommandStartedEvent)) {
+	f.hookMu.Lock()
+	defer f.hookMu.Unlock()
+	f.onCommand = hook
+}
+
+func (f *saleFixture) commandStarted(ctx context.Context, e *event.CommandStartedEvent) {
+	f.hookMu.Lock()
+	hook := f.onCommand
+	f.hookMu.Unlock()
+	if hook != nil {
+		hook(ctx, e)
+	}
 }
 
 // sell records a Sale through the Stock ledger, as the order handler does.

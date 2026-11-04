@@ -293,7 +293,7 @@ func (entity *orderEntity) GetOrderDetailById(id string) (*entities.OrderDetail,
 // is never reported as failed.
 func (entity *orderEntity) CancelOrderById(requestCtx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
 	logrus.Info("CancelOrderById")
-	ctx, cancel := context.WithTimeout(requestCtx, utils.ContextTimeout)
+	ctx, cancel := utils.ContextFrom(requestCtx)
 	defer cancel()
 	order, err := entity.getOrderDetailByIdWithContext(ctx, id)
 	if err != nil {
@@ -378,7 +378,7 @@ func (entity *orderEntity) GetOrderItemById(id string, branchId string) (*entiti
 // is never reported as failed.
 func (entity *orderEntity) CancelOrderItemById(requestCtx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemById")
-	ctx, cancel := context.WithTimeout(requestCtx, utils.ContextTimeout)
+	ctx, cancel := utils.ContextFrom(requestCtx)
 	defer cancel()
 	item, err := entity.getOrderItemDetailByIdWithContext(ctx, id)
 	if err != nil {
@@ -602,16 +602,16 @@ func (entity *orderEntity) RemoveOrderItemByOrderId(orderId string) ([]entities.
 }
 
 // CancelOrderItemByOrderProductId cancels an Order's Line of a Product through
-// the Stock ledger.
+// the Stock ledger, under the request's context (#39) like its siblings.
 func (entity *orderEntity) CancelOrderItemByOrderProductId(requestCtx context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemByOrderProductId")
-	ctx, cancel := context.WithTimeout(requestCtx, utils.ContextTimeout)
+	ctx, cancel := utils.ContextFrom(requestCtx)
 	defer cancel()
 	item, err := entity.getOrderItemDetailByOrderProductIdWithContext(ctx, orderId, productId)
 	if err != nil {
 		return nil, err
 	}
-	return entity.CancelOrderItemById(requestCtx, item.Id.Hex(), userId, branchId, reason)
+	return entity.CancelOrderItemById(ctx, item.Id.Hex(), userId, branchId, reason)
 }
 
 func (entity *orderEntity) GetPaymentsByOrderId(orderId string) ([]entities.Payment, error) {

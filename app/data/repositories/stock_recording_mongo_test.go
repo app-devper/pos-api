@@ -13,6 +13,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
 )
 
 // stockCommands is the Stock ledger that records Returns, Adjustments and
@@ -375,6 +376,58 @@ func TestCancelHonoursTheRequestContext(t *testing.T) {
 	}
 	if got := f.items(order.Order.Id)[0].Status; got == constant.CANCELLED {
 		t.Fatal("the Line was recorded as cancelled although its request had ended")
+	}
+}
+
+type requestMarker struct{}
+
+// TestCancelWritesUnderTheRequestContext marks the request's context and
+// checks that every write the ledger issues while cancelling carries the
+// mark: a ledger handed its own context would still pass the test above,
+// because the read before it fails first, but not this one.
+func TestCancelWritesUnderTheRequestContext(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 6, 3)
+	lineOrder, err := f.sell(f.sale("cancel-line-under-request", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wholeOrder, err := f.sell(f.sale("cancel-order-under-request", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := f.items(lineOrder.Order.Id)[0]
+
+	var mu sync.Mutex
+	writes, outsideRequest := 0, 0
+	f.watchCommands(func(ctx context.Context, e *event.CommandStartedEvent) {
+		if e.CommandName != "update" {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		writes++
+		if ctx.Value(requestMarker{}) == nil {
+			outsideRequest++
+		}
+	})
+	defer f.watchCommands(nil)
+
+	requestCtx := context.WithValue(context.Background(), requestMarker{}, true)
+	if _, err := f.orders.CancelOrderItemById(requestCtx, line.Id.Hex(), "admin", f.branchId.Hex(), "under request"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.orders.CancelOrderById(requestCtx, wholeOrder.Order.Id.Hex(), "admin", f.branchId.Hex(), "under request"); err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if writes == 0 {
+		t.Fatal("the cancels issued no write at all")
+	}
+	if outsideRequest > 0 {
+		t.Fatalf("%d of %d ledger writes ran outside the request's context", outsideRequest, writes)
 	}
 }
 
