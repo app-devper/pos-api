@@ -118,7 +118,7 @@ func TestReturnRecordingRejectsDuplicateAndCancelledLines(t *testing.T) {
 	if f.quantity(lot) != 2 || returnedQuantity(f, item.Id) != 0 {
 		t.Fatal("duplicate Line changed Stock")
 	}
-	if _, err := f.orders.CancelOrderItemById(item.Id.Hex(), "admin", f.branchId.Hex(), "cancel"); err != nil {
+	if _, err := f.orders.CancelOrderItemById(context.Background(), item.Id.Hex(), "admin", f.branchId.Hex(), "cancel"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := returns.Return(context.Background(), returnRequest(f, order.Order.Id, item.Id, 1, 0)); err == nil {
@@ -345,7 +345,7 @@ func TestCancelAfterReturnRestoresOnlyRemainingQuantity(t *testing.T) {
 	if _, err := returns.Return(context.Background(), returnRequest(f, order.Order.Id, item.Id, 4, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.orders.CancelOrderById(order.Order.Id.Hex(), "admin", f.branchId.Hex(), "cancel remainder"); err != nil {
+	if _, err := f.orders.CancelOrderById(context.Background(), order.Order.Id.Hex(), "admin", f.branchId.Hex(), "cancel remainder"); err != nil {
 		t.Fatal(err)
 	}
 	if f.quantity(first) != 3 || f.quantity(second) != 3 {
@@ -353,6 +353,28 @@ func TestCancelAfterReturnRestoresOnlyRemainingQuantity(t *testing.T) {
 	}
 	if _, err := returns.Return(context.Background(), returnRequest(f, order.Order.Id, item.Id, 1, 0)); err == nil {
 		t.Fatal("cancelled Order accepted a Return")
+	}
+}
+
+func TestCancelHonoursTheRequestContext(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 3, 3)
+	order, err := f.sell(f.sale("cancel-after-request-ended", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := f.items(order.Order.Id)[0]
+	ended, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := f.orders.CancelOrderItemById(ended, item.Id.Hex(), "admin", f.branchId.Hex(), "late"); err == nil {
+		t.Fatal("a Line was cancelled after its request had ended")
+	}
+	if _, err := f.orders.CancelOrderById(ended, order.Order.Id.Hex(), "admin", f.branchId.Hex(), "late"); err == nil {
+		t.Fatal("an Order was cancelled after its request had ended")
+	}
+	if got := f.items(order.Order.Id)[0].Status; got == constant.CANCELLED {
+		t.Fatal("the Line was recorded as cancelled although its request had ended")
 	}
 }
 

@@ -22,7 +22,7 @@ func DeleteOrderItemById(orderEntity repositories.IOrder, _ repositories.IProduc
 			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
-		result, err := orderEntity.CancelOrderItemById(itemId, userId, ctx.GetString("BranchId"), req.Reason)
+		result, err := orderEntity.CancelOrderItemById(ctx.Request.Context(), itemId, userId, ctx.GetString("BranchId"), req.Reason)
 		if err != nil {
 			errcode.AbortLedger(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return

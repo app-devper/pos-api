@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -47,15 +48,15 @@ func (s *cancelOrderRepoStub) GetOrderItemById(id string, branchId string) (*ent
 	return d, err
 }
 
-func (s *cancelOrderRepoStub) CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
+func (s *cancelOrderRepoStub) CancelOrderById(_ context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
 	return s.cancelOrderByIDFn(id, userId, branchId, reason)
 }
 
-func (s *cancelOrderRepoStub) CancelOrderItemById(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+func (s *cancelOrderRepoStub) CancelOrderItemById(_ context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	return s.cancelByIDFn(id, userId, branchId, reason)
 }
 
-func (s *cancelOrderRepoStub) CancelOrderItemByOrderProductId(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+func (s *cancelOrderRepoStub) CancelOrderItemByOrderProductId(_ context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	return s.cancelByOrderProductIDFn(orderId, productId, userId, branchId, reason)
 }
 

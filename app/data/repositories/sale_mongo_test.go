@@ -288,7 +288,7 @@ func TestCancelLineRecomputesOrderMoney(t *testing.T) {
 		t.Fatal(err)
 	}
 	items := f.items(got.Order.Id)
-	if _, err := f.orders.CancelOrderItemById(items[0].Id.Hex(), "manager", f.branchId.Hex(), "wrong item"); err != nil {
+	if _, err := f.orders.CancelOrderItemById(context.Background(), items[0].Id.Hex(), "manager", f.branchId.Hex(), "wrong item"); err != nil {
 		t.Fatal(err)
 	}
 	var o entities.Order
@@ -376,7 +376,7 @@ func TestRepairOrderTotalsAgreesWithACancelledLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	items := f.items(got.Order.Id)
-	if _, err := f.orders.CancelOrderItemById(items[0].Id.Hex(), "manager", f.branchId.Hex(), ""); err != nil {
+	if _, err := f.orders.CancelOrderItemById(context.Background(), items[0].Id.Hex(), "manager", f.branchId.Hex(), ""); err != nil {
 		t.Fatal(err)
 	}
 	report, err := RepairCancelledLineTotals(context.Background(), f.pos, false)
@@ -398,10 +398,10 @@ func TestCancelByOrderAndProductCancelsTheLineStillStanding(t *testing.T) {
 		t.Fatal(err)
 	}
 	items := f.items(got.Order.Id)
-	if _, err := f.orders.CancelOrderItemById(items[0].Id.Hex(), "manager", f.branchId.Hex(), ""); err != nil {
+	if _, err := f.orders.CancelOrderItemById(context.Background(), items[0].Id.Hex(), "manager", f.branchId.Hex(), ""); err != nil {
 		t.Fatal(err)
 	}
-	cancelled, err := f.orders.CancelOrderItemByOrderProductId(got.Order.Id.Hex(), f.product.Hex(), "manager", f.branchId.Hex(), "")
+	cancelled, err := f.orders.CancelOrderItemByOrderProductId(context.Background(), got.Order.Id.Hex(), f.product.Hex(), "manager", f.branchId.Hex(), "")
 	if err != nil {
 		t.Fatalf("the second Line of the Product must still be cancellable, got %v", err)
 	}
