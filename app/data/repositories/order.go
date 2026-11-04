@@ -300,6 +300,9 @@ func (entity *orderEntity) CancelOrderById(requestCtx context.Context, id string
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	ledgerCtx, done := utils.DetachedFrom(requestCtx)
 	defer done()
 	if err := entity.ledger.CancelOrder(ledgerCtx, id, branchId, userId, reason); err != nil {
@@ -386,6 +389,9 @@ func (entity *orderEntity) CancelOrderItemById(requestCtx context.Context, id st
 	defer cancel()
 	item, err := entity.getOrderItemDetailByIdWithContext(ctx, id)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	ledgerCtx, done := utils.DetachedFrom(requestCtx)

@@ -381,11 +381,11 @@ func TestCancelHonoursTheRequestContext(t *testing.T) {
 
 type requestMarker struct{}
 
-// TestCancelWritesUnderTheRequestContext marks the request's context and
-// checks that every write the ledger issues while cancelling carries the
-// mark: a ledger handed its own context would still pass the test above,
-// because the read before it fails first, but not this one.
-func TestCancelWritesUnderTheRequestContext(t *testing.T) {
+// TestCancelWritesCarryTheRequestContextValues marks the request's context
+// with a value and checks that every write the ledger issues while cancelling
+// carries it: the ledger runs detached from the request's cancellation but
+// keeps its values, and a ledger handed an unrelated context would lose them.
+func TestCancelWritesCarryTheRequestContextValues(t *testing.T) {
 	f := newSaleFixture(t)
 	f.stock(1, 6, 3)
 	lineOrder, err := f.sell(f.sale("cancel-line-under-request", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
@@ -427,7 +427,7 @@ func TestCancelWritesUnderTheRequestContext(t *testing.T) {
 		t.Fatal("the cancels issued no write at all")
 	}
 	if outsideRequest > 0 {
-		t.Fatalf("%d of %d ledger writes ran outside the request's context", outsideRequest, writes)
+		t.Fatalf("%d of %d ledger writes did not carry the request context values", outsideRequest, writes)
 	}
 }
 
