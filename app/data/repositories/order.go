@@ -288,9 +288,10 @@ func (entity *orderEntity) GetOrderDetailById(id string) (*entities.OrderDetail,
 	return &data, nil
 }
 
-// CancelOrderById is recorded by the Stock ledger (ADR-0001), under the
-// request's context (#39). The Order is read first, so a cancel that committed
-// is never reported as failed.
+// CancelOrderById is recorded by the Stock ledger (ADR-0001). The Order is read
+// under the request's context, so nothing starts after the request ended; the
+// ledger runs detached from the client's disconnect, so a cancel that has
+// started finishes.
 func (entity *orderEntity) CancelOrderById(requestCtx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
 	logrus.Info("CancelOrderById")
 	ctx, cancel := utils.ContextFrom(requestCtx)
@@ -299,7 +300,9 @@ func (entity *orderEntity) CancelOrderById(requestCtx context.Context, id string
 	if err != nil {
 		return nil, err
 	}
-	if err := entity.ledger.CancelOrder(ctx, id, branchId, userId, reason); err != nil {
+	ledgerCtx, done := utils.DetachedFrom(requestCtx)
+	defer done()
+	if err := entity.ledger.CancelOrder(ledgerCtx, id, branchId, userId, reason); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{"orderId": id, "userId": userId, "branchId": branchId}).Error("cancel order failed")
 		return nil, err
 	}
@@ -373,9 +376,10 @@ func (entity *orderEntity) GetOrderItemById(id string, branchId string) (*entiti
 	return &data, nil
 }
 
-// CancelOrderItemById is recorded by the Stock ledger (ADR-0001), under the
-// request's context (#39). The Line is read first, so a cancel that committed
-// is never reported as failed.
+// CancelOrderItemById is recorded by the Stock ledger (ADR-0001). The Line is
+// read under the request's context, so nothing starts after the request ended;
+// the ledger runs detached from the client's disconnect, so a cancel that has
+// started finishes.
 func (entity *orderEntity) CancelOrderItemById(requestCtx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemById")
 	ctx, cancel := utils.ContextFrom(requestCtx)
@@ -384,7 +388,9 @@ func (entity *orderEntity) CancelOrderItemById(requestCtx context.Context, id st
 	if err != nil {
 		return nil, err
 	}
-	if err := entity.ledger.CancelLine(ctx, id, branchId, userId, reason); err != nil {
+	ledgerCtx, done := utils.DetachedFrom(requestCtx)
+	defer done()
+	if err := entity.ledger.CancelLine(ledgerCtx, id, branchId, userId, reason); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{"orderItemId": id, "userId": userId, "branchId": branchId}).Error("cancel order item failed")
 		return nil, err
 	}
@@ -602,7 +608,10 @@ func (entity *orderEntity) RemoveOrderItemByOrderId(orderId string) ([]entities.
 }
 
 // CancelOrderItemByOrderProductId cancels an Order's Line of a Product through
-// the Stock ledger, under the request's context (#39) like its siblings.
+// the Stock ledger. The Line is read under the request's context, so nothing
+// starts after the request ended; the ledger, reached through
+// CancelOrderItemById, runs detached from the client's disconnect, so a cancel
+// that has started finishes.
 func (entity *orderEntity) CancelOrderItemByOrderProductId(requestCtx context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemByOrderProductId")
 	ctx, cancel := utils.ContextFrom(requestCtx)

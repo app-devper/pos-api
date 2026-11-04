@@ -431,6 +431,34 @@ func TestCancelWritesUnderTheRequestContext(t *testing.T) {
 	}
 }
 
+// TestCancelStartedBeforeTheRequestEndedFinishes ends the request when the
+// ledger's first write starts: the cancel has begun, so it must finish and
+// report what it did rather than be torn apart by the disconnect.
+func TestCancelStartedBeforeTheRequestEndedFinishes(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 3, 3)
+	order, err := f.sell(f.sale("ends-mid-transaction", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := f.items(order.Order.Id)[0]
+	requestCtx, endRequest := context.WithCancel(context.Background())
+	defer endRequest()
+	f.watchCommands(func(_ context.Context, e *event.CommandStartedEvent) {
+		if e.CommandName == "update" {
+			endRequest()
+		}
+	})
+	defer f.watchCommands(nil)
+
+	if _, err := f.orders.CancelOrderItemById(requestCtx, item.Id.Hex(), "admin", f.branchId.Hex(), "client left"); err != nil {
+		t.Fatalf("a cancel that had started was torn apart by the disconnect: %v", err)
+	}
+	if got := f.items(order.Order.Id)[0].Status; got != constant.CANCELLED {
+		t.Fatalf("Line status %q after a cancel that started, want CANCELLED", got)
+	}
+}
+
 func TestReturnHistoryFailureRollsBackStockAndReturnedQuantity(t *testing.T) {
 	f := newSaleFixture(t)
 	returns, _, _ := stockCommands(f)
