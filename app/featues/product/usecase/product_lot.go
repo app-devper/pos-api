@@ -18,7 +18,7 @@ func GetAllLots(productEntity repositories.IProduct) gin.HandlerFunc {
 		_ = ctx.ShouldBindQuery(&req)
 		result, err := productEntity.GetProductLots(req, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -30,7 +30,7 @@ func GetLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 		lotId := ctx.Param("lotId")
 		result, err := productEntity.GetProductLotById(lotId, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -48,7 +48,7 @@ func CreateLot(productEntity repositories.IProduct) gin.HandlerFunc {
 		req.UpdatedBy = utils.GetUserId(ctx)
 		result, err := productEntity.CreateProductLot(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -67,7 +67,7 @@ func UpdateLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 		req.UpdatedBy = utils.GetUserId(ctx)
 		result, err := productEntity.UpdateProductLotById(lotId, req, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -79,7 +79,7 @@ func DeleteLotById(productEntity repositories.IProduct) gin.HandlerFunc {
 		lotId := ctx.Param("lotId")
 		result, err := productEntity.RemoveProductLotById(lotId, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -98,7 +98,7 @@ func GetProductLotsExpireNotify(productStock repositories.IProductStock) gin.Han
 		}
 		result, err := productStock.GetExpiringProductStocks(req, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 

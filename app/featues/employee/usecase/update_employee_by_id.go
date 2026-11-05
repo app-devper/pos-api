@@ -30,7 +30,7 @@ func UpdateEmployeeById(employeeEntity repositories.IEmployee) gin.HandlerFunc {
 				"employeeId": employeeId,
 				"updatedBy":  req.UpdatedBy,
 			}).Error("update employee failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.EM_BAD_REQUEST_002)
 			return
 		}
 

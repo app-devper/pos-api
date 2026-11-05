@@ -16,7 +16,7 @@ func DeleteCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 		result, err := entity.RemoveCategoryById(categoryId, utils.GetUserId(ctx))
 		if err != nil {
 			logrus.WithError(err).WithField("categoryId", categoryId).Error("delete category failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CA_BAD_REQUEST_002)
 			return
 		}
 

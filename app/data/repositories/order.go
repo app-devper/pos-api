@@ -33,13 +33,13 @@ type IOrder interface {
 	GetOrderById(id string, branchId string) (*entities.Order, error)
 	GetOrderDetailById(id string) (*entities.OrderDetail, error)
 	UpdateCustomerCodeOrderById(id string, customerCode string) (*entities.Order, error)
-	CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error)
+	CancelOrderById(ctx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error)
 
 	GetOrderItemRange(form request.GetOrderRange) ([]entities.OrderItemProductDetail, error)
 	GetOrderItemById(id string, branchId string) (*entities.OrderItem, error)
-	CancelOrderItemById(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
+	CancelOrderItemById(ctx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
 	GetOrderItemDetailById(id string) (*entities.OrderItemProductDetail, error)
-	CancelOrderItemByOrderProductId(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
+	CancelOrderItemByOrderProductId(ctx context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error)
 	GetOrderItemByProductId(productId string, branchId string) ([]entities.OrderItem, error)
 	GetOrderItemOrderDetailsByProductId(productId string, branchId string, form request.GetOrderRange) ([]entities.OrderItemOrderDetail, error)
 }
@@ -288,18 +288,24 @@ func (entity *orderEntity) GetOrderDetailById(id string) (*entities.OrderDetail,
 	return &data, nil
 }
 
-// CancelOrderById is recorded by the Stock ledger (ADR-0001); the response is
-// CancelOrderById is recorded by the Stock ledger (ADR-0001). The Order is
-// read first, so a cancel that committed is never reported as failed.
-func (entity *orderEntity) CancelOrderById(id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
+// CancelOrderById is recorded by the Stock ledger (ADR-0001). The Order is read
+// under the request's context, so nothing starts after the request ended; the
+// ledger runs detached from the client's disconnect, so a cancel that has
+// started finishes.
+func (entity *orderEntity) CancelOrderById(requestCtx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderDetail, error) {
 	logrus.Info("CancelOrderById")
-	ctx, cancel := utils.InitContext()
+	ctx, cancel := utils.ContextFrom(requestCtx)
 	defer cancel()
 	order, err := entity.getOrderDetailByIdWithContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if err := entity.ledger.CancelOrder(context.Background(), id, branchId, userId, reason); err != nil {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	ledgerCtx, done := utils.DetachedFrom(requestCtx)
+	defer done()
+	if err := entity.ledger.CancelOrder(ledgerCtx, id, branchId, userId, reason); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{"orderId": id, "userId": userId, "branchId": branchId}).Error("cancel order failed")
 		return nil, err
 	}
@@ -373,18 +379,24 @@ func (entity *orderEntity) GetOrderItemById(id string, branchId string) (*entiti
 	return &data, nil
 }
 
-// CancelOrderItemById is recorded by the Stock ledger (ADR-0001); the response
 // CancelOrderItemById is recorded by the Stock ledger (ADR-0001). The Line is
-// read first, so a cancel that committed is never reported as failed.
-func (entity *orderEntity) CancelOrderItemById(id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+// read under the request's context, so nothing starts after the request ended;
+// the ledger runs detached from the client's disconnect, so a cancel that has
+// started finishes.
+func (entity *orderEntity) CancelOrderItemById(requestCtx context.Context, id string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemById")
-	ctx, cancel := utils.InitContext()
+	ctx, cancel := utils.ContextFrom(requestCtx)
 	defer cancel()
 	item, err := entity.getOrderItemDetailByIdWithContext(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if err := entity.ledger.CancelLine(context.Background(), id, branchId, userId, reason); err != nil {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	ledgerCtx, done := utils.DetachedFrom(requestCtx)
+	defer done()
+	if err := entity.ledger.CancelLine(ledgerCtx, id, branchId, userId, reason); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{"orderItemId": id, "userId": userId, "branchId": branchId}).Error("cancel order item failed")
 		return nil, err
 	}
@@ -602,16 +614,19 @@ func (entity *orderEntity) RemoveOrderItemByOrderId(orderId string) ([]entities.
 }
 
 // CancelOrderItemByOrderProductId cancels an Order's Line of a Product through
-// the Stock ledger.
-func (entity *orderEntity) CancelOrderItemByOrderProductId(orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
+// the Stock ledger. The Line is read under the request's context, so nothing
+// starts after the request ended; the ledger, reached through
+// CancelOrderItemById, runs detached from the client's disconnect, so a cancel
+// that has started finishes.
+func (entity *orderEntity) CancelOrderItemByOrderProductId(requestCtx context.Context, orderId string, productId string, userId string, branchId string, reason string) (*entities.OrderItemProductDetail, error) {
 	logrus.Info("CancelOrderItemByOrderProductId")
-	ctx, cancel := utils.InitContext()
+	ctx, cancel := utils.ContextFrom(requestCtx)
 	defer cancel()
 	item, err := entity.getOrderItemDetailByOrderProductIdWithContext(ctx, orderId, productId)
 	if err != nil {
 		return nil, err
 	}
-	return entity.CancelOrderItemById(item.Id.Hex(), userId, branchId, reason)
+	return entity.CancelOrderItemById(ctx, item.Id.Hex(), userId, branchId, reason)
 }
 
 func (entity *orderEntity) GetPaymentsByOrderId(orderId string) ([]entities.Payment, error) {

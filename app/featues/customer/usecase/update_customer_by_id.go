@@ -28,7 +28,7 @@ func UpdateCustomerById(customerEntity repositories.ICustomer) gin.HandlerFunc {
 				"customerId": id,
 				"updatedBy":  req.UpdatedBy,
 			}).Error("update customer failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CU_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

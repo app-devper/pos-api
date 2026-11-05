@@ -14,7 +14,7 @@ func GetBranches(branchEntity repositories.IBranch) gin.HandlerFunc {
 		result, err := branchEntity.GetBranches()
 		if err != nil {
 			logrus.WithError(err).Error("get branches failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.BR_BAD_REQUEST_002)
 			return
 		}
 

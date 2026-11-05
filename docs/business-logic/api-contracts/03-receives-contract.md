@@ -61,7 +61,8 @@
 - quantity / price / expiry invalid
 - patch items with missing product not allowed
 - branch context ไม่ถูกต้อง
-- receive not found
+- receive not found (`404 SY-404-002`)
+- แก้ไข/ลบ Receive ที่ import หรือ cancel ไปแล้ว (`409 SY-409-003` — ก่อนหน้านี้ตอบ 400)
 - import ซ้ำ (ถ้ามีการป้องกัน)
 - cancel imported receive not allowed
 - receive items out of sync with document state ต้องไม่เกิดขึ้นใน flow ปกติ

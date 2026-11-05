@@ -49,7 +49,7 @@ func AllergyCheck(patientEntity repositories.IPatient, productEntity repositorie
 				"branchId":   branchId,
 				"productIds": req.ProductIds,
 			}).Error("get products for allergy check failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 

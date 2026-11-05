@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/data/repositories"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
@@ -27,7 +29,13 @@ func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 				"branchId":      branchId,
 				"promotionCode": req.PromotionCode,
 			}).Error("get promotion by code failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "promotion not found or expired")
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				// A code the cashier typed that names no live promotion is a
+				// rule of the domain, not a missing resource.
+				errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "promotion not found or expired")
+				return
+			}
+			errcode.AbortLookup(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 
@@ -44,7 +52,7 @@ func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 				"promotionCode": req.PromotionCode,
 				"orderTotal":    req.OrderTotal,
 			}).Warn("apply promotion rejected")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.Reject(ctx, errcode.PM_BAD_REQUEST_002, err)
 			return
 		}
 

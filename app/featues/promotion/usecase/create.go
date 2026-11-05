@@ -27,7 +27,7 @@ func CreatePromotion(entity repositories.IPromotion) gin.HandlerFunc {
 				"branchId":  req.BranchId,
 				"createdBy": req.CreatedBy,
 			}).Error("create promotion failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

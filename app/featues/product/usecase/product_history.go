@@ -20,7 +20,7 @@ func GetProductHistoryByProductId(productStock repositories.IProductStock) gin.H
 		branchId := ctx.GetString("BranchId")
 		result, err := productStock.GetProductHistoryByProductId(productId, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -37,7 +37,7 @@ func GetProductHistoryByDateRange(productStock repositories.IProductStock) gin.H
 		branchId := ctx.GetString("BranchId")
 		result, err := productStock.GetProductHistoryByDateRange(branchId, req.StartDate.Time, req.EndDate.Time)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

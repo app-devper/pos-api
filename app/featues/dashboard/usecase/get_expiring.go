@@ -27,7 +27,7 @@ func GetExpiringProducts(productStock repositories.IProductStock) gin.HandlerFun
 				"startDate": param.StartDate,
 				"endDate":   param.EndDate,
 			}).Error("get expiring products failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.DA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

@@ -17,7 +17,7 @@ func GetPromotions(entity repositories.IPromotion) gin.HandlerFunc {
 		result, err := entity.GetPromotions(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get promotions failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -34,7 +34,7 @@ func GetPromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 				"id":       id,
 				"branchId": branchId,
 			}).Error("get promotion by id failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -59,7 +59,7 @@ func UpdatePromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 				"branchId":  branchId,
 				"updatedBy": req.UpdatedBy,
 			}).Error("update promotion failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -78,7 +78,7 @@ func DeletePromotionById(entity repositories.IPromotion) gin.HandlerFunc {
 				"branchId": branchId,
 				"userId":   userId,
 			}).Error("delete promotion failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

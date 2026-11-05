@@ -16,7 +16,7 @@ func DeleteSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 		result, err := supplierEntity.RemoveSupplierById(id, utils.GetUserId(ctx))
 		if err != nil {
 			logrus.WithError(err).WithField("supplierId", id).Error("delete supplier failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.SU_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

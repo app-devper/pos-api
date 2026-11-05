@@ -33,3 +33,4 @@
 - unauthorized setting updates
 - invalid value format
 - scope mismatch ระหว่าง user กับ settings ที่กำลังแก้
+- `GET /setting` ของสาขาที่ยังไม่เคยบันทึก settings ตอบ `404 SY-404-002` (ก่อนหน้านี้ตอบ 400) — frontend ควรถือเป็น "ยังไม่มี" และแสดงค่าเริ่มต้น; endpoint PromptPay QR/payload ใช้ค่าเริ่มต้นเองโดยไม่ error

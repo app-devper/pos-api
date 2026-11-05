@@ -16,8 +16,14 @@ import (
 //   - a document it names does not exist (ledger.ErrNotFound): 404;
 //   - Stock or a Line changed under it (ledger.ErrConflict): 409, and
 //     resending the same request is safe;
+//   - the request's time budget ran out (context.DeadlineExceeded): 504 with
+//     SY_TIMEOUT_001;
+//   - the client left (context.Canceled): 499 with no body;
 //   - anything else: 400 with the feature's code, as before.
 func AbortLedger(ctx *gin.Context, err error, code string) {
+	if abortContextError(ctx, err) {
+		return
+	}
 	var rejected *ledger.Rejected
 	switch {
 	case errors.As(err, &rejected):

@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -119,13 +121,34 @@ func (entity *sequenceEntity) nextSequenceWithContext(ctx context.Context, field
 		}},
 	}
 
+	// Two first callers of a field can both upsert its counter at once; the
+	// unique index on field makes the loser's insert a duplicate key. That is
+	// not the caller's duplicate, so the loser simply takes the next number.
 	var data entities.Sequence
-	err := entity.sequenceRepo.FindOneAndUpdate(ctx, bson.M{"field": field}, update, opts).Decode(&data)
+	var err error
+	for attempt := 0; attempt < sequenceUpsertAttempts; attempt++ {
+		err = entity.sequenceRepo.FindOneAndUpdate(ctx, bson.M{"field": field}, update, opts).Decode(&data)
+		if !mongo.IsDuplicateKeyError(err) {
+			break
+		}
+	}
+	if mongo.IsDuplicateKeyError(err) {
+		return nil, fmt.Errorf("sequence %s: %w", field, ErrSequenceContended)
+	}
 	if err != nil {
 		return nil, err
 	}
 	return &data, nil
 }
+
+// sequenceUpsertAttempts bounds the retries of a counter's first upsert when
+// concurrent callers race to create it.
+const sequenceUpsertAttempts = 3
+
+// ErrSequenceContended is a counter whose first upsert lost the race every
+// time it was tried. The caller's request was fine; sending it again will
+// almost certainly succeed.
+var ErrSequenceContended = errors.New("sequence counter is being created by another request; retry")
 
 func getSequenceDate() string {
 	location := utils.GetLocation()

@@ -267,7 +267,7 @@ func GetKHY9Data(receiveEntity repositories.IReceive, productEntity repositories
 		branchId := ctx.GetString("BranchId")
 		items, err := getKHY9Items(receiveEntity, productEntity, supplierEntity, branchId, req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: "khy9", Title: "ข.ย.9 บัญชีการซื้อยา", StartDate: req.StartDate.Time, EndDate: req.EndDate.Time, Items: items})
@@ -291,7 +291,7 @@ func getSalesReportDataHandler(orderEntity repositories.IOrder, productEntity re
 		branchId := ctx.GetString("BranchId")
 		items, err := getSalesReportItems(orderEntity, productEntity, branchId, req, khyKey)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, pharmacyReportResponse{Key: key, Title: title, StartDate: req.StartDate.Time, EndDate: req.EndDate.Time, Items: items})

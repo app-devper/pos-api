@@ -15,7 +15,7 @@ func GetEmployeeById(employeeEntity repositories.IEmployee) gin.HandlerFunc {
 		result, err := employeeEntity.GetEmployeeById(employeeId)
 		if err != nil {
 			logrus.WithError(err).WithField("employeeId", employeeId).Error("get employee by id failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.EM_BAD_REQUEST_002)
 			return
 		}
 

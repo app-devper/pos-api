@@ -41,7 +41,7 @@ func GetBarcodePDF(productEntity repositories.IProduct) gin.HandlerFunc {
 				"productIds": req.ProductIds,
 				"copies":     req.Copies,
 			}).Error("get barcode products failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 		productMap := make(map[string]*repositoriesLabelProduct, len(productList))

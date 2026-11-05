@@ -15,7 +15,7 @@ func GetABCAnalysis(orderEntity repositories.IOrderAnalytics) gin.HandlerFunc {
 		result, err := orderEntity.GetABCAnalysis(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get abc analysis failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.DA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

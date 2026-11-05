@@ -19,7 +19,7 @@ func GetOrdersRange(orderEntity repositories.IOrder) gin.HandlerFunc {
 		req.BranchId = ctx.GetString("BranchId")
 		result, err := orderEntity.GetOrderRange(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 
