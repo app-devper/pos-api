@@ -12,7 +12,31 @@ import (
 // wrong: a missing document, a timed-out database and a duplicate key all read
 // as the caller's fault. Those answers belong to errcode.AbortLookup,
 // errcode.AbortWrite and errcode.AbortLedger, which know the difference.
-var directRepositoryAbort = regexp.MustCompile(`errcode\.Abort\(\s*ctx,\s*http\.StatusBadRequest,\s*errcode\.\w+_BAD_REQUEST_002,\s*err\.Error\(\)\s*\)`)
+var directRepositoryAbort = regexp.MustCompile(`errcode\.Abort\(\s*ctx,\s*(?:http\.StatusBadRequest|400),\s*errcode\.\w+_BAD_REQUEST_002,\s*\w+\.Error\(\)\s*\)`)
+
+func TestDirectRepositoryAbortPatternMatchesWhatItForbids(t *testing.T) {
+	forbidden := []string{
+		`errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())`,
+		`errcode.Abort(ctx, 400, errcode.RC_BAD_REQUEST_002, cause.Error())`,
+		`errcode.Abort( ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, pErr.Error() )`,
+	}
+	for _, line := range forbidden {
+		if !directRepositoryAbort.MatchString(line) {
+			t.Errorf("pattern misses %s", line)
+		}
+	}
+	allowed := []string{
+		`errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_001, err.Error())`,
+		`errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, "promotion not found or expired")`,
+		`errcode.Reject(ctx, errcode.PM_BAD_REQUEST_002, err)`,
+		`errcode.AbortWrite(ctx, err, errcode.PM_BAD_REQUEST_002)`,
+	}
+	for _, line := range allowed {
+		if directRepositoryAbort.MatchString(line) {
+			t.Errorf("pattern wrongly matches %s", line)
+		}
+	}
+}
 
 func TestRepositoryErrorsAnswerThroughTheSharedHelpers(t *testing.T) {
 	var offenders []string

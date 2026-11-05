@@ -31,7 +31,7 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 		}
 		items, err := receiveItems(productEntity, req.ReceiveItems)
 		if err != nil {
-			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		req.ReceiveItems = items

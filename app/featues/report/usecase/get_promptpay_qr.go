@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"pos/app/core/errcode"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-pdf/fpdf"
 	"github.com/sirupsen/logrus"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func GetPromptPayQR(settingEntity repositories.ISetting) gin.HandlerFunc {
@@ -23,8 +25,10 @@ func GetPromptPayQR(settingEntity repositories.ISetting) gin.HandlerFunc {
 			return
 		}
 
+		// A branch that has never saved settings is not an error here: the
+		// defaults below apply, and the PromptPay check answers for the rest.
 		setting, err := settingEntity.GetSettingByBranchId(branchId)
-		if err != nil {
+		if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"branchId": branchId,
 				"amount":   amount,
@@ -97,7 +101,7 @@ func GetPromptPayPayload(settingEntity repositories.ISetting) gin.HandlerFunc {
 		}
 
 		setting, err := settingEntity.GetSettingByBranchId(branchId)
-		if err != nil {
+		if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"branchId": branchId,
 				"amount":   amount,

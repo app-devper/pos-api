@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"pos/app/data/repositories"
+
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -18,36 +20,55 @@ func Abort(ctx *gin.Context, httpStatus int, code string, msg string) {
 	ctx.AbortWithStatusJSON(httpStatus, AppError{ErrCode: code, Error: msg})
 }
 
-// AbortLookup answers a failed read of one document by id. A document that
-// does not exist and one that belongs to another branch are the same answer,
-// 404: the repository read it with the caller's branch in the query. Any
-// other failure is 400 with code. A read that ran out of time is 504 and one
-// the client abandoned is 499 (see abortContextError).
+// AbortLookup answers a failed read. A document that does not exist and one
+// that belongs to another branch are the same answer, 404: repositories read
+// with the caller's branch in the query where a branch applies. Any other
+// failure is 400 with code. A read that ran out of time is 504 and one the
+// client abandoned is 499 (see abortContextError).
 func AbortLookup(ctx *gin.Context, err error, code string) {
 	if abortContextError(ctx, err) {
 		return
 	}
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		Abort(ctx, http.StatusNotFound, SY_NOT_FOUND_002, "not found in this branch")
+		Abort(ctx, http.StatusNotFound, SY_NOT_FOUND_002, "not found")
 		return
 	}
 	Abort(ctx, http.StatusBadRequest, code, err.Error())
 }
 
 // AbortWrite answers a failed repository write (insert, update, delete) that
-// is not recorded by the Stock ledger (those go through AbortLedger). A write
-// that ran out of time is 504 and one the client abandoned is 499 (see
-// abortContextError); a document whose key already exists is 409 with
-// SY_CONFLICT_002, so the caller knows resending the same request will not
-// help; anything else is 400 with code.
+// is not recorded by the Stock ledger (those go through AbortLedger):
+//
+//   - the document to change does not exist (mongo.ErrNoDocuments): 404;
+//   - a document with that key already exists: 409 with SY_CONFLICT_002,
+//     resending the same request will not help;
+//   - the document is no longer in a state the change applies to
+//     (repositories.ErrReceiveLocked): 409 with SY_CONFLICT_003;
+//   - the write ran out of time: 504; the client left: 499;
+//   - anything else: 400 with code.
 func AbortWrite(ctx *gin.Context, err error, code string) {
 	if abortContextError(ctx, err) {
 		return
 	}
-	if mongo.IsDuplicateKeyError(err) {
+	switch {
+	case errors.Is(err, mongo.ErrNoDocuments):
+		Abort(ctx, http.StatusNotFound, SY_NOT_FOUND_002, "not found")
+	case mongo.IsDuplicateKeyError(err):
 		Abort(ctx, http.StatusConflict, SY_CONFLICT_002, "already exists")
-		return
+	case errors.Is(err, repositories.ErrReceiveLocked):
+		Abort(ctx, http.StatusConflict, SY_CONFLICT_003, err.Error())
+	default:
+		Abort(ctx, http.StatusBadRequest, code, err.Error())
 	}
+}
+
+// Reject answers a request that breaks a rule of the domain (a promotion's
+// minimum purchase, an expiry date that cannot be parsed): 400 with code and
+// the rule's own message, which is written for the caller. It is for errors
+// the usecase or domain produced, never for a repository's — those carry
+// causes (missing document, timeout, duplicate) that AbortLookup, AbortWrite
+// and AbortLedger tell apart.
+func Reject(ctx *gin.Context, code string, err error) {
 	Abort(ctx, http.StatusBadRequest, code, err.Error())
 }
 

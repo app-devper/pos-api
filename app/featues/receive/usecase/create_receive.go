@@ -57,7 +57,7 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 				"branchId":  branchId,
 				"code":      req.Code,
 			}).Error("create receive rolled back")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, cause.Error())
+			errcode.AbortWrite(ctx, cause, errcode.RC_BAD_REQUEST_002)
 		}
 		var totalCost float64
 

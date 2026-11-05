@@ -234,10 +234,10 @@ func TestUpdateReceiveItemsByIdRejectsImportedReceive(t *testing.T) {
 
 	UpdateReceiveItemsById(repo, nil)(ctx)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d", http.StatusConflict, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "can no longer change") {
+	if !strings.Contains(w.Body.String(), errcode.SY_CONFLICT_003) || !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }
@@ -393,10 +393,10 @@ func TestUpdateReceiveTotalCostByIdRejectsImportedReceive(t *testing.T) {
 
 	UpdateReceiveTotalCostById(repo)(ctx)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected status %d, got %d", http.StatusConflict, w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "can no longer change") {
+	if !strings.Contains(w.Body.String(), errcode.SY_CONFLICT_003) || !strings.Contains(w.Body.String(), "can no longer change") {
 		t.Fatalf("expected imported receive guard, got %s", w.Body.String())
 	}
 }
