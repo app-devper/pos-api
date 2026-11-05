@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"pos/app/core/utils"
 	"pos/app/data/entities"
 	"pos/app/domain/constant"
@@ -130,6 +132,9 @@ func (entity *sequenceEntity) nextSequenceWithContext(ctx context.Context, field
 			break
 		}
 	}
+	if mongo.IsDuplicateKeyError(err) {
+		return nil, fmt.Errorf("sequence %s: %w", field, ErrSequenceContended)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +144,11 @@ func (entity *sequenceEntity) nextSequenceWithContext(ctx context.Context, field
 // sequenceUpsertAttempts bounds the retries of a counter's first upsert when
 // concurrent callers race to create it.
 const sequenceUpsertAttempts = 3
+
+// ErrSequenceContended is a counter whose first upsert lost the race every
+// time it was tried. The caller's request was fine; sending it again will
+// almost certainly succeed.
+var ErrSequenceContended = errors.New("sequence counter is being created by another request; retry")
 
 func getSequenceDate() string {
 	location := utils.GetLocation()

@@ -37,6 +37,7 @@ func TestAbortWriteTellsTheCallerWhatToDo(t *testing.T) {
 		{"the document already exists: 409, resending is not safe", duplicate, http.StatusConflict, SY_CONFLICT_002},
 		{"the document to change does not exist: 404", mongo.ErrNoDocuments, http.StatusNotFound, SY_NOT_FOUND_002},
 		{"the Receive is no longer a draft: 409 with the reason", fmt.Errorf("update: %w", repositories.ErrReceiveLocked), http.StatusConflict, SY_CONFLICT_003},
+		{"a counter lost its creation race every time: 503, resending is safe", fmt.Errorf("sequence RC: %w", repositories.ErrSequenceContended), http.StatusServiceUnavailable, SY_BUSY_001},
 		{"anything else: 400 with the feature's code", errors.New("boom"), http.StatusBadRequest, "PM-400-002"},
 	}
 	for _, c := range cases {

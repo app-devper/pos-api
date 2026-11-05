@@ -44,6 +44,8 @@ func AbortLookup(ctx *gin.Context, err error, code string) {
 //     resending the same request will not help;
 //   - the document is no longer in a state the change applies to
 //     (repositories.ErrReceiveLocked): 409 with SY_CONFLICT_003;
+//   - a shared counter lost its creation race every time
+//     (repositories.ErrSequenceContended): 503, resending is safe;
 //   - the write ran out of time: 504; the client left: 499;
 //   - anything else: 400 with code.
 func AbortWrite(ctx *gin.Context, err error, code string) {
@@ -53,6 +55,8 @@ func AbortWrite(ctx *gin.Context, err error, code string) {
 	switch {
 	case errors.Is(err, mongo.ErrNoDocuments):
 		Abort(ctx, http.StatusNotFound, SY_NOT_FOUND_002, "not found")
+	case errors.Is(err, repositories.ErrSequenceContended):
+		Abort(ctx, http.StatusServiceUnavailable, SY_BUSY_001, err.Error())
 	case mongo.IsDuplicateKeyError(err):
 		Abort(ctx, http.StatusConflict, SY_CONFLICT_002, "already exists")
 	case errors.Is(err, repositories.ErrReceiveLocked):
