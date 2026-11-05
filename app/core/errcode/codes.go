@@ -185,6 +185,7 @@ const (
 	SY_NOT_FOUND_001 = "SY-404-001" // route not found
 	SY_NOT_FOUND_002 = "SY-404-002" // document not found in the caller's branch
 	SY_CONFLICT_001  = "SY-409-001" // Stock changed while recording; resending is safe
+	SY_CONFLICT_002  = "SY-409-002" // a document with that key already exists; resending will not help
 	SY_TIMEOUT_001   = "SY-504-001" // the request's time budget ran out before the database answered
 	SY_FORBIDDEN_001 = "SY-403-001" // invalid request / restricted endpoint
 	SY_FORBIDDEN_002 = "SY-403-002" // no permission

@@ -34,6 +34,23 @@ func AbortLookup(ctx *gin.Context, err error, code string) {
 	Abort(ctx, http.StatusBadRequest, code, err.Error())
 }
 
+// AbortWrite answers a failed repository write (insert, update, delete) that
+// is not recorded by the Stock ledger (those go through AbortLedger). A write
+// that ran out of time is 504 and one the client abandoned is 499 (see
+// abortContextError); a document whose key already exists is 409 with
+// SY_CONFLICT_002, so the caller knows resending the same request will not
+// help; anything else is 400 with code.
+func AbortWrite(ctx *gin.Context, err error, code string) {
+	if abortContextError(ctx, err) {
+		return
+	}
+	if mongo.IsDuplicateKeyError(err) {
+		Abort(ctx, http.StatusConflict, SY_CONFLICT_002, "already exists")
+		return
+	}
+	Abort(ctx, http.StatusBadRequest, code, err.Error())
+}
+
 // statusClientClosedRequest is the de-facto (nginx) status for a client that
 // left before the answer; net/http has no constant for it.
 const statusClientClosedRequest = 499
