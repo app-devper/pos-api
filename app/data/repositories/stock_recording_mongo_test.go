@@ -381,11 +381,11 @@ func TestCancelHonoursTheRequestContext(t *testing.T) {
 
 type requestMarker struct{}
 
-// TestCancelWritesUnderTheRequestContext marks the request's context and
-// checks that every write the ledger issues while cancelling carries the
-// mark: a ledger handed its own context would still pass the test above,
-// because the read before it fails first, but not this one.
-func TestCancelWritesUnderTheRequestContext(t *testing.T) {
+// TestCancelWritesCarryTheRequestContextValues marks the request's context
+// with a value and checks that every write the ledger issues while cancelling
+// carries it: the ledger runs detached from the request's cancellation but
+// keeps its values, and a ledger handed an unrelated context would lose them.
+func TestCancelWritesCarryTheRequestContextValues(t *testing.T) {
 	f := newSaleFixture(t)
 	f.stock(1, 6, 3)
 	lineOrder, err := f.sell(f.sale("cancel-line-under-request", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
@@ -427,7 +427,35 @@ func TestCancelWritesUnderTheRequestContext(t *testing.T) {
 		t.Fatal("the cancels issued no write at all")
 	}
 	if outsideRequest > 0 {
-		t.Fatalf("%d of %d ledger writes ran outside the request's context", outsideRequest, writes)
+		t.Fatalf("%d of %d ledger writes did not carry the request context values", outsideRequest, writes)
+	}
+}
+
+// TestCancelStartedBeforeTheRequestEndedFinishes ends the request when the
+// ledger's first write starts: the cancel has begun, so it must finish and
+// report what it did rather than be torn apart by the disconnect.
+func TestCancelStartedBeforeTheRequestEndedFinishes(t *testing.T) {
+	f := newSaleFixture(t)
+	f.stock(1, 3, 3)
+	order, err := f.sell(f.sale("ends-mid-transaction", 100, request.SaleLine{Quantity: 2, PriceType: "General"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := f.items(order.Order.Id)[0]
+	requestCtx, endRequest := context.WithCancel(context.Background())
+	defer endRequest()
+	f.watchCommands(func(_ context.Context, e *event.CommandStartedEvent) {
+		if e.CommandName == "update" {
+			endRequest()
+		}
+	})
+	defer f.watchCommands(nil)
+
+	if _, err := f.orders.CancelOrderItemById(requestCtx, item.Id.Hex(), "admin", f.branchId.Hex(), "client left"); err != nil {
+		t.Fatalf("a cancel that had started was torn apart by the disconnect: %v", err)
+	}
+	if got := f.items(order.Order.Id)[0].Status; got != constant.CANCELLED {
+		t.Fatalf("Line status %q after a cancel that started, want CANCELLED", got)
 	}
 }
 
