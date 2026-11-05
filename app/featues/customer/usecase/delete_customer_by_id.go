@@ -15,7 +15,7 @@ func DeleteCustomerById(customerEntity repositories.ICustomer) gin.HandlerFunc {
 		result, err := customerEntity.RemoveCustomerById(customerId)
 		if err != nil {
 			logrus.WithError(err).WithField("customerId", customerId).Error("delete customer failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CU_BAD_REQUEST_002)
 			return
 		}
 

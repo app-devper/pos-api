@@ -26,7 +26,7 @@ func GetSummary(orderEntity repositories.IOrderAnalytics) gin.HandlerFunc {
 				"startDate": req.StartDate,
 				"endDate":   req.EndDate,
 			}).Error("get dashboard summary failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.DA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

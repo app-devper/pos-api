@@ -26,7 +26,7 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 
 		sequence, err := sequenceEntity.NextSequence(constant.RECEIVE)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		if sequence == nil {
@@ -39,7 +39,7 @@ func CreateReceive(receiveEntity repositories.IReceive, sequenceEntity repositor
 
 		result, err := receiveEntity.CreateReceive(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 

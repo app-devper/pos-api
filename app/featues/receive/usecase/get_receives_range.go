@@ -19,7 +19,7 @@ func GetReceivesRange(receiveEntity repositories.IReceive) gin.HandlerFunc {
 		req.BranchId = ctx.GetString("BranchId")
 		result, err := receiveEntity.GetReceives(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 

@@ -28,7 +28,7 @@ func CreateCustomerHistory(entity repositories.ICustomerHistory) gin.HandlerFunc
 				"createdBy":    req.CreatedBy,
 				"customerCode": req.CustomerCode,
 			}).Error("create customer history failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CH_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CH_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -45,7 +45,7 @@ func GetCustomerHistories(entity repositories.ICustomerHistory) gin.HandlerFunc 
 				"customerCode": customerCode,
 				"branchId":     branchId,
 			}).Error("get customer histories failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CH_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.CH_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

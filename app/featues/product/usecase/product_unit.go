@@ -21,7 +21,7 @@ func CreateProductUnit(productEntity repositories.IProduct) gin.HandlerFunc {
 		req.UpdatedBy = userId
 		unit, err := productEntity.CreateProductUnitCascade(req, ctx.GetString("BranchId"), userId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -34,7 +34,7 @@ func GetProductUnitsByProductId(productEntity repositories.IProduct) gin.Handler
 		productId := ctx.Param("productId")
 		result, err := productEntity.GetProductUnitsByProductId(productId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -54,7 +54,7 @@ func UpdateProductUnitById(productEntity repositories.IProduct, productStock rep
 
 		unit, err := productEntity.UpdateProductUnitById(id, req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -74,7 +74,7 @@ func RemoveProductUnitById(productEntity repositories.IProduct) gin.HandlerFunc 
 		userId := ctx.GetString("UserId")
 		result, err := productEntity.RemoveProductUnitCascade(id, ctx.GetString("BranchId"), userId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

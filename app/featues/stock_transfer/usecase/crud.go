@@ -18,7 +18,7 @@ func GetStockTransfers(entity repositories.IStockTransfer) gin.HandlerFunc {
 		branchId := ctx.GetString("BranchId")
 		result, err := entity.GetStockTransfers(branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

@@ -13,7 +13,7 @@ func GetOrdersByCustomerCode(orderEntity repositories.IOrder) gin.HandlerFunc {
 		customerCode := ctx.Param("customerCode")
 		result, err := orderEntity.GetOrdersByCustomerCode(customerCode, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 

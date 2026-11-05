@@ -15,7 +15,7 @@ func GetCustomerByCode(customerEntity repositories.ICustomer) gin.HandlerFunc {
 		result, err := customerEntity.GetCustomerByCode(customerCode)
 		if err != nil {
 			logrus.WithError(err).WithField("customerCode", customerCode).Error("get customer by code failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.CU_BAD_REQUEST_002)
 			return
 		}
 

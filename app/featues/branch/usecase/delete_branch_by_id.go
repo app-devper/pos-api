@@ -16,7 +16,7 @@ func DeleteBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
 		result, err := branchEntity.RemoveBranchById(branchId, utils.GetUserId(ctx))
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("delete branch failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.BR_BAD_REQUEST_002)
 			return
 		}
 

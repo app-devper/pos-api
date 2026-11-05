@@ -15,7 +15,7 @@ func GetStockReport(productStock repositories.IProductStock) gin.HandlerFunc {
 		result, err := productStock.GetStockReport(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get dashboard stock report failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.DA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

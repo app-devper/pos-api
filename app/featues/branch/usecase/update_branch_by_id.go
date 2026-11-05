@@ -30,7 +30,7 @@ func UpdateBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
 				"branchId":  branchId,
 				"updatedBy": req.UpdatedBy,
 			}).Error("update branch failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.BR_BAD_REQUEST_002)
 			return
 		}
 

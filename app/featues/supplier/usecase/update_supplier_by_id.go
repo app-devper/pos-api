@@ -30,7 +30,7 @@ func UpdateSupplierById(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 				"supplierId": id,
 				"updatedBy":  req.UpdatedBy,
 			}).Error("update supplier failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.SU_BAD_REQUEST_002)
 			return
 		}
 

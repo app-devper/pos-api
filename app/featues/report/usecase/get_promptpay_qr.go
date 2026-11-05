@@ -29,7 +29,7 @@ func GetPromptPayQR(settingEntity repositories.ISetting) gin.HandlerFunc {
 				"branchId": branchId,
 				"amount":   amount,
 			}).Error("get promptpay qr setting failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 		companyName := "POS System"
@@ -102,7 +102,7 @@ func GetPromptPayPayload(settingEntity repositories.ISetting) gin.HandlerFunc {
 				"branchId": branchId,
 				"amount":   amount,
 			}).Error("get promptpay payload setting failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 		promptPayId := ""

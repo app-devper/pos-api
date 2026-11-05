@@ -17,7 +17,7 @@ func GetOrderById(orderEntity repositories.IOrder) gin.HandlerFunc {
 		}
 		result, err := orderEntity.GetOrderDetailById(orderId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 

@@ -31,13 +31,13 @@ func UpdateReceiveById(receiveEntity repositories.IReceive, productEntity reposi
 		}
 		items, err := receiveItems(productEntity, req.ReceiveItems)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		req.ReceiveItems = items
 		result, err := receiveEntity.UpdateReceiveById(id, req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 
@@ -60,14 +60,14 @@ func UpdateReceiveItemsById(receiveEntity repositories.IReceive, productEntity r
 		req.UpdatedBy = utils.GetUserId(ctx)
 		items, err := receiveItems(productEntity, req.ReceiveItems)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		req.ReceiveItems = items
 
 		result, err := receiveEntity.UpdateReceiveItemsById(receiveId, req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 
@@ -89,7 +89,7 @@ func UpdateReceiveTotalCostById(receiveEntity repositories.IReceive) gin.Handler
 		}
 		result, err := receiveEntity.UpdateReceiveTotalCostById(id, req.TotalCost)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 

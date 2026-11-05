@@ -41,7 +41,7 @@ func GetProductReturnsByOrderId(productReturnEntity repositories.IProductReturn)
 		branchId := utils.GetBranchId(ctx)
 		result, err := productReturnEntity.GetProductReturnsByOrderId(orderId, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RT_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

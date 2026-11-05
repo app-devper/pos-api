@@ -36,7 +36,7 @@ func CreateStockTransfer(ledger transferRequester, productEntity repositories.IP
 
 		sequence, err := sequenceEntity.NextSequence(constant.STOCK_TRANSFER)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.TR_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.TR_BAD_REQUEST_002)
 			return
 		}
 		if sequence == nil {

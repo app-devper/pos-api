@@ -44,7 +44,7 @@ func ApplyPromotion(entity repositories.IPromotion) gin.HandlerFunc {
 				"promotionCode": req.PromotionCode,
 				"orderTotal":    req.OrderTotal,
 			}).Warn("apply promotion rejected")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PM_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PM_BAD_REQUEST_002)
 			return
 		}
 

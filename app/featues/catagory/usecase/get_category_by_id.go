@@ -15,7 +15,7 @@ func GetCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 		result, err := entity.GetCategoryById(categoryId)
 		if err != nil {
 			logrus.WithError(err).WithField("categoryId", categoryId).Error("get category by id failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.CA_BAD_REQUEST_002)
 			return
 		}
 

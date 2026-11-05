@@ -46,7 +46,7 @@ func GetProductStocksByProductId(productStock repositories.IProductStock) gin.Ha
 		branchId := ctx.GetString("BranchId")
 		result, err := productStock.GetProductStocksByProductId(productId, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -73,7 +73,7 @@ func UpdateProductStockById(productStock repositories.IProductStock, productEnti
 
 		stock, err = productStock.UpdateProductStockById(id, req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		if err := appendProductStockHistory(branchId, productEntity, productStock, req.UnitId, func(unit *entities.ProductUnit, branchId string) request.ProductHistory {
@@ -82,7 +82,7 @@ func UpdateProductStockById(productStock repositories.IProductStock, productEnti
 			updateHistory.BranchId = branchId
 			return updateHistory
 		}); err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -143,7 +143,7 @@ func UpdateProductStockSequence(productStock repositories.IProductStock) gin.Han
 		req.BranchId = ctx.GetString("BranchId")
 		stocks, err := productStock.UpdateProductStockSequence(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, stocks)

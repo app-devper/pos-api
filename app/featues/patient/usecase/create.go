@@ -27,7 +27,7 @@ func CreatePatient(entity repositories.IPatient) gin.HandlerFunc {
 				"branchId":  req.BranchId,
 				"createdBy": req.CreatedBy,
 			}).Error("create patient failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

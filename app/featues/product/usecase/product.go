@@ -17,7 +17,7 @@ func GenerateSerialNumber(sequenceEntity repositories.ISequence) gin.HandlerFunc
 	return func(ctx *gin.Context) {
 		result, err := sequenceEntity.NextSequence(constant.PRODUCT)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, gin.H{"serialNumber": result.GenerateCode()})
@@ -52,7 +52,7 @@ func CreateProduct(productEntity repositories.IProduct) gin.HandlerFunc {
 		})
 
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -72,7 +72,7 @@ func CreateProductReceive(productEntity repositories.IProduct) gin.HandlerFunc {
 		req.BranchId = ctx.GetString("BranchId")
 		product, err := productEntity.CreateProductReceive(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -90,7 +90,7 @@ func GetProducts(productEntity repositories.IProduct) gin.HandlerFunc {
 		req.BranchId = ctx.GetString("BranchId")
 		results, err := productEntity.GetProductAll(req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, results)
@@ -102,7 +102,7 @@ func GetProductBySerialNumber(productEntity repositories.IProduct) gin.HandlerFu
 		serialNumber := ctx.Param("serialNumber")
 		result, err := productEntity.GetProductBySerialNumber(serialNumber)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -115,7 +115,7 @@ func DeleteProductById(productEntity repositories.IProduct) gin.HandlerFunc {
 		product, err := productEntity.RemoveProductById(id)
 
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -129,24 +129,24 @@ func GetProductById(productEntity repositories.IProduct, productStock repositori
 		product, err := productEntity.GetProductById(id)
 
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
 		branchId := ctx.GetString("BranchId")
 		units, err := productEntity.GetProductUnitsByProductId(id)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		prices, err := productEntity.GetProductPricesByProductId(id)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		stocks, err := productStock.GetProductStocksByProductId(id, branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -190,7 +190,7 @@ func UpdateProductById(productEntity repositories.IProduct, productStock reposit
 		req.UpdatedBy = userId
 		result, err := productEntity.UpdateProductById(id, req)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 
@@ -209,7 +209,7 @@ func ClearQuantitySoldFirstById(productEntity repositories.IProduct) gin.Handler
 		productId := ctx.Param("productId")
 		result, err := productEntity.ClearQuantitySoldFirstById(productId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

@@ -13,7 +13,7 @@ func GetOrderItemByProductId(orderEntity repositories.IOrder) gin.HandlerFunc {
 		productId := ctx.Param("productId")
 		result, err := orderEntity.GetOrderItemByProductId(productId, ctx.GetString("BranchId"))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 

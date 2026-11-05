@@ -18,7 +18,7 @@ func GetStockReportExcel(productStock repositories.IProductStock) gin.HandlerFun
 		stocks, err := productStock.GetStockReport(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get stock report data failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 
