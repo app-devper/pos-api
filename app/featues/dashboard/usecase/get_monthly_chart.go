@@ -15,7 +15,7 @@ func GetMonthlyChart(orderEntity repositories.IOrderAnalytics) gin.HandlerFunc {
 		result, err := orderEntity.GetOrderMonthlyChart(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get dashboard monthly chart failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.DA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

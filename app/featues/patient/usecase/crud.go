@@ -17,7 +17,7 @@ func GetPatients(entity repositories.IPatient) gin.HandlerFunc {
 		result, err := entity.GetPatients(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get patients failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -34,7 +34,7 @@ func GetPatientById(entity repositories.IPatient) gin.HandlerFunc {
 				"id":       id,
 				"branchId": branchId,
 			}).Error("get patient by id failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -51,7 +51,7 @@ func GetPatientByCustomerCode(entity repositories.IPatient) gin.HandlerFunc {
 				"customerCode": code,
 				"branchId":     branchId,
 			}).Error("get patient by customer code failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -76,7 +76,7 @@ func UpdatePatientById(entity repositories.IPatient) gin.HandlerFunc {
 				"branchId":  branchId,
 				"updatedBy": req.UpdatedBy,
 			}).Error("update patient failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -95,7 +95,7 @@ func DeletePatientById(entity repositories.IPatient) gin.HandlerFunc {
 				"branchId": branchId,
 				"userId":   userId,
 			}).Error("delete patient failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.PT_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.PT_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

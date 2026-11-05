@@ -31,7 +31,7 @@ func CreateCustomer(customerEntity repositories.ICustomer, sequenceEntity reposi
 		sequence, err := sequenceEntity.NextSequence(constant.MEMBER)
 		if err != nil {
 			logrus.WithError(err).WithField("createdBy", userId).Error("get customer sequence failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CU_BAD_REQUEST_002)
 			return
 		}
 		if sequence == nil {
@@ -47,7 +47,7 @@ func CreateCustomer(customerEntity repositories.ICustomer, sequenceEntity reposi
 				"code":      req.Code,
 				"createdBy": req.CreatedBy,
 			}).Error("create customer failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CU_BAD_REQUEST_002)
 			return
 		}
 

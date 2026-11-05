@@ -30,7 +30,7 @@ func GetSalesReportExcel(orderEntity repositories.IOrder) gin.HandlerFunc {
 				"startDate": req.StartDate,
 				"endDate":   req.EndDate,
 			}).Error("get sales report data failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 

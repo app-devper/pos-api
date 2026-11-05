@@ -15,7 +15,7 @@ func GetBranchById(branchEntity repositories.IBranch) gin.HandlerFunc {
 		result, err := branchEntity.GetBranchById(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get branch by id failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.BR_BAD_REQUEST_002)
 			return
 		}
 

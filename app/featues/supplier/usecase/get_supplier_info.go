@@ -15,7 +15,7 @@ func GetSupplierInfo(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 		result, err := supplierEntity.GetSupplierByClientId(clientId)
 		if err != nil {
 			logrus.WithError(err).WithField("clientId", clientId).Error("get supplier info failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.SU_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

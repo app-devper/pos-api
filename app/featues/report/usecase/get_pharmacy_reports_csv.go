@@ -42,13 +42,13 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 		}
 		receives, err := receiveEntity.GetReceives(receiveRange)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 
 		receiveItemsMap, err := getReceiveItemsMap(receiveEntity, receives)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 
@@ -72,7 +72,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 		}
 		productList, err := productEntity.GetProductsByIds(productIds)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 		productMap := make(map[string]*entities.Product, len(productList))
@@ -85,7 +85,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 		}
 		unitMap, err := buildUnitNameMap(productEntity, unitIds)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 
@@ -95,7 +95,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 		}
 		supplierMap, err := getSupplierNameMap(supplierEntity, supplierIds)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
 		}
 
@@ -147,12 +147,12 @@ func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, product
 	}
 	orderMap, err := buildOrderMap(orderEntity, orderRange)
 	if err != nil {
-		errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+		errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 		return
 	}
 	orderItems, err := orderEntity.GetOrderItemRange(orderRange)
 	if err != nil {
-		errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+		errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 		return
 	}
 	unitIdSet := make(map[string]struct{})
@@ -167,7 +167,7 @@ func generateSalesCSV(ctx *gin.Context, orderEntity repositories.IOrder, product
 	}
 	unitMap, err := buildUnitNameMap(productEntity, unitIds)
 	if err != nil {
-		errcode.Abort(ctx, http.StatusBadRequest, errcode.RP_BAD_REQUEST_002, err.Error())
+		errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 		return
 	}
 

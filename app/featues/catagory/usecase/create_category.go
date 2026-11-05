@@ -21,7 +21,7 @@ func CreateCategory(entity repositories.ICategory) gin.HandlerFunc {
 		result, err := entity.CreateCategory(req)
 		if err != nil {
 			logrus.WithError(err).Error("create category failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CA_BAD_REQUEST_002)
 			return
 		}
 

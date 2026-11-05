@@ -26,7 +26,7 @@ func CreateSupplier(supplierEntity repositories.ISupplier) gin.HandlerFunc {
 		result, err := supplierEntity.CreateSupplier(req)
 		if err != nil {
 			logrus.WithError(err).WithField("updatedBy", req.UpdatedBy).Error("create supplier failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SU_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.SU_BAD_REQUEST_002)
 			return
 		}
 

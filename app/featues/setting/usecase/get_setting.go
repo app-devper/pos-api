@@ -15,7 +15,7 @@ func GetSetting(settingEntity repositories.ISetting) gin.HandlerFunc {
 		result, err := settingEntity.GetSettingByBranchId(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get setting failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SE_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.SE_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

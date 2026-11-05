@@ -40,7 +40,7 @@ func GetStockCounts(stockCountEntity repositories.IStockCount) gin.HandlerFunc {
 		branchId := utils.GetBranchId(ctx)
 		result, err := stockCountEntity.GetStockCounts(branchId)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SC_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.SC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

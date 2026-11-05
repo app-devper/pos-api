@@ -23,7 +23,7 @@ func UpdateCustomerCodeOrderById(orderEntity repositories.IOrder) gin.HandlerFun
 		}
 		result, err := orderEntity.UpdateCustomerCodeOrderById(orderId, req.CustomerCode)
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.OR_BAD_REQUEST_002)
 			return
 		}
 

@@ -15,7 +15,7 @@ func GetEmployeesByBranchId(employeeEntity repositories.IEmployee) gin.HandlerFu
 		result, err := employeeEntity.GetEmployeesByBranchId(branchId)
 		if err != nil {
 			logrus.WithError(err).WithField("branchId", branchId).Error("get employees by branch id failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.EM_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.EM_BAD_REQUEST_002)
 			return
 		}
 

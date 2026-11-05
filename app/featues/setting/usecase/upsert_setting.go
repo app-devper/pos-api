@@ -28,7 +28,7 @@ func UpsertSetting(settingEntity repositories.ISetting) gin.HandlerFunc {
 				"branchId":  req.BranchId,
 				"updatedBy": req.UpdatedBy,
 			}).Error("upsert setting failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.SE_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.SE_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

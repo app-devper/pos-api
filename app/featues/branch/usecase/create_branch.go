@@ -30,7 +30,7 @@ func CreateBranch(
 		sequence, err := sequenceEntity.NextSequence(constant.BRANCH)
 		if err != nil {
 			logrus.WithError(err).WithField("createdBy", userId).Error("get branch sequence failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.BR_BAD_REQUEST_002)
 			return
 		}
 		if sequence == nil {
@@ -46,7 +46,7 @@ func CreateBranch(
 				"code":      req.Code,
 				"createdBy": req.CreatedBy,
 			}).Error("create branch failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.BR_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.BR_BAD_REQUEST_002)
 			return
 		}
 

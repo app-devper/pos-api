@@ -26,7 +26,7 @@ func GetDeadStockProducts(productStock repositories.IProductStock) gin.HandlerFu
 				"branchId": branchId,
 				"days":     days,
 			}).Error("get dead stock products failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.DA_BAD_REQUEST_002, err.Error())
+			errcode.AbortLookup(ctx, err, errcode.DA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

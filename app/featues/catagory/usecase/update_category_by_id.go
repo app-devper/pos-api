@@ -22,7 +22,7 @@ func UpdateCategoryById(entity repositories.ICategory) gin.HandlerFunc {
 		result, err := entity.UpdateCategoryById(categoryId, req)
 		if err != nil {
 			logrus.WithError(err).WithField("categoryId", categoryId).Error("update category failed")
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.CA_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.CA_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)

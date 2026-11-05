@@ -18,7 +18,7 @@ func DeleteReceiveById(receiveEntity repositories.IReceive) gin.HandlerFunc {
 		}
 		result, err := receiveEntity.CancelReceiveById(id, utils.GetUserId(ctx))
 		if err != nil {
-			errcode.Abort(ctx, http.StatusBadRequest, errcode.RC_BAD_REQUEST_002, err.Error())
+			errcode.AbortWrite(ctx, err, errcode.RC_BAD_REQUEST_002)
 			return
 		}
 		ctx.JSON(http.StatusOK, result)
