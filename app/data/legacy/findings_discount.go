@@ -20,12 +20,18 @@ var discountKinds = []discountKind{
 	{KindDiscountUnknown, "Orders with a discounted line whose total matches none of the three discount rules", ""},
 }
 
-// numericTypes are the BSON types $isNumber accepts, and the types that leave
-// a line amount at 0 without being reported (missing, null).
-var numericTypes = bson.A{"double", "int", "long", "decimal", "missing", "null"}
+// floatTypes decode into the float64 price and discount of entities.OrderItem
+// (missing and null decode as 0); a Decimal128 or any non-number does not.
+var floatTypes = bson.A{"double", "int", "long", "missing", "null"}
 
-// lineAmounts are the line fields the sums read.
-var lineAmounts = []string{"price", "quantity", "discount"}
+// intTypes decode into its int quantity; a double does only when it is whole
+// and in range, which wholeDouble checks.
+var intTypes = bson.A{"int", "long", "missing", "null"}
+
+// maxWholeDouble bounds a double the driver puts into an int64 without
+// overflow; NaN compares below every number in MongoDB, so it fails the
+// lower bound.
+const maxWholeDouble = 9.2e18
 
 // field returns the value at path when it is a number, otherwise 0: a missing,
 // null or non-numeric amount neither stops the aggregation nor compares as
@@ -34,18 +40,37 @@ func field(path string) bson.M {
 	return bson.M{"$cond": bson.A{bson.M{"$isNumber": "$" + path}, "$" + path, 0}}
 }
 
-// nonNumericLine is 1 when a line amount holds a value that is not a number
-// (a missing or null amount is not counted), otherwise 0.
-func nonNumericLine() bson.M {
-	anyAmount := bson.A{}
-	for _, name := range lineAmounts {
-		anyAmount = append(anyAmount, bson.M{"$not": bson.A{bson.M{"$in": bson.A{bson.M{"$type": "$" + name}, numericTypes}}}})
-	}
-	return bson.M{"$cond": bson.A{bson.M{"$or": anyAmount}, 1, 0}}
+// typeIn is true when the value at path has one of types.
+func typeIn(path string, types bson.A) bson.M {
+	return bson.M{"$in": bson.A{bson.M{"$type": "$" + path}, types}}
+}
+
+// wholeDouble is true for a double quantity with no fraction, in range. $and
+// stops at the first false, so $trunc only sees a double.
+func wholeDouble(path string) bson.M {
+	v := "$" + path
+	return bson.M{"$and": bson.A{
+		bson.M{"$eq": bson.A{bson.M{"$type": v}, "double"}},
+		bson.M{"$gte": bson.A{v, -maxWholeDouble}},
+		bson.M{"$lte": bson.A{v, maxWholeDouble}},
+		bson.M{"$eq": bson.A{v, bson.M{"$trunc": v}}},
+	}}
+}
+
+// undecodableLine is 1 when the current code could not read a line amount
+// into entities.OrderItem (a text, a Decimal128, a fractional or out-of-range
+// quantity), otherwise 0.
+func undecodableLine() bson.M {
+	readable := bson.M{"$and": bson.A{
+		typeIn("price", floatTypes),
+		typeIn("discount", floatTypes),
+		bson.M{"$or": bson.A{typeIn("quantity", intTypes), wholeDouble("quantity")}},
+	}}
+	return bson.M{"$cond": bson.A{readable, 0, 1}}
 }
 
 // orderSums groups every line by its Order once: whether any line carries a
-// discount or a non-numeric amount, and Σ price under each rule. A line's
+// discount or an amount the current code cannot read, and Σ price under each rule. A line's
 // price is its whole amount before discount. Grouping all lines (not only the
 // discounted ones) keeps the undiscounted lines of a discounted Order in its
 // sums.
@@ -54,7 +79,7 @@ func orderSums() bson.D {
 	return bson.D{{Key: "$group", Value: bson.M{
 		"_id":        "$orderId",
 		"discounted": bson.M{"$max": bson.M{"$cond": bson.A{bson.M{"$gt": bson.A{discount, 0}}, 1, 0}}},
-		"nonNumeric": bson.M{"$max": nonNumericLine()},
+		"nonNumeric": bson.M{"$max": undecodableLine()},
 		"perUnit":    bson.M{"$sum": bson.M{"$subtract": bson.A{field("price"), bson.M{"$multiply": bson.A{discount, field("quantity")}}}}},
 		"perLine":    bson.M{"$sum": bson.M{"$subtract": bson.A{field("price"), discount}}},
 		"plain":      bson.M{"$sum": field("price")},
@@ -99,7 +124,7 @@ func discountPipeline() mongo.Pipeline {
 }
 
 // nonNumericDetail explains KindNonNumericLineAmount.
-const nonNumericDetail = "Orders with a Line whose price, quantity or discount is not a number; the discount check counted it as 0"
+const nonNumericDetail = "Orders with a Line whose price, quantity or discount the current code cannot read: not a number (counted as 0 by the discount check), a Decimal128, or a fractional quantity"
 
 // checkDiscountConvention reports, in one pass, the Orders with a discounted
 // line whose total does not follow the current per-unit discount, then the

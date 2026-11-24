@@ -2,6 +2,7 @@ package legacy
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -120,6 +121,23 @@ func TestFindings_NonNumericAmountCountsAsZeroInTheSums(t *testing.T) {
 	if len(all) != 1 {
 		t.Errorf("findings = %+v, want only the non-numeric line", all)
 	}
+}
+
+func TestFindings_AmountsTheCurrentCodeCannotDecodeAreListed(t *testing.T) {
+	// Arrange: entities.OrderItem has float64 price and discount, int quantity
+	db := newTestDB(t)
+	two, _ := primitive.ParseDecimal128("2")
+	fractional := lineOrder(t, db, 250, bson.M{"price": 250.0, "quantity": 2.5})
+	decimal := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": 2, "discount": two})
+	infinite := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": math.Inf(1)})
+	notANumber := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": math.NaN()})
+	lineOrder(t, db, 200, bson.M{"price": int64(200), "quantity": 2.0, "discount": int32(0)})
+
+	// Act
+	all := runFindings(t, db)
+
+	// Assert
+	wantFinding(t, all, KindNonNumericLineAmount, 4, fractional, decimal, infinite, notANumber)
 }
 
 func TestFindings_OddOrderIdsAreShownNotFatal(t *testing.T) {
