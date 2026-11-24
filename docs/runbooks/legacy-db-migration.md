@@ -148,31 +148,37 @@ total of every Order with a discounted line against three rules, within 0.005:
 - not subtracted, Σ price: `DISCOUNT_NOT_SUBTRACTED`;
 - none of them: `DISCOUNT_UNKNOWN`.
 
-Where the totals came from: the 2024 server stored the total the till sent
-when the bill was made, and replaced it with Σ price (discount not subtracted)
-whenever a Line was deleted from the bill (`b165b4d`
-`app/data/repositories/order.go`, `UpdateTotalOrderById` /
-`GetTotalOrderById`). What the 2024 **till** sent as `price` and `discount`,
-and which rule it used for the total, is **not known from this repo**.
+The 2024 server stored the total the till sent, and replaced it with Σ price
+whenever a Line was deleted (`b165b4d` `app/data/repositories/order.go`,
+`UpdateTotalOrderById`). What the 2024 **till** sent as `price` and
+`discount`, and its rule for the total, is **not known from this repo**.
 
 The stored totals stay as they are. What changes after the move:
 
-- **Cancelling one Line** of such an Order (`CancelLine`,
-  `app/data/ledger/cancel.go`, `recomputeOrder`) recomputes the **whole**
-  Order from the Lines still standing with the per-unit rule
-  (`sale.OrderMoney`) and overwrites its `total`, `totalCost` and `discount`.
-  The new total is then lower than what the remaining Lines were charged:
-  for an Order listed under `DISCOUNT_NOT_SUBTRACTED`, by each remaining
-  Line's discount × quantity; under `DISCOUNT_PER_LINE`, by each remaining
-  Line's discount × (quantity − 1).
+- **Cancelling one Line** (`CancelLine`, `app/data/ledger/cancel.go`,
+  `recomputeOrder`) recomputes the **whole** Order from its standing Lines
+  with the per-unit rule (`sale.OrderMoney`), overwriting `total`,
+  `totalCost`, `discount`. The new total is lower than what the remaining
+  Lines were charged: by each one's discount × quantity under
+  `DISCOUNT_NOT_SUBTRACTED`, × (quantity − 1) under `DISCOUNT_PER_LINE`.
 - **Cancelling the whole Order** (`CancelOrder`) marks it, its Lines and its
   payments cancelled and puts the Stock back; it does not recompute the total.
 - **A Return** caps each refund at price ÷ quantity − discount per unit
-  (`app/data/ledger/return.go`, `paidPerUnit`), the per-unit rule again.
+  (`app/data/ledger/return.go`, `paidPerUnit`). On a `DISCOUNT_NOT_SUBTRACTED`
+  or `DISCOUNT_PER_LINE` bill (per line: quantity above 1) that is below what
+  was paid per unit: the shop decides the refund amount by hand.
 
-So for the Orders listed under these three kinds the shop should cancel the
-whole Order rather than one Line, or accept the recomputed total. Tell the
-shop before the switch, with the Order ids from the report.
+The report lists at most 20 ids per kind; `(<total>)` is the real count. So
+the rule for the shop does not depend on that list: **for any bill made before
+the switch that has a discounted Line, cancel the whole bill, never one Line.**
+To give the shop every such bill, run on the COPY (reads only; tried on a
+synthetic scratch database only, never real data):
+
+```bash
+COPY_DB=<COPY_DB_NAME> mongosh '<NEW_MONGO_URI>' --quiet docs/runbooks/legacy-discounted-orders.js
+```
+
+Expected: one line per Order, `<_id> <code> <createdDate>`, oldest first.
 
 ### Duplicate sequence rows
 
@@ -296,10 +302,9 @@ service and survives deploys (AGENTS.md, "Environment Notes").
 
 **Repointing `pos-dev-api` at the copy takes whatever it serves today off the
 current till.** Whether anyone depends on what it serves today is **not known**
-from this repo; that is the owner's call, made before step 4.
+from this repo; that is the owner's call, made before step 6.4.
 
-Each step needs the owner's go-ahead for that step, and none is run by an agent
-on its own.
+Each step needs the owner's go-ahead; none is run by an agent on its own.
 
 1. [ ] **Record what `pos-dev-api` serves today, before any change.** Reads the
    service's configuration only. Untried example (`<GCP_PROJECT>`, `<REGION>`
@@ -328,33 +333,24 @@ on its own.
    diff legacy.txt copy.txt
    ```
 
-   Expected: `diff` prints nothing, exit 0. The migration adds no documents to
-   these collections and changes no Stock quantity or counter (the HQ Branch
-   goes to `branches`, not compared), so every line matches exactly.
+   Expected: `diff` prints nothing, exit 0 (the migration changes nothing the
+   script counts; the HQ Branch goes to `branches`, not compared).
 
-   What was tried (2026-11-24, never real data): this script file on two
-   synthetic scratch databases on a local test replica set, URI with
-   `?replicaSet=…`. Identical databases: no `diff` output. One extra
-   `product_histories` row and one lowered Stock quantity: exactly those two
-   lines, `diff` exit 1. No `COMPARE_DB`: a message, exit 2.
+   Tried 2026-11-24 on synthetic scratch databases on a local test replica
+   set (URI with `?replicaSet=…`), never real data: identical → no output; one
+   extra history row and one lowered Stock → exactly those two lines, exit 1.
 
-   What it sees: a sale, a Receive, a Stock added, adjusted or counted, a new
-   Product, Unit, price or Customer. In the 2024 build every Product, Unit,
-   price and Stock edit also writes a `product_histories` row, so an edit of
-   those is seen through that count (the 2024 code ignores a failed history
-   write, so such an edit could in principle leave no row). What it **cannot**
-   see: an edit that changes no count, no Stock quantity and writes no
-   history row, for example a renamed Customer, a changed Customer type, or
-   anything in a collection it does not count (suppliers, categories,
-   settings, employees). Section 1's "no use of the back office" is what
-   covers those.
+   It sees sales, Receives, Stock moves and new Products, Units, prices or
+   Customers; 2024 Product, Unit, price and Stock edits write a
+   `product_histories` row (unless that write failed: the 2024 code ignores
+   it). It **cannot** see an edit that changes no count, no Stock quantity and
+   writes no history row (a renamed Customer; suppliers, categories, settings,
+   employees). Section 1's "no use of the back office" covers those.
 
-   On any difference: do not switch. Something was done on the legacy stack
-   after the dump. Take a fresh dump (section 2), then run the report and
-   apply again (sections 3 and 4) and compare again. **Hand fixes made in the
-   old copy are gone** with it: the report run on the fresh copy shows those
-   findings again, and each needs its fix again (keep a list of the fixes you
-   made, so they can be repeated).
+   On any difference: do not switch. Take a fresh dump (section 2), run the
+   report and apply again (sections 3, 4), compare again. **Hand fixes made in
+   the old copy are gone**: the fresh report shows those findings again (keep
+   a list of your fixes, to repeat them).
 4. [ ] **Repoint `pos-dev-api` at the copy.** This changes the configuration
    of the service that serves the current till: owner-authorised step only,
    never run by an agent on its own. Set, as in section 5:
@@ -362,7 +358,10 @@ on its own.
    `CLIENT_ID` → the shop's Client id. `MONGO_HOST` is a secret: how it is
    switched (a new secret, or a new version of the current one) is the
    owner's decision; a new version of a secret changes it for every service
-   that reads its latest version. Untried example for the two plain values:
+   that reads its latest version. If the copy is on a different server than
+   today's, change the Mongo host and `MONGO_POS_DB_NAME` / `CLIENT_ID` in ONE
+   revision, so no revision serves `<COPY_DB_NAME>` on the old host. Untried
+   example for the two plain values:
 
    ```bash
    gcloud run services update pos-dev-api --project=<GCP_PROJECT> --region=<REGION> \
