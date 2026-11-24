@@ -322,3 +322,64 @@ func TestRun_OneVariableMissingExitsTwo(t *testing.T) {
 		}
 	}
 }
+
+func TestRun_SRVOnlyOptionsAreAccepted(t *testing.T) {
+	for _, uri := range []string{
+		"mongodb+srv://user:12345@cluster0.example.net/?srvMaxHosts=2&retryWrites=true",
+		"mongodb+srv://user:12345@cluster0.example.net/db?retryWrites=true&srvServiceName=mongo",
+		"mongodb+srv://user:12345@cluster0.example.net/?SRVMAXHOSTS=2",
+	} {
+		// Arrange
+		c := &call{}
+		env := map[string]string{"MONGO_HOST": uri, "MONGO_POS_DB_NAME": "copy_db"}
+		// Act
+		code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+		// Assert
+		if code != 0 || c.count != 1 || c.host != uri {
+			t.Errorf("%s: code=%d calls=%d host passed on=%v, want 0, 1 and the URI unchanged\n%s", uri, code, c.count, c.host == uri, errOut)
+		}
+		if first := strings.Split(out, "\n")[0]; !strings.Contains(first, " on cluster0.example.net, ") {
+			t.Errorf("%s: first line %q, want the SRV name", uri, first)
+		}
+		for _, secret := range secrets {
+			if strings.Contains(out+errOut, secret) {
+				t.Errorf("%s: output shows %q", uri, secret)
+			}
+		}
+	}
+}
+
+func TestRun_SRVOptionOnAPlainURIIsStillRefused(t *testing.T) {
+	c := &call{}
+	env := map[string]string{"MONGO_HOST": "mongodb://user:12345@host/?srvMaxHosts=2", "MONGO_POS_DB_NAME": "copy_db"}
+
+	code, _, _ := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+
+	if code != 2 || c.count != 0 {
+		t.Errorf("code=%d calls=%d, want 2 and 0", code, c.count)
+	}
+}
+
+func TestRun_RefusedURIMessageSaysWhatToCheck(t *testing.T) {
+	c := &call{}
+	env := map[string]string{"MONGO_HOST": "mongodb://user:12345/6@host/db", "MONGO_POS_DB_NAME": "copy_db"}
+
+	code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+
+	if code != 2 || c.count != 0 {
+		t.Errorf("code=%d calls=%d, want 2 and 0", code, c.count)
+	}
+	for _, want := range []string{"MONGO_HOST", "driver", "percent-encoded"} {
+		if !strings.Contains(errOut, want) {
+			t.Errorf("message %q lacks %q", errOut, want)
+		}
+	}
+	if strings.Contains(errOut, "is not a mongodb://") {
+		t.Errorf("message still claims the scheme is wrong: %q", errOut)
+	}
+	for _, secret := range secrets {
+		if strings.Contains(out+errOut, secret) {
+			t.Errorf("output shows %q", secret)
+		}
+	}
+}

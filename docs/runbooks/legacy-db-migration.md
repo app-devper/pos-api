@@ -126,9 +126,12 @@ server's host(s) from `MONGO_HOST` (never the user, password or options). If
 the host is not the server that holds the copy, or the name is not
 `<COPY_DB_NAME>`, stop. The command cannot tell a copy from the live legacy
 database: both are a 2024 database without Branches. This line and
-`-confirm-db` are the only guards. A `MONGO_HOST` that does not parse as a
-`mongodb://` or `mongodb+srv://` URI is refused with exit 2, without printing
-it.
+`-confirm-db` are the only guards. A `MONGO_HOST` the driver does not accept
+is refused with exit 2, without printing it; the usual cause is a special
+character in the password that is not percent-encoded.
+
+`receives status` counts the 2024 Receives whose status is not `IMPORTED` yet;
+`receives branchId` counts all of them.
 
 The all-zero HQ id means no HQ Branch exists yet; `-apply` creates it. Each
 `Change` line is a field the migration sets; in report mode the counts are

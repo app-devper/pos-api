@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -107,7 +108,7 @@ func parseConfig(args []string, env func(string) string, errOut io.Writer) (conf
 	}
 	hosts, ok := hostsOf(uri)
 	if !ok {
-		fmt.Fprintln(errOut, "MONGO_HOST is not a mongodb:// or mongodb+srv:// URI with a host (not shown, it may hold a password)")
+		fmt.Fprintln(errOut, refusedURI)
 		return config{}, false
 	}
 	if *apply && *confirm != name {
@@ -120,12 +121,38 @@ func parseConfig(args []string, env func(string) string, errOut io.Writer) (conf
 const (
 	schemePlain = "mongodb://"
 	schemeSRV   = "mongodb+srv://"
+
+	refusedURI = "MONGO_HOST is not a MongoDB URI the driver accepts (not shown, it may hold a password): " +
+		"check that it starts with mongodb:// or mongodb+srv://, that every host is valid, " +
+		"and that special characters in the credentials are percent-encoded"
 )
+
+// srvOnlyOptions are the URI options the driver allows only on mongodb+srv.
+var srvOnlyOptions = []string{"srvmaxhosts", "srvservicename"}
+
+// withoutSRVOnlyOptions drops the SRV-only options from the query of rest (a
+// mongodb+srv URI without its scheme), so the rest can be checked as a plain
+// URI. Everything else is returned as it was.
+func withoutSRVOnlyOptions(rest string) string {
+	at := strings.LastIndex(rest, "?")
+	if at < 0 {
+		return rest
+	}
+	kept := make([]string, 0)
+	for _, option := range strings.Split(rest[at+1:], "&") {
+		key, _, _ := strings.Cut(option, "=")
+		if !slices.Contains(srvOnlyOptions, strings.ToLower(key)) {
+			kept = append(kept, option)
+		}
+	}
+	return rest[:at+1] + strings.Join(kept, "&")
+}
 
 // hostsOf returns the host list of a MongoDB URI as the driver reads it,
 // without user, password, database or options; false when the driver would
 // refuse it. The parse error is dropped: it can quote the URI. A mongodb+srv
-// URI is parsed as mongodb:// with its one host, so nothing is looked up.
+// URI is parsed as mongodb:// with its one host and without the options only
+// SRV allows, so nothing is looked up.
 func hostsOf(uri string) (string, bool) {
 	rest, srv := strings.CutPrefix(uri, schemeSRV)
 	if !srv && !strings.HasPrefix(uri, schemePlain) {
@@ -133,7 +160,7 @@ func hostsOf(uri string) (string, bool) {
 	}
 	plain := uri
 	if srv {
-		plain = schemePlain + rest
+		plain = schemePlain + withoutSRVOnlyOptions(rest)
 	}
 	cs, err := connstring.ParseAndValidate(plain)
 	if err != nil || len(cs.Hosts) == 0 {
