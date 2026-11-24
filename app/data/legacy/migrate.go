@@ -105,20 +105,23 @@ func insertHQ(ctx context.Context, db *mongo.Database) (primitive.ObjectID, erro
 	return branch.Id, nil
 }
 
-// backfillBranchId counts the documents without a branchId and, when apply is
-// set, gives them hq. Count is the number found before writing.
+// backfillBranchId gives hq to the documents without a branchId. With apply
+// set, Count is the number the database modified; otherwise it is the number
+// that would change.
 func backfillBranchId(ctx context.Context, coll *mongo.Collection, hq primitive.ObjectID, apply bool) (Change, error) {
 	change := Change{Collection: coll.Name(), Field: branchIdField}
-	count, err := coll.CountDocuments(ctx, withoutBranchId)
-	if err != nil {
-		return Change{}, fmt.Errorf("count %s without branchId: %w", coll.Name(), err)
-	}
-	change.Count = count
-	if !apply || count == 0 {
+	if !apply {
+		count, err := coll.CountDocuments(ctx, withoutBranchId)
+		if err != nil {
+			return Change{}, fmt.Errorf("count %s without branchId: %w", coll.Name(), err)
+		}
+		change.Count = count
 		return change, nil
 	}
-	if _, err := coll.UpdateMany(ctx, withoutBranchId, bson.M{"$set": bson.M{branchIdField: hq}}); err != nil {
+	res, err := coll.UpdateMany(ctx, withoutBranchId, bson.M{"$set": bson.M{branchIdField: hq}})
+	if err != nil {
 		return Change{}, fmt.Errorf("set branchId on %s: %w", coll.Name(), err)
 	}
+	change.Count = res.ModifiedCount
 	return change, nil
 }
