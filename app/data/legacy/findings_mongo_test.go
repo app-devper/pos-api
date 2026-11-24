@@ -235,6 +235,8 @@ func TestIsReplicaSet(t *testing.T) {
 		{"standalone", bson.M{"ok": 1}, false},
 		{"empty name", bson.M{"setName": ""}, false},
 		{"wrong type", bson.M{"setName": 3}, false},
+		{"mongos", bson.M{"msg": "isdbgrid"}, true},
+		{"other msg", bson.M{"msg": "hello"}, false},
 	}
 	for _, c := range cases {
 		if got := isReplicaSet(c.reply); got != c.want {

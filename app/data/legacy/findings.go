@@ -111,8 +111,15 @@ func checkReplicaSet(ctx context.Context, db *mongo.Database) ([]Finding, error)
 	}}, nil
 }
 
-// isReplicaSet reports whether a hello reply comes from a replica set member.
+// mongosMsg is what a mongos router answers in the msg field of hello.
+const mongosMsg = "isdbgrid"
+
+// isReplicaSet reports whether a hello reply comes from a server that runs
+// transactions: a replica set member, or a mongos in front of a sharded cluster.
 func isReplicaSet(reply bson.M) bool {
+	if msg, ok := reply["msg"].(string); ok && msg == mongosMsg {
+		return true
+	}
 	name, ok := reply["setName"].(string)
 	return ok && name != ""
 }
