@@ -217,3 +217,28 @@ func TestMigrate_LegacyReceiveWithNoItemRowsKeepsNoItems(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrate_LegacyReceiveAlreadyImportedIsNotCountedUnderStatus(t *testing.T) {
+	for _, apply := range []bool{false, true} {
+		// Arrange: one 2024 Receive someone already marked IMPORTED, one with no status
+		database := newTestDB(t)
+		marked, plain := primitive.NewObjectID(), primitive.NewObjectID()
+		insertDoc(t, database, "receives", bson.M{"_id": marked, "code": "RC_0007", "status": constant.IMPORTED})
+		insertDoc(t, database, "receives", bson.M{"_id": plain, "code": "RC_0008"})
+		// Act
+		report, err := Migrate(context.Background(), database, apply)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Assert
+		if n := changeFor(report, "receives", "branchId"); n != 2 {
+			t.Errorf("apply=%v: receives/branchId change = %d, want 2", apply, n)
+		}
+		if n := changeFor(report, "receives", "status"); n != 1 {
+			t.Errorf("apply=%v: receives/status change = %d, want 1", apply, n)
+		}
+		if got := findReceive(t, database, marked); apply && (got["branchId"] != report.HQ || got["status"] != constant.IMPORTED) {
+			t.Errorf("marked receive not migrated: %v", got)
+		}
+	}
+}

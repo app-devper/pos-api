@@ -58,17 +58,21 @@ func countReceivesToFill(ctx context.Context, db *mongo.Database) (int64, error)
 	return rows[0].N, nil
 }
 
-// receiveWrites counts the legacy Receives updated, and among them those
-// given their receive_items rows as items.
+// receiveWrites counts the legacy Receives updated, and among them those whose
+// status became IMPORTED (it was something else) and those given their
+// receive_items rows as items.
 type receiveWrites struct {
-	updated, filled int64
+	updated, statused, filled int64
 }
+
+// withoutImportedStatus matches a legacy Receive whose status is not IMPORTED yet.
+var withoutImportedStatus = bson.M{branchIdField: bson.M{"$exists": false}, "status": bson.M{"$ne": constant.IMPORTED}}
 
 // changes are the Change lines for these counts.
 func (w receiveWrites) changes() []Change {
 	return []Change{
 		{Collection: receivesCollection, Field: branchIdField, Count: w.updated},
-		{Collection: receivesCollection, Field: "status", Count: w.updated},
+		{Collection: receivesCollection, Field: "status", Count: w.statused},
 		{Collection: receivesCollection, Field: "items", Count: w.filled},
 	}
 }
@@ -90,23 +94,28 @@ func migrateReceives(ctx context.Context, db *mongo.Database, hq primitive.Objec
 	if err != nil {
 		return nil, fmt.Errorf("count receives without branchId: %w", err)
 	}
+	needStatus, err := db.Collection(receivesCollection).CountDocuments(ctx, withoutImportedStatus)
+	if err != nil {
+		return nil, fmt.Errorf("count receives without IMPORTED status: %w", err)
+	}
 	needItems, err := countReceivesToFill(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	return receiveWrites{updated: legacy, filled: needItems}.changes(), nil
+	return receiveWrites{updated: legacy, statused: needStatus, filled: needItems}.changes(), nil
 }
 
 // legacyReceive is what writeReceives reads of a 2024 Receive.
 type legacyReceive struct {
-	Id    primitive.ObjectID `bson:"_id"`
-	Items []bson.M           `bson:"items"`
+	Id     primitive.ObjectID `bson:"_id"`
+	Status any                `bson:"status"`
+	Items  []bson.M           `bson:"items"`
 }
 
 // writeReceives visits each legacy Receive once; the branchId is set last, so
 // a run that stops half way finds the same Receives again.
 func writeReceives(ctx context.Context, db *mongo.Database, hq primitive.ObjectID) (receiveWrites, error) {
-	cursor, err := db.Collection(receivesCollection).Find(ctx, withoutBranchId, options.Find().SetProjection(bson.M{"_id": 1, "items": 1}).SetSort(bson.D{{Key: "_id", Value: 1}}))
+	cursor, err := db.Collection(receivesCollection).Find(ctx, withoutBranchId, options.Find().SetProjection(bson.M{"_id": 1, "status": 1, "items": 1}).SetSort(bson.D{{Key: "_id", Value: 1}}))
 	if err != nil {
 		return receiveWrites{}, fmt.Errorf("find legacy receives: %w", err)
 	}
@@ -121,7 +130,11 @@ func writeReceives(ctx context.Context, db *mongo.Database, hq primitive.ObjectI
 			return written, err
 		}
 		if modified {
-			written = receiveWrites{updated: written.updated + 1, filled: written.filled + boolCount(filled)}
+			written = receiveWrites{
+				updated:  written.updated + 1,
+				statused: written.statused + boolCount(receive.Status != constant.IMPORTED),
+				filled:   written.filled + boolCount(filled),
+			}
 		}
 	}
 	return written, nil
