@@ -14,15 +14,16 @@ import (
 
 // Finding kinds, in the order findings reports them.
 const (
-	KindNotReplicaSet      = "NOT_REPLICA_SET"
-	KindNegativeStock      = "NEGATIVE_STOCK"
-	KindDuplicateSerial    = "DUPLICATE_SERIAL"
-	KindDuplicateSequence  = "DUPLICATE_SEQUENCE"
-	KindOrphanStock        = "ORPHAN_STOCK"
-	KindNoMainUnit         = "NO_MAIN_UNIT"
-	KindDiscountPerLine    = "DISCOUNT_PER_LINE"
-	KindDiscountUnknown    = "DISCOUNT_UNKNOWN"
-	KindUnknownPaymentType = "UNKNOWN_PAYMENT_TYPE"
+	KindNotReplicaSet         = "NOT_REPLICA_SET"
+	KindNegativeStock         = "NEGATIVE_STOCK"
+	KindDuplicateSerial       = "DUPLICATE_SERIAL"
+	KindDuplicateSequence     = "DUPLICATE_SEQUENCE"
+	KindOrphanStock           = "ORPHAN_STOCK"
+	KindNoMainUnit            = "NO_MAIN_UNIT"
+	KindDiscountPerLine       = "DISCOUNT_PER_LINE"
+	KindDiscountNotSubtracted = "DISCOUNT_NOT_SUBTRACTED"
+	KindDiscountUnknown       = "DISCOUNT_UNKNOWN"
+	KindUnknownPaymentType    = "UNKNOWN_PAYMENT_TYPE"
 )
 
 const (
@@ -73,19 +74,26 @@ func idFinding(ctx context.Context, db *mongo.Database, coll string, pipeline mo
 	if err := cursor.All(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read %s on %s: %w", kind, coll, err)
 	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
 	ids := make([]string, 0, len(rows))
 	for _, row := range rows {
 		ids = append(ids, row.Id.Hex())
 	}
+	return findingOf(kind, detail, ids), nil
+}
+
+// findingOf is one finding for the hex ids, sorted and capped; none when ids
+// is empty. ids is not changed.
+func findingOf(kind, detail string, ids []string) []Finding {
+	if len(ids) == 0 {
+		return nil
+	}
+	ids = append([]string(nil), ids...)
 	sort.Strings(ids)
 	total := int64(len(ids))
 	if len(ids) > maxFindingIds {
 		ids = ids[:maxFindingIds]
 	}
-	return []Finding{{Kind: kind, Detail: detail, Ids: ids, Total: total}}, nil
+	return []Finding{{Kind: kind, Detail: detail, Ids: ids, Total: total}}
 }
 
 func checkReplicaSet(ctx context.Context, db *mongo.Database) ([]Finding, error) {
