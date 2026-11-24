@@ -30,7 +30,7 @@ history you share, and commits.
 ## 1. What must be true first
 
 - [ ] The owner has given the go-ahead for each step below that touches the
-      legacy stack (step 2.2, the dump, and section 6, the switch).
+      legacy stack (step 2.1, the dump; section 6, the comparison and the switch).
 - [ ] The shop's users exist in UM under the shop's Client, with System `POS`.
       Authentication goes through UM; a user missing there cannot sign in.
 - [ ] The current till (`devper.web.app`) is deployed. The 2024 till cannot sell
@@ -107,14 +107,54 @@ writing.
 | Kind | Meaning | Decision |
 |---|---|---|
 | `NOT_REPLICA_SET` | The server is not a replica set. | Stop. Restore onto a replica set (section 2). |
-| `NEGATIVE_STOCK` | Stock below zero (`product_stocks`). The current ledger refuses a move that leaves one. | Count the product and correct the quantity in the copy, or accept that sales of it are refused until a Receive. |
+| `NEGATIVE_STOCK` | Stock below zero (`product_stocks`). The current ledger refuses a move that leaves one. | Do not hand-edit `quantity`: that bypasses the Stock ledger (ADR-0001). First record, per listed row, the legacy value and the counted value. Then either (a) leave it and do a Stock count or adjustment in the new till after the move, or (b) the owner decides on a hand edit in the copy. Limitation if left: the ledger refuses a move that leaves a Stock below zero, so cancelling a bill that drew from that Stock can fail until it is corrected. |
 | `DUPLICATE_SERIAL` | Products share a `serialNumber`, empty counts, soft-deleted too. The unique index on `products.serialNumber` cannot be built. | Give each a distinct serial in the copy. |
-| `DUPLICATE_SEQUENCE` | `sequences` rows share a `field`. The unique index cannot be built. | Keep the row with the highest value per field, remove the others in the copy. |
-| `ORPHAN_STOCK` | Stock whose `productId` or `unitId` matches no Product or Unit. | Delete the row in the copy, or restore the missing Product/Unit. |
+| `DUPLICATE_SEQUENCE` | `sequences` rows share a `field`. The unique index cannot be built. | See "Duplicate sequence rows" below; the right row is not the highest value. |
+| `ORPHAN_STOCK` | Stock whose `productId` or `unitId` matches no Product or Unit. | Export the listed rows first (see "Before deleting orphan Stock" below). Deleting them is the owner's decision; the alternative is to restore the missing Product/Unit. |
 | `NO_MAIN_UNIT` | A Product has no `product_units` row named like its own unit; a Receive is entered in the main unit. | Add the unit row in the copy. |
 | `DISCOUNT_PER_LINE` | Orders whose total matches a per-line discount; the current code discounts per unit. The stored total follows the 2024 till's rule. | Decide with the owner whether the stored totals stay as they are (reports use them). The command changes nothing here. |
 | `DISCOUNT_UNKNOWN` | A discounted line whose total matches neither convention. | Open the listed Orders with the owner; fix by hand in the copy, or accept. |
-| `UNKNOWN_PAYMENT_TYPE` | `payments.type` outside `CASH`, `CREDIT`, `PROMPTPAY`, `TRANSFER`. | Map each to one of the four in the copy. |
+| `UNKNOWN_PAYMENT_TYPE` | `payments.type` outside `CASH`, `CREDIT`, `PROMPTPAY`, `TRANSFER`. | First find out what each legacy value meant (ask the shop); only then map it, or leave it. Effect of leaving it: the current Go code stores and returns `payments.type` without grouping or validating it, so the API itself is unaffected; whether the till or its reports group by it is not determined. |
+
+### Duplicate sequence rows
+
+`app/data/repositories/sequence.go`: each `sequences` row has `field`,
+`value`, `date` (`YYYYMMDD`, shop time zone), `prefix`, `format`, `type`. The
+`ORDER` (prefix `OD_`) and `RECEIVE` (prefix `RC_`) counters are `DAILY`: on
+each request, if the row's `date` equals today it adds 1 to `value`, otherwise
+it sets `value` to 1 and `date` to today. The code is `prefix + date +
+value` zero-padded to `format` digits (4), for example `OD_202611240007`.
+
+So the right row is the one with the **latest `date`, and among equal dates
+the highest `value`**. Keeping an older date with a higher value makes today's
+next order restart at 1 and collide with bills already made today. The
+surviving row must cover the highest code already used in `orders` for that
+date. Check in `mongosh '<NEW_MONGO_URI>'` (untried):
+
+```js
+const d = db.getSiblingDB('<COPY_DB_NAME>');
+d.sequences.find({field: 'ORDER'}, {_id: 0, field: 1, date: 1, value: 1}).toArray()
+d.orders.find({code: /^OD_/}, {_id: 0, code: 1}).sort({code: -1}).limit(1).toArray()
+```
+
+Expected: one `ORDER` row, e.g. `{ field: 'ORDER', date: '20261124', value: 7 }`,
+and a highest code `OD_202611240007` with the same date and a number no
+higher than `value`. If the code's date is later, or its number is higher,
+fix the row before going on. Repeat with `field: 'RECEIVE'`, `code: /^RC_/`
+on `receives`.
+
+### Before deleting orphan Stock
+
+Export the listed rows so they can be put back (untried; ids from the
+report):
+
+```bash
+mongoexport --uri='<NEW_MONGO_URI>' --db=<COPY_DB_NAME> --collection=product_stocks \
+  --query='{"_id": {"$in": [{"$oid": "<ID_1>"}, {"$oid": "<ID_2>"}]}}' --out=orphan-stock.json
+```
+
+Expected: `exported <N> records`, N equal to the ids given. Keep the file with
+the dump.
 
 After fixing the copy, run the report again until it exits 0, or the owner
 accepts the remaining findings in writing.
@@ -167,17 +207,48 @@ Checks, all must hold:
    and payments show.
 4. **A past month reports:** the sales report for a month before the dump shows
    a non-zero total, equal to the legacy report for that month.
-5. **A test Sale lowers Stock:** sell one unit of a test Product; its Stock
-   falls by one. Then cancel it so the copy returns to its state. Do this on
-   the copy only.
+
+The checks above are read-only and are the only ones run on the copy that will
+go live.
+
+5. **A test Sale lowers Stock, on a throwaway copy.** A test Sale leaves a
+   permanent trace: cancelling it keeps the cancelled Order, its lines and
+   payments, product history rows and the consumed order code, and today's
+   counter has moved. So by default do this on a **second, throwaway
+   restore of the same dump** (section 2 under another `<COPY_DB_NAME>`),
+   migrated the same way (sections 3 and 4), and drop it afterwards. Sell one
+   unit of a test Product; its Stock falls by one. If the owner chooses to
+   test in the live-bound copy anyway, record the Order code of the test Sale.
 
 ## 6. The switch
 
 Only after the owner's go-ahead for this step.
 
 1. Confirm the shop has stopped selling on the legacy till (section 1).
-2. If anything was sold on the legacy till since the dump, stop: repeat from
-   section 2 with a fresh dump.
+2. [ ] **Required: compare the legacy database with the copy.** This reads the
+   live legacy database. It writes nothing, but it touches the legacy stack,
+   so it needs the owner's explicit go-ahead and is never run by an agent on
+   its own. Untried. Run the same script against both and compare:
+
+   ```bash
+   cat > compare.js <<'JS'
+   const n = db.getName();
+   print(n, 'orders', db.orders.countDocuments({}));
+   print(n, 'payments', db.payments.countDocuments({}));
+   print(n, 'receives', db.receives.countDocuments({}));
+   print(n, 'newest order createdDate', JSON.stringify(db.orders.find({}, {createdDate: 1, _id: 0}).sort({createdDate: -1}).limit(1).toArray()));
+   print(n, 'sequences', JSON.stringify(db.sequences.find({}, {_id: 0, field: 1, date: 1, value: 1}).sort({field: 1}).toArray()));
+   JS
+   mongosh '<LEGACY_MONGO_URI>' --quiet compare.js
+   mongosh '<NEW_MONGO_URI>/<COPY_DB_NAME>' --quiet compare.js
+   ```
+
+   Expected: every line identical except the database name at the start. The
+   migration adds no documents to these collections, so counts match exactly.
+   On any mismatch, something
+   was sold or received on the legacy till after the dump: do not switch. Take
+   a fresh dump (section 2), then run the report and apply again (sections 3
+   and 4) and compare again.
 3. Deploy or point the shop's pos-api at `<COPY_DB_NAME>` with `MONGO_HOST`,
    `MONGO_POS_DB_NAME` and `CLIENT_ID` set as in section 5, and give the shop
    the current till URL (`devper.web.app`).
@@ -189,6 +260,9 @@ The legacy services and their database are not touched at any point.
 ## 7. Going back
 
 Point the shop at the old URL (`devper-pos.web.app`). The legacy services were
-never modified, and their database never changed, so there is nothing to undo.
-Sales made on the new API after the switch exist only in the copy; they must be
-re-keyed on the legacy till if the shop goes back for good.
+never modified, and their database never changed.
+
+- Going back **before any real sale** on the new stack costs nothing.
+- Going back **after** costs every bill and stock movement made on the new
+  stack: they exist only in the copy, and would have to be re-keyed on the
+  legacy till.

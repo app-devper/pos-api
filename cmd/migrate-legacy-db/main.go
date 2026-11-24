@@ -55,6 +55,10 @@ func run(args []string, env func(string) string, out, errOut io.Writer, migrate 
 	if err := flags.Parse(args); err != nil {
 		return exitUsage
 	}
+	if flags.NArg() > 0 {
+		fmt.Fprintf(errOut, "unexpected argument %q (flags start with a dash, as in -apply)\n", flags.Arg(0))
+		return exitUsage
+	}
 	host, name := env("MONGO_HOST"), env("MONGO_POS_DB_NAME")
 	if host == "" || name == "" {
 		fmt.Fprintln(errOut, "MONGO_HOST and MONGO_POS_DB_NAME are required")

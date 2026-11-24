@@ -133,3 +133,28 @@ func TestRun_BadFlagExitsTwo(t *testing.T) {
 		t.Fatalf("code=%d calls=%d, want 2 and 0", code, c.count)
 	}
 }
+
+func TestRun_ExtraArgumentIsUsageError(t *testing.T) {
+	for _, args := range [][]string{{"apply"}, {"-apply", "-confirm-db", "copy_db", "extra"}} {
+		c := &call{}
+		code, _, errOut := exec(args, fullEnv, fakeMigrate(c, legacy.Report{}, nil))
+		if code != 2 || c.count != 0 {
+			t.Errorf("args %v: code=%d calls=%d, want 2 and 0", args, code, c.count)
+		}
+		if !strings.Contains(errOut, "unexpected argument") {
+			t.Errorf("args %v: stderr %q does not explain", args, errOut)
+		}
+	}
+}
+
+func TestRun_OneVariableMissingExitsTwo(t *testing.T) {
+	for _, missing := range []string{"MONGO_HOST", "MONGO_POS_DB_NAME"} {
+		env := map[string]string{"MONGO_HOST": "mongodb://example", "MONGO_POS_DB_NAME": "copy_db"}
+		delete(env, missing)
+		c := &call{}
+		code, _, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+		if code != 2 || c.count != 0 || !strings.Contains(errOut, missing) {
+			t.Errorf("missing %s: code=%d calls=%d stderr=%q", missing, code, c.count, errOut)
+		}
+	}
+}
