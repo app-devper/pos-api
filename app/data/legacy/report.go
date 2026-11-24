@@ -32,3 +32,9 @@ type Report struct {
 func (r Report) HasFindings() bool {
 	return len(r.Findings) > 0
 }
+
+// withChanges is a copy of r with changes in place of its Changes.
+func (r Report) withChanges(changes []Change) Report {
+	r.Changes = changes
+	return r
+}

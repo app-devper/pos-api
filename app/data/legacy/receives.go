@@ -79,14 +79,12 @@ func (w receiveWrites) changes() []Change {
 // with no receive_items rows keeps its items field as it is). A Receive the
 // current API wrote has a branchId and is never touched; receive_items is left
 // as it is. With apply set the counts are the Receives the database modified;
-// otherwise those that would change.
+// otherwise those that would change. On an error during apply the counts are
+// the Receives modified before it.
 func migrateReceives(ctx context.Context, db *mongo.Database, hq primitive.ObjectID, apply bool) ([]Change, error) {
 	if apply {
 		written, err := writeReceives(ctx, db, hq)
-		if err != nil {
-			return nil, err
-		}
-		return written.changes(), nil
+		return written.changes(), err
 	}
 	legacy, err := db.Collection(receivesCollection).CountDocuments(ctx, withoutBranchId)
 	if err != nil {
@@ -108,7 +106,7 @@ type legacyReceive struct {
 // writeReceives visits each legacy Receive once; the branchId is set last, so
 // a run that stops half way finds the same Receives again.
 func writeReceives(ctx context.Context, db *mongo.Database, hq primitive.ObjectID) (receiveWrites, error) {
-	cursor, err := db.Collection(receivesCollection).Find(ctx, withoutBranchId, options.Find().SetProjection(bson.M{"_id": 1, "items": 1}))
+	cursor, err := db.Collection(receivesCollection).Find(ctx, withoutBranchId, options.Find().SetProjection(bson.M{"_id": 1, "items": 1}).SetSort(bson.D{{Key: "_id", Value: 1}}))
 	if err != nil {
 		return receiveWrites{}, fmt.Errorf("find legacy receives: %w", err)
 	}

@@ -35,42 +35,46 @@ var branchedCollections = []string{
 var withoutBranchId = bson.M{branchIdField: bson.M{"$exists": false}}
 
 // Migrate gives every document without a branchId the HQ Branch. With apply
-// false it only reports what it would change and writes nothing.
+// false it only reports what it would change and writes nothing. On an error
+// it returns the report built so far with the error: the findings, the HQ
+// Branch and the Changes completed before the failure.
 func Migrate(ctx context.Context, db *mongo.Database, apply bool) (Report, error) {
-	report := Report{}
 	found, err := findings(ctx, db)
 	if err != nil {
 		return Report{}, err
 	}
-	report.Findings = found
+	report := Report{Findings: found}
 	hq, err := findHQ(ctx, db)
 	if err != nil {
-		return Report{}, err
+		return report, err
 	}
 	report.HQ = hq
 
 	if apply && hq.IsZero() {
 		hq, err = insertHQ(ctx, db)
 		if err != nil {
-			return Report{}, err
+			return report, err
 		}
 		report.HQ = hq
 		report.HQCreated = true
 	}
+	return migrateCollections(ctx, db, report, apply)
+}
 
+// migrateCollections adds to a copy of report one Change per field it sets,
+// stopping at the first error with the Changes done so far.
+func migrateCollections(ctx context.Context, db *mongo.Database, report Report, apply bool) (Report, error) {
+	changes := append([]Change(nil), report.Changes...)
 	for _, name := range branchedCollections {
 		change, err := backfillBranchId(ctx, db.Collection(name), report.HQ, apply)
 		if err != nil {
-			return Report{}, err
+			return report.withChanges(changes), err
 		}
-		report.Changes = append(report.Changes, change)
+		changes = append(changes, change)
 	}
-	changes, err := migrateReceives(ctx, db, report.HQ, apply)
-	if err != nil {
-		return Report{}, err
-	}
-	report.Changes = append(report.Changes, changes...)
-	return report, nil
+	receives, err := migrateReceives(ctx, db, report.HQ, apply)
+	changes = append(changes, receives...)
+	return report.withChanges(changes), err
 }
 
 // findHQ returns the HQ Branch id, or the zero id when there is none.

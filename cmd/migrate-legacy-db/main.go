@@ -79,6 +79,8 @@ func run(args []string, env func(string) string, out, errOut io.Writer, migrate 
 	defer cancel()
 	report, err := migrate(ctx, host, name, *apply)
 	if err != nil {
+		printReport(out, report, *apply)
+		fmt.Fprintln(out, "\nthe run did not finish: the lines above are what was done before the error (the step that failed may have written part of its documents); running it again is safe")
 		fmt.Fprintln(errOut, err)
 		return exitError
 	}

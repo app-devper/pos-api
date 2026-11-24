@@ -126,6 +126,26 @@ func TestRun_MigrateErrorExitsOne(t *testing.T) {
 	}
 }
 
+func TestRun_FailedApplyPrintsWhatWasWrittenBeforeTheError(t *testing.T) {
+	// Arrange
+	c := &call{}
+	partial := legacy.Report{
+		Changes:  []legacy.Change{{Collection: "product_stocks", Field: "branchId", Count: 4}},
+		Findings: []legacy.Finding{{Kind: legacy.KindNegativeStock, Detail: "Stock below zero", Ids: []string{"a1"}, Total: 1}},
+	}
+	// Act
+	code, out, errOut := exec([]string{"-apply", "-confirm-db", "copy_db"}, fullEnv, fakeMigrate(c, partial, errors.New("set branchId on orders: boom")))
+	// Assert
+	if code != 1 || !strings.Contains(errOut, "boom") {
+		t.Fatalf("code=%d stderr=%q, want 1 and the error", code, errOut)
+	}
+	for _, want := range []string{"product_stocks branchId: changed 4", legacy.KindNegativeStock, "did not finish", "again is safe"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestRun_BadFlagExitsTwo(t *testing.T) {
 	c := &call{}
 	code, _, _ := exec([]string{"-nope"}, fullEnv, fakeMigrate(c, legacy.Report{}, nil))
