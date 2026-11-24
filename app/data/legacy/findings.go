@@ -102,13 +102,17 @@ func checkNegativeStock(ctx context.Context, db *mongo.Database) ([]Finding, err
 		"Stock below zero; the current Stock ledger refuses a move that leaves one")
 }
 
-// duplicatesOf lists every document sharing the value of field with another.
-// Each document is given the size of its group; no group's ids are gathered
-// into one document.
+// duplicatesOf lists every document sharing the value of field with another,
+// and every document whose field is an array (no unique index accepts it as
+// one value, and the current code reads it as a string). Each document is
+// given the size of its group; no group's ids are gathered into one document.
+// An array is partitioned on its own _id, as an array cannot be a partition.
 func duplicatesOf(field string) mongo.Pipeline {
+	isArray := bson.M{"$isArray": "$" + field}
+	partition := bson.M{"$cond": bson.A{isArray, bson.M{"array": "$_id"}, "$" + field}}
 	return mongo.Pipeline{
-		{{Key: "$setWindowFields", Value: bson.M{"partitionBy": "$" + field, "output": bson.M{"n": bson.M{"$count": bson.M{}}}}}},
-		{{Key: "$match", Value: bson.M{"n": bson.M{"$gt": 1}}}},
+		{{Key: "$setWindowFields", Value: bson.M{"partitionBy": partition, "output": bson.M{"n": bson.M{"$count": bson.M{}}}}}},
+		{{Key: "$match", Value: bson.M{"$or": bson.A{bson.M{"n": bson.M{"$gt": 1}}, bson.M{"$expr": isArray}}}}},
 		{{Key: "$project", Value: bson.M{"_id": 1}}},
 	}
 }
@@ -117,12 +121,12 @@ func duplicatesOf(field string) mongo.Pipeline {
 // products.serialNumber is not partial.
 func checkDuplicateSerial(ctx context.Context, db *mongo.Database) ([]Finding, error) {
 	return idFinding(ctx, db, "products", duplicatesOf("serialNumber"), KindDuplicateSerial,
-		"Products share a serialNumber (empty counts); the unique index on products.serialNumber cannot be built")
+		"Products share a serialNumber (empty counts), or hold an array in it; the unique index on products.serialNumber cannot be built")
 }
 
 func checkDuplicateSequence(ctx context.Context, db *mongo.Database) ([]Finding, error) {
 	return idFinding(ctx, db, "sequences", duplicatesOf("field"), KindDuplicateSequence,
-		"sequences share a field; the unique index on sequences.field cannot be built")
+		"sequences share a field, or hold an array in it; the unique index on sequences.field cannot be built")
 }
 
 func checkOrphanStock(ctx context.Context, db *mongo.Database) ([]Finding, error) {

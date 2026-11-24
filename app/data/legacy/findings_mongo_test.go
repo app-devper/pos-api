@@ -119,6 +119,25 @@ func TestFindings_DuplicateSerialCountsSoftDeleted(t *testing.T) {
 	wantFinding(t, runFindings(t, db), KindDuplicateSerial, 2, a, b)
 }
 
+func TestFindings_ArrayValuedKeyIsListedNotFatal(t *testing.T) {
+	// Arrange
+	db := newTestDB(t)
+	array, _ := seedFindingsProduct(t, db, "")
+	if _, err := db.Collection("products").UpdateByID(context.Background(), array, bson.M{"$set": bson.M{"serialNumber": bson.A{"X", "Y"}}}); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := seedFindingsProduct(t, db, "A1")
+	b, _ := seedFindingsProduct(t, db, "A1")
+	seedFindingsProduct(t, db, "B2")
+	seqArray := insert(t, db, "sequences", bson.M{"field": bson.A{"ORDER"}})
+	insert(t, db, "sequences", bson.M{"field": "ORDER"})
+	// Act
+	all := runFindings(t, db)
+	// Assert
+	wantFinding(t, all, KindDuplicateSerial, 3, array, a, b)
+	wantFinding(t, all, KindDuplicateSequence, 1, seqArray)
+}
+
 func TestFindings_DuplicateSequence(t *testing.T) {
 	db := newTestDB(t)
 	a := insert(t, db, "sequences", bson.M{"field": "ORDER"})
