@@ -38,6 +38,11 @@ var withoutBranchId = bson.M{branchIdField: bson.M{"$exists": false}}
 // false it only reports what it would change and writes nothing.
 func Migrate(ctx context.Context, db *mongo.Database, apply bool) (Report, error) {
 	report := Report{}
+	found, err := findings(ctx, db)
+	if err != nil {
+		return Report{}, err
+	}
+	report.Findings = found
 	hq, err := findHQ(ctx, db)
 	if err != nil {
 		return Report{}, err
