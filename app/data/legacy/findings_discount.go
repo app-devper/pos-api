@@ -20,20 +20,41 @@ var discountKinds = []discountKind{
 	{KindDiscountUnknown, "Orders with a discounted line whose total matches none of the three discount rules", ""},
 }
 
-// field returns the line value or 0 when it is missing.
-func field(name string) bson.M {
-	return bson.M{"$ifNull": bson.A{"$" + name, 0}}
+// numericTypes are the BSON types $isNumber accepts, and the types that leave
+// a line amount at 0 without being reported (missing, null).
+var numericTypes = bson.A{"double", "int", "long", "decimal", "missing", "null"}
+
+// lineAmounts are the line fields the sums read.
+var lineAmounts = []string{"price", "quantity", "discount"}
+
+// field returns the value at path when it is a number, otherwise 0: a missing,
+// null or non-numeric amount neither stops the aggregation nor compares as
+// greater than 0.
+func field(path string) bson.M {
+	return bson.M{"$cond": bson.A{bson.M{"$isNumber": "$" + path}, "$" + path, 0}}
+}
+
+// nonNumericLine is 1 when a line amount holds a value that is not a number
+// (a missing or null amount is not counted), otherwise 0.
+func nonNumericLine() bson.M {
+	anyAmount := bson.A{}
+	for _, name := range lineAmounts {
+		anyAmount = append(anyAmount, bson.M{"$not": bson.A{bson.M{"$in": bson.A{bson.M{"$type": "$" + name}, numericTypes}}}})
+	}
+	return bson.M{"$cond": bson.A{bson.M{"$or": anyAmount}, 1, 0}}
 }
 
 // orderSums groups every line by its Order once: whether any line carries a
-// discount, and Σ price under each rule. A line's price is its whole amount
-// before discount. Grouping all lines (not only the discounted ones) keeps the
-// undiscounted lines of a discounted Order in its sums.
+// discount or a non-numeric amount, and Σ price under each rule. A line's
+// price is its whole amount before discount. Grouping all lines (not only the
+// discounted ones) keeps the undiscounted lines of a discounted Order in its
+// sums.
 func orderSums() bson.D {
 	discount := field("discount")
 	return bson.D{{Key: "$group", Value: bson.M{
 		"_id":        "$orderId",
 		"discounted": bson.M{"$max": bson.M{"$cond": bson.A{bson.M{"$gt": bson.A{discount, 0}}, 1, 0}}},
+		"nonNumeric": bson.M{"$max": nonNumericLine()},
 		"perUnit":    bson.M{"$sum": bson.M{"$subtract": bson.A{field("price"), bson.M{"$multiply": bson.A{discount, field("quantity")}}}}},
 		"perLine":    bson.M{"$sum": bson.M{"$subtract": bson.A{field("price"), discount}}},
 		"plain":      bson.M{"$sum": field("price")},
@@ -59,25 +80,35 @@ func kindOf() bson.M {
 }
 
 // discountPipeline starts from order_items, so it needs no index on orderId:
-// one collection scan, then each Order is found by its _id index.
+// one collection scan, then each Order is found by its _id index. A row is an
+// Order with a discount kind, a non-numeric line amount, or both.
 func discountPipeline() mongo.Pipeline {
+	hasDiscountAndOrder := bson.M{"$and": bson.A{
+		bson.M{"$eq": bson.A{"$discounted", 1}},
+		bson.M{"$ne": bson.A{bson.M{"$type": "$order"}, "missing"}},
+	}}
 	return mongo.Pipeline{
 		orderSums(),
-		{{Key: "$match", Value: bson.M{"discounted": 1}}},
+		{{Key: "$match", Value: bson.M{"$or": bson.A{bson.M{"discounted": 1}, bson.M{"nonNumeric": 1}}}}},
 		{{Key: "$lookup", Value: bson.M{"from": "orders", "localField": "_id", "foreignField": "_id", "as": "order"}}},
-		{{Key: "$unwind", Value: "$order"}},
-		{{Key: "$addFields", Value: bson.M{"total": bson.M{"$ifNull": bson.A{"$order.total", 0}}}}},
-		{{Key: "$project", Value: bson.M{"kind": kindOf()}}},
-		{{Key: "$match", Value: bson.M{"kind": bson.M{"$ne": ""}}}},
+		{{Key: "$unwind", Value: bson.M{"path": "$order", "preserveNullAndEmptyArrays": true}}},
+		{{Key: "$addFields", Value: bson.M{"total": field("order.total")}}},
+		{{Key: "$project", Value: bson.M{"nonNumeric": 1, "kind": bson.M{"$cond": bson.A{hasDiscountAndOrder, kindOf(), ""}}}}},
+		{{Key: "$match", Value: bson.M{"$or": bson.A{bson.M{"kind": bson.M{"$ne": ""}}, bson.M{"nonNumeric": 1}}}}},
 	}
 }
 
+// nonNumericDetail explains KindNonNumericLineAmount.
+const nonNumericDetail = "Orders with a Line whose price, quantity or discount is not a number; the discount check counted it as 0"
+
 // checkDiscountConvention reports, in one pass, the Orders with a discounted
-// line whose total does not follow the current per-unit discount.
+// line whose total does not follow the current per-unit discount, then the
+// Orders with a non-numeric line amount.
 func checkDiscountConvention(ctx context.Context, db *mongo.Database) ([]Finding, error) {
-	groups := make([]offenders, 0, len(discountKinds))
+	groups := make([]offenders, 0, len(discountKinds)+1)
 	for _, k := range discountKinds {
 		groups = append(groups, offenders{kind: k.kind, detail: k.detail, match: bson.M{"kind": k.kind}})
 	}
+	groups = append(groups, offenders{kind: KindNonNumericLineAmount, detail: nonNumericDetail, match: bson.M{"nonNumeric": 1}})
 	return findOffenders(ctx, db, "order_items", discountPipeline(), groups)
 }

@@ -21,6 +21,7 @@ const (
 	KindDiscountPerLine       = "DISCOUNT_PER_LINE"
 	KindDiscountNotSubtracted = "DISCOUNT_NOT_SUBTRACTED"
 	KindDiscountUnknown       = "DISCOUNT_UNKNOWN"
+	KindNonNumericLineAmount  = "NON_NUMERIC_LINE_AMOUNT"
 	KindUnknownPaymentType    = "UNKNOWN_PAYMENT_TYPE"
 )
 

@@ -69,6 +69,59 @@ func TestFindings_DiscountKindsInFixedOrder(t *testing.T) {
 	}
 }
 
+// lineOrder inserts an Order with total and one line.
+func lineOrder(t *testing.T, db *mongo.Database, total float64, line bson.M) primitive.ObjectID {
+	t.Helper()
+	id := insert(t, db, "orders", bson.M{"total": total})
+	withOrder := bson.M{"orderId": id}
+	for k, v := range line {
+		withOrder[k] = v
+	}
+	insert(t, db, "order_items", withOrder)
+	return id
+}
+
+func TestFindings_NonNumericLineAmountIsReportedNotFatal(t *testing.T) {
+	// Arrange
+	db := newTestDB(t)
+	price := lineOrder(t, db, 200, bson.M{"price": "200", "quantity": 2, "discount": 0.0})
+	quantity := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": "2", "discount": 0.0})
+	// a string discount is not "greater than 0": this Order is not examined
+	// for a discount kind, though its total matches no rule
+	discount := lineOrder(t, db, 150, bson.M{"price": 200.0, "quantity": 2, "discount": "5"})
+	lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": 2, "discount": nil})
+	lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": 2})
+	unknown := discountOrder(t, db, 150, 5)
+
+	// Act
+	all := runFindings(t, db)
+
+	// Assert
+	wantFinding(t, all, KindNonNumericLineAmount, 3, price, quantity, discount)
+	wantFinding(t, all, KindDiscountUnknown, 1, unknown)
+	if len(all) != 2 || all[0].Kind != KindDiscountUnknown || all[1].Kind != KindNonNumericLineAmount {
+		t.Errorf("findings = %+v, want DISCOUNT_UNKNOWN then NON_NUMERIC_LINE_AMOUNT", all)
+	}
+}
+
+func TestFindings_NonNumericAmountCountsAsZeroInTheSums(t *testing.T) {
+	// Arrange: per unit 200 - 5*2 = 190 on the numeric line, the other line's
+	// price "abc" counts 0
+	db := newTestDB(t)
+	id := insert(t, db, "orders", bson.M{"total": 190.0})
+	insert(t, db, "order_items", bson.M{"orderId": id, "price": 200.0, "quantity": 2, "discount": 5.0})
+	insert(t, db, "order_items", bson.M{"orderId": id, "price": "abc", "quantity": 1, "discount": 0.0})
+
+	// Act
+	all := runFindings(t, db)
+
+	// Assert
+	wantFinding(t, all, KindNonNumericLineAmount, 1, id)
+	if len(all) != 1 {
+		t.Errorf("findings = %+v, want only the non-numeric line", all)
+	}
+}
+
 // bulkDiscountOrders inserts n Orders of two lines each, in batches. Every odd
 // Order has a discounted line; its total cycles through the per-unit (fine),
 // per-line, Σ price and unknown rules.
