@@ -3,12 +3,10 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"pos/app/domain/constant"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -23,6 +21,7 @@ const (
 	KindDiscountPerLine       = "DISCOUNT_PER_LINE"
 	KindDiscountNotSubtracted = "DISCOUNT_NOT_SUBTRACTED"
 	KindDiscountUnknown       = "DISCOUNT_UNKNOWN"
+	KindNonNumericLineAmount  = "NON_NUMERIC_LINE_AMOUNT"
 	KindUnknownPaymentType    = "UNKNOWN_PAYMENT_TYPE"
 )
 
@@ -63,37 +62,7 @@ func findings(ctx context.Context, db *mongo.Database) ([]Finding, error) {
 // idFinding runs pipeline on coll; every document it returns is one offender.
 // It returns no finding when there are none.
 func idFinding(ctx context.Context, db *mongo.Database, coll string, pipeline mongo.Pipeline, kind, detail string) ([]Finding, error) {
-	cursor, err := db.Collection(coll).Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, fmt.Errorf("check %s on %s: %w", kind, coll, err)
-	}
-	defer cursor.Close(ctx)
-	var rows []struct {
-		Id primitive.ObjectID `bson:"_id"`
-	}
-	if err := cursor.All(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read %s on %s: %w", kind, coll, err)
-	}
-	ids := make([]string, 0, len(rows))
-	for _, row := range rows {
-		ids = append(ids, row.Id.Hex())
-	}
-	return findingOf(kind, detail, ids), nil
-}
-
-// findingOf is one finding for the hex ids, sorted and capped; none when ids
-// is empty. ids is not changed.
-func findingOf(kind, detail string, ids []string) []Finding {
-	if len(ids) == 0 {
-		return nil
-	}
-	ids = append([]string(nil), ids...)
-	sort.Strings(ids)
-	total := int64(len(ids))
-	if len(ids) > maxFindingIds {
-		ids = ids[:maxFindingIds]
-	}
-	return []Finding{{Kind: kind, Detail: detail, Ids: ids, Total: total}}
+	return findOffenders(ctx, db, coll, pipeline, []offenders{{kind: kind, detail: detail, match: bson.M{}}})
 }
 
 func checkReplicaSet(ctx context.Context, db *mongo.Database) ([]Finding, error) {
@@ -111,8 +80,15 @@ func checkReplicaSet(ctx context.Context, db *mongo.Database) ([]Finding, error)
 	}}, nil
 }
 
-// isReplicaSet reports whether a hello reply comes from a replica set member.
+// mongosMsg is what a mongos router answers in the msg field of hello.
+const mongosMsg = "isdbgrid"
+
+// isReplicaSet reports whether a hello reply comes from a server that runs
+// transactions: a replica set member, or a mongos in front of a sharded cluster.
 func isReplicaSet(reply bson.M) bool {
+	if msg, ok := reply["msg"].(string); ok && msg == mongosMsg {
+		return true
+	}
 	name, ok := reply["setName"].(string)
 	return ok && name != ""
 }
@@ -126,13 +102,18 @@ func checkNegativeStock(ctx context.Context, db *mongo.Database) ([]Finding, err
 		"Stock below zero; the current Stock ledger refuses a move that leaves one")
 }
 
-// duplicatesOf lists every document sharing the value of field with another.
+// duplicatesOf lists every document sharing the value of field with another,
+// and every document whose field is an array (no unique index accepts it as
+// one value, and the current code reads it as a string). Each document is
+// given the size of its group; no group's ids are gathered into one document.
+// An array is partitioned on its own _id, as an array cannot be a partition.
 func duplicatesOf(field string) mongo.Pipeline {
+	isArray := bson.M{"$isArray": "$" + field}
+	partition := bson.M{"$cond": bson.A{isArray, bson.M{"array": "$_id"}, "$" + field}}
 	return mongo.Pipeline{
-		{{Key: "$group", Value: bson.M{"_id": "$" + field, "ids": bson.M{"$push": "$_id"}, "n": bson.M{"$sum": 1}}}},
-		{{Key: "$match", Value: bson.M{"n": bson.M{"$gt": 1}}}},
-		{{Key: "$unwind", Value: "$ids"}},
-		{{Key: "$project", Value: bson.M{"_id": "$ids"}}},
+		{{Key: "$setWindowFields", Value: bson.M{"partitionBy": partition, "output": bson.M{"n": bson.M{"$count": bson.M{}}}}}},
+		{{Key: "$match", Value: bson.M{"$or": bson.A{bson.M{"n": bson.M{"$gt": 1}}, bson.M{"$expr": isArray}}}}},
+		{{Key: "$project", Value: bson.M{"_id": 1}}},
 	}
 }
 
@@ -140,12 +121,12 @@ func duplicatesOf(field string) mongo.Pipeline {
 // products.serialNumber is not partial.
 func checkDuplicateSerial(ctx context.Context, db *mongo.Database) ([]Finding, error) {
 	return idFinding(ctx, db, "products", duplicatesOf("serialNumber"), KindDuplicateSerial,
-		"Products share a serialNumber (empty counts); the unique index on products.serialNumber cannot be built")
+		"Products share a serialNumber (empty counts), or hold an array in it; the unique index on products.serialNumber cannot be built")
 }
 
 func checkDuplicateSequence(ctx context.Context, db *mongo.Database) ([]Finding, error) {
 	return idFinding(ctx, db, "sequences", duplicatesOf("field"), KindDuplicateSequence,
-		"sequences share a field; the unique index on sequences.field cannot be built")
+		"sequences share a field, or hold an array in it; the unique index on sequences.field cannot be built")
 }
 
 func checkOrphanStock(ctx context.Context, db *mongo.Database) ([]Finding, error) {

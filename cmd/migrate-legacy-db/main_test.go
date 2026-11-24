@@ -126,6 +126,170 @@ func TestRun_MigrateErrorExitsOne(t *testing.T) {
 	}
 }
 
+func TestRun_FailedApplyPrintsWhatWasWrittenBeforeTheError(t *testing.T) {
+	// Arrange
+	c := &call{}
+	partial := legacy.Report{
+		Reached:  legacy.StageWriting,
+		Changes:  []legacy.Change{{Collection: "product_stocks", Field: "branchId", Count: 4}},
+		Findings: []legacy.Finding{{Kind: legacy.KindNegativeStock, Detail: "Stock below zero", Ids: []string{"a1"}, Total: 1}},
+	}
+	// Act
+	code, out, errOut := exec([]string{"-apply", "-confirm-db", "copy_db"}, fullEnv, fakeMigrate(c, partial, errors.New("set branchId on orders: boom")))
+	// Assert
+	if code != 1 || !strings.Contains(errOut, "boom") {
+		t.Fatalf("code=%d stderr=%q, want 1 and the error", code, errOut)
+	}
+	for _, want := range []string{"product_stocks branchId: changed 4", legacy.KindNegativeStock, "did not finish", "may have written part", "again is safe"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRun_FirstLineShowsTheHostsWithoutCredentials(t *testing.T) {
+	// Arrange
+	env := map[string]string{
+		"MONGO_HOST":        "mongodb://alice:s3cretpw@db1.example:27017,db2.example:27018/admin?replicaSet=rs0&authSource=admin",
+		"MONGO_POS_DB_NAME": "copy_db",
+	}
+	for _, migrateErr := range []error{nil, errors.New("boom")} {
+		c := &call{}
+		// Act
+		_, out, errOut := exec([]string{"-apply", "-confirm-db", "copy_db"}, env, fakeMigrate(c, legacy.Report{}, migrateErr))
+		// Assert
+		first := strings.Split(out, "\n")[0]
+		for _, want := range []string{"db1.example:27017,db2.example:27018", "copy_db", "APPLY"} {
+			if !strings.Contains(first, want) {
+				t.Errorf("err %v: first line %q lacks %q", migrateErr, first, want)
+			}
+		}
+		for _, secret := range []string{"alice", "s3cretpw", "replicaSet", "authSource"} {
+			if strings.Contains(out+errOut, secret) {
+				t.Errorf("err %v: output shows %q:\n%s%s", migrateErr, secret, out, errOut)
+			}
+		}
+	}
+}
+
+func TestRun_UnparsableHostIsUsageErrorThatDoesNotEchoIt(t *testing.T) {
+	for _, uri := range []string{"mongodb://alice:s3cretpw@db1:notaport/", "alice:s3cretpw@db1", "mongodb://alice:s3cretpw@/x",
+		"mongodb://alice:s3cretpw@h1:27017,h2:x/db", "mongodb+srv://alice:s3cretpw@h1,h2/db"} {
+		// Arrange
+		c := &call{}
+		env := map[string]string{"MONGO_HOST": uri, "MONGO_POS_DB_NAME": "copy_db"}
+		// Act
+		code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+		// Assert
+		if code != 2 || c.count != 0 {
+			t.Errorf("%s: code=%d calls=%d, want 2 and 0", uri, code, c.count)
+		}
+		if !strings.Contains(errOut, "MONGO_HOST") || strings.Contains(out+errOut, "s3cretpw") || strings.Contains(out+errOut, "alice") {
+			t.Errorf("%s: output must name MONGO_HOST without echoing it:\n%s%s", uri, out, errOut)
+		}
+	}
+}
+
+// secrets are the user and password spellings the host cases below use.
+var secrets = []string{"user", "12345", "12%40345", "12@345", "12%3A345", "12:345"}
+
+func TestRun_HostLineNeverShowsUserinfo(t *testing.T) {
+	cases := []struct {
+		uri, hosts string // hosts "" = usage error
+	}{
+		{"mongodb://user:12345?x@host/db", "host"},
+		{"mongodb://user:12345#x@host/db", "host"},
+		{"mongodb://user:12345/6@host/db", ""},
+		{"mongodb://user?x@host", "host"},
+		{"mongodb://user:12%40345@host/db", "host"},
+		{"mongodb://user:12%3A345@host/db", "host"},
+		{"mongodb+srv://user:12345@cluster0.example.net/?retryWrites=true", "cluster0.example.net"},
+	}
+	for _, tc := range cases {
+		for _, migrateErr := range []error{nil, errors.New("boom")} {
+			// Arrange
+			c := &call{}
+			env := map[string]string{"MONGO_HOST": tc.uri, "MONGO_POS_DB_NAME": "copy_db"}
+			// Act
+			code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, migrateErr))
+			// Assert
+			for _, secret := range secrets {
+				if strings.Contains(out+errOut, secret) {
+					t.Errorf("%s err %v: output shows %q:\n%s%s", tc.uri, migrateErr, secret, out, errOut)
+				}
+			}
+			if tc.hosts == "" {
+				if code != 2 || c.count != 0 {
+					t.Errorf("%s: code=%d calls=%d, want 2 and 0", tc.uri, code, c.count)
+				}
+				continue
+			}
+			if first := strings.Split(out, "\n")[0]; !strings.Contains(first, " on "+tc.hosts+", ") {
+				t.Errorf("%s: first line %q, want hosts %q", tc.uri, first, tc.hosts)
+			}
+		}
+	}
+}
+
+func TestRun_EveryHostOfAValidListIsAccepted(t *testing.T) {
+	cases := []struct{ uri, hosts string }{
+		{"mongodb://u:p@h1:27017,h2/db", "h1:27017,h2"},
+		{"mongodb://%2Ftmp%2Fmongodb-27017.sock/db", "/tmp/mongodb-27017.sock"},
+		{"mongodb://[::1]:27017,[::2]:1/", "[::1]:27017,[::2]:1"},
+	}
+	for _, tc := range cases {
+		// Arrange
+		c := &call{}
+		env := map[string]string{"MONGO_HOST": tc.uri, "MONGO_POS_DB_NAME": "copy_db"}
+		// Act
+		code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+		// Assert
+		if code != 0 || c.count != 1 || !strings.Contains(strings.Split(out, "\n")[0], " on "+tc.hosts+", ") {
+			t.Errorf("%s: code=%d calls=%d, want 0, 1 and hosts %q:\n%s%s", tc.uri, code, c.count, tc.hosts, out, errOut)
+		}
+	}
+}
+
+func TestRun_AFailedRunSaysWhetherAnythingWasWritten(t *testing.T) {
+	applyArgs := []string{"-apply", "-confirm-db", "copy_db"}
+	cases := []struct {
+		name          string
+		args          []string
+		reached       legacy.Stage
+		want, notWant []string
+	}{
+		{"connect failed", nil, legacy.StageStarted, []string{"nothing was written"}, []string{"HQ Branch", "may have written"}},
+		{"report mode after HQ", nil, legacy.StageHQ, []string{"HQ Branch", "nothing was written"}, []string{"may have written"}},
+		{"apply before any write", applyArgs, legacy.StageFindings, []string{"nothing was written", legacy.KindNegativeStock}, []string{"HQ Branch", "may have written"}},
+		{"apply after HQ, before writing", applyArgs, legacy.StageHQ, []string{"HQ Branch", "nothing was written"}, []string{"may have written"}},
+		{"apply while writing", applyArgs, legacy.StageWriting, []string{"HQ Branch", "may have written part"}, []string{"nothing was written"}},
+	}
+	for _, tc := range cases {
+		// Arrange
+		c := &call{}
+		report := legacy.Report{Reached: tc.reached}
+		if tc.reached >= legacy.StageFindings {
+			report.Findings = []legacy.Finding{{Kind: legacy.KindNegativeStock, Detail: "d", Ids: []string{"a1"}, Total: 1}}
+		}
+		// Act
+		code, out, _ := exec(tc.args, fullEnv, fakeMigrate(c, report, errors.New("boom")))
+		// Assert
+		if code != 1 {
+			t.Errorf("%s: code=%d, want 1", tc.name, code)
+		}
+		for _, want := range append([]string{"did not finish", "again is safe"}, tc.want...) {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: output lacks %q:\n%s", tc.name, want, out)
+			}
+		}
+		for _, notWant := range tc.notWant {
+			if strings.Contains(out, notWant) {
+				t.Errorf("%s: output has %q:\n%s", tc.name, notWant, out)
+			}
+		}
+	}
+}
+
 func TestRun_BadFlagExitsTwo(t *testing.T) {
 	c := &call{}
 	code, _, _ := exec([]string{"-nope"}, fullEnv, fakeMigrate(c, legacy.Report{}, nil))

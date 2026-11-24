@@ -2,12 +2,9 @@ package legacy
 
 import (
 	"context"
-	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // discountKind is one way an Order's stored total can disagree with the
@@ -23,20 +20,66 @@ var discountKinds = []discountKind{
 	{KindDiscountUnknown, "Orders with a discounted line whose total matches none of the three discount rules", ""},
 }
 
-// field returns the line value or 0 when it is missing.
-func field(name string) bson.M {
-	return bson.M{"$ifNull": bson.A{"$" + name, 0}}
+// floatTypes decode into the float64 price and discount of entities.OrderItem
+// (missing and null decode as 0); a Decimal128 or any non-number does not.
+var floatTypes = bson.A{"double", "int", "long", "missing", "null"}
+
+// intTypes decode into its int quantity; a double does only when it is whole
+// and in range, which wholeDouble checks.
+var intTypes = bson.A{"int", "long", "missing", "null"}
+
+// maxWholeDouble bounds a double the driver puts into an int64 without
+// overflow; NaN compares below every number in MongoDB, so it fails the
+// lower bound.
+const maxWholeDouble = 9.2e18
+
+// field returns the value at path when it is a number, otherwise 0: a missing,
+// null or non-numeric amount neither stops the aggregation nor compares as
+// greater than 0.
+func field(path string) bson.M {
+	return bson.M{"$cond": bson.A{bson.M{"$isNumber": "$" + path}, "$" + path, 0}}
+}
+
+// typeIn is true when the value at path has one of types.
+func typeIn(path string, types bson.A) bson.M {
+	return bson.M{"$in": bson.A{bson.M{"$type": "$" + path}, types}}
+}
+
+// wholeDouble is true for a double quantity with no fraction, in range. $and
+// stops at the first false, so $trunc only sees a double.
+func wholeDouble(path string) bson.M {
+	v := "$" + path
+	return bson.M{"$and": bson.A{
+		bson.M{"$eq": bson.A{bson.M{"$type": v}, "double"}},
+		bson.M{"$gte": bson.A{v, -maxWholeDouble}},
+		bson.M{"$lte": bson.A{v, maxWholeDouble}},
+		bson.M{"$eq": bson.A{v, bson.M{"$trunc": v}}},
+	}}
+}
+
+// undecodableLine is 1 when the current code could not read a line amount
+// into entities.OrderItem (a text, a Decimal128, a fractional or out-of-range
+// quantity), otherwise 0.
+func undecodableLine() bson.M {
+	readable := bson.M{"$and": bson.A{
+		typeIn("price", floatTypes),
+		typeIn("discount", floatTypes),
+		bson.M{"$or": bson.A{typeIn("quantity", intTypes), wholeDouble("quantity")}},
+	}}
+	return bson.M{"$cond": bson.A{readable, 0, 1}}
 }
 
 // orderSums groups every line by its Order once: whether any line carries a
-// discount, and Σ price under each rule. A line's price is its whole amount
-// before discount. Grouping all lines (not only the discounted ones) keeps the
-// undiscounted lines of a discounted Order in its sums.
+// discount or an amount the current code cannot read, and Σ price under each rule. A line's
+// price is its whole amount before discount. Grouping all lines (not only the
+// discounted ones) keeps the undiscounted lines of a discounted Order in its
+// sums.
 func orderSums() bson.D {
 	discount := field("discount")
 	return bson.D{{Key: "$group", Value: bson.M{
 		"_id":        "$orderId",
 		"discounted": bson.M{"$max": bson.M{"$cond": bson.A{bson.M{"$gt": bson.A{discount, 0}}, 1, 0}}},
+		"nonNumeric": bson.M{"$max": undecodableLine()},
 		"perUnit":    bson.M{"$sum": bson.M{"$subtract": bson.A{field("price"), bson.M{"$multiply": bson.A{discount, field("quantity")}}}}},
 		"perLine":    bson.M{"$sum": bson.M{"$subtract": bson.A{field("price"), discount}}},
 		"plain":      bson.M{"$sum": field("price")},
@@ -62,41 +105,35 @@ func kindOf() bson.M {
 }
 
 // discountPipeline starts from order_items, so it needs no index on orderId:
-// one collection scan, then each Order is found by its _id index.
+// one collection scan, then each Order is found by its _id index. A row is an
+// Order with a discount kind, a non-numeric line amount, or both.
 func discountPipeline() mongo.Pipeline {
+	hasDiscountAndOrder := bson.M{"$and": bson.A{
+		bson.M{"$eq": bson.A{"$discounted", 1}},
+		bson.M{"$ne": bson.A{bson.M{"$type": "$order"}, "missing"}},
+	}}
 	return mongo.Pipeline{
 		orderSums(),
-		{{Key: "$match", Value: bson.M{"discounted": 1}}},
+		{{Key: "$match", Value: bson.M{"$or": bson.A{bson.M{"discounted": 1}, bson.M{"nonNumeric": 1}}}}},
 		{{Key: "$lookup", Value: bson.M{"from": "orders", "localField": "_id", "foreignField": "_id", "as": "order"}}},
-		{{Key: "$unwind", Value: "$order"}},
-		{{Key: "$addFields", Value: bson.M{"total": bson.M{"$ifNull": bson.A{"$order.total", 0}}}}},
-		{{Key: "$project", Value: bson.M{"kind": kindOf()}}},
-		{{Key: "$match", Value: bson.M{"kind": bson.M{"$ne": ""}}}},
+		{{Key: "$unwind", Value: bson.M{"path": "$order", "preserveNullAndEmptyArrays": true}}},
+		{{Key: "$addFields", Value: bson.M{"total": field("order.total")}}},
+		{{Key: "$project", Value: bson.M{"nonNumeric": 1, "kind": bson.M{"$cond": bson.A{hasDiscountAndOrder, kindOf(), ""}}}}},
+		{{Key: "$match", Value: bson.M{"$or": bson.A{bson.M{"kind": bson.M{"$ne": ""}}, bson.M{"nonNumeric": 1}}}}},
 	}
 }
 
+// nonNumericDetail explains KindNonNumericLineAmount.
+const nonNumericDetail = "Orders with a Line whose price, quantity or discount the current code cannot read: not a number (counted as 0 by the discount check), a Decimal128, or a fractional quantity"
+
 // checkDiscountConvention reports, in one pass, the Orders with a discounted
-// line whose total does not follow the current per-unit discount.
+// line whose total does not follow the current per-unit discount, then the
+// Orders with a non-numeric line amount.
 func checkDiscountConvention(ctx context.Context, db *mongo.Database) ([]Finding, error) {
-	cursor, err := db.Collection("order_items").Aggregate(ctx, discountPipeline(), options.Aggregate().SetAllowDiskUse(true))
-	if err != nil {
-		return nil, fmt.Errorf("check discounts on order_items: %w", err)
-	}
-	defer cursor.Close(ctx)
-	var rows []struct {
-		Id   primitive.ObjectID `bson:"_id"`
-		Kind string             `bson:"kind"`
-	}
-	if err := cursor.All(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read discounts on order_items: %w", err)
-	}
-	byKind := map[string][]string{}
-	for _, row := range rows {
-		byKind[row.Kind] = append(byKind[row.Kind], row.Id.Hex())
-	}
-	found := []Finding{}
+	groups := make([]offenders, 0, len(discountKinds)+1)
 	for _, k := range discountKinds {
-		found = append(found, findingOf(k.kind, k.detail, byKind[k.kind])...)
+		groups = append(groups, offenders{kind: k.kind, detail: k.detail, match: bson.M{"kind": k.kind}})
 	}
-	return found, nil
+	groups = append(groups, offenders{kind: KindNonNumericLineAmount, detail: nonNumericDetail, match: bson.M{"nonNumeric": 1}})
+	return findOffenders(ctx, db, "order_items", discountPipeline(), groups)
 }

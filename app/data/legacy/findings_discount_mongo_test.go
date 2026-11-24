@@ -2,6 +2,7 @@ package legacy
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -40,6 +41,18 @@ func TestFindings_DiscountNotSubtracted(t *testing.T) {
 	wantFinding(t, all, KindDiscountUnknown, 1, unknown)
 }
 
+func TestFindings_DiscountToleranceBoundary(t *testing.T) {
+	// Arrange: per unit the total is 190
+	db := newTestDB(t)
+	discountOrder(t, db, 190.004, 5)
+	discountOrder(t, db, 189.996, 5)
+	offByOneSatang := discountOrder(t, db, 190.01, 5)
+	// Act
+	all := runFindings(t, db)
+	// Assert
+	wantFinding(t, all, KindDiscountUnknown, 1, offByOneSatang)
+}
+
 func TestFindings_DiscountKindsInFixedOrder(t *testing.T) {
 	db := newTestDB(t)
 	discountOrder(t, db, 150, 5)
@@ -53,6 +66,98 @@ func TestFindings_DiscountKindsInFixedOrder(t *testing.T) {
 	for i, kind := range want {
 		if got[i].Kind != kind {
 			t.Errorf("finding %d = %s, want %s", i, got[i].Kind, kind)
+		}
+	}
+}
+
+// lineOrder inserts an Order with total and one line.
+func lineOrder(t *testing.T, db *mongo.Database, total float64, line bson.M) primitive.ObjectID {
+	t.Helper()
+	id := insert(t, db, "orders", bson.M{"total": total})
+	withOrder := bson.M{"orderId": id}
+	for k, v := range line {
+		withOrder[k] = v
+	}
+	insert(t, db, "order_items", withOrder)
+	return id
+}
+
+func TestFindings_NonNumericLineAmountIsReportedNotFatal(t *testing.T) {
+	// Arrange
+	db := newTestDB(t)
+	price := lineOrder(t, db, 200, bson.M{"price": "200", "quantity": 2, "discount": 0.0})
+	quantity := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": "2", "discount": 0.0})
+	// a string discount is not "greater than 0": this Order is not examined
+	// for a discount kind, though its total matches no rule
+	discount := lineOrder(t, db, 150, bson.M{"price": 200.0, "quantity": 2, "discount": "5"})
+	lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": 2, "discount": nil})
+	lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": 2})
+	unknown := discountOrder(t, db, 150, 5)
+
+	// Act
+	all := runFindings(t, db)
+
+	// Assert
+	wantFinding(t, all, KindNonNumericLineAmount, 3, price, quantity, discount)
+	wantFinding(t, all, KindDiscountUnknown, 1, unknown)
+	if len(all) != 2 || all[0].Kind != KindDiscountUnknown || all[1].Kind != KindNonNumericLineAmount {
+		t.Errorf("findings = %+v, want DISCOUNT_UNKNOWN then NON_NUMERIC_LINE_AMOUNT", all)
+	}
+}
+
+func TestFindings_NonNumericAmountCountsAsZeroInTheSums(t *testing.T) {
+	// Arrange: per unit 200 - 5*2 = 190 on the numeric line, the other line's
+	// price "abc" counts 0
+	db := newTestDB(t)
+	id := insert(t, db, "orders", bson.M{"total": 190.0})
+	insert(t, db, "order_items", bson.M{"orderId": id, "price": 200.0, "quantity": 2, "discount": 5.0})
+	insert(t, db, "order_items", bson.M{"orderId": id, "price": "abc", "quantity": 1, "discount": 0.0})
+
+	// Act
+	all := runFindings(t, db)
+
+	// Assert
+	wantFinding(t, all, KindNonNumericLineAmount, 1, id)
+	if len(all) != 1 {
+		t.Errorf("findings = %+v, want only the non-numeric line", all)
+	}
+}
+
+func TestFindings_AmountsTheCurrentCodeCannotDecodeAreListed(t *testing.T) {
+	// Arrange: entities.OrderItem has float64 price and discount, int quantity
+	db := newTestDB(t)
+	two, _ := primitive.ParseDecimal128("2")
+	fractional := lineOrder(t, db, 250, bson.M{"price": 250.0, "quantity": 2.5})
+	decimal := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": 2, "discount": two})
+	infinite := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": math.Inf(1)})
+	notANumber := lineOrder(t, db, 200, bson.M{"price": 200.0, "quantity": math.NaN()})
+	lineOrder(t, db, 200, bson.M{"price": int64(200), "quantity": 2.0, "discount": int32(0)})
+
+	// Act
+	all := runFindings(t, db)
+
+	// Assert
+	wantFinding(t, all, KindNonNumericLineAmount, 4, fractional, decimal, infinite, notANumber)
+}
+
+func TestFindings_OddOrderIdsAreShownNotFatal(t *testing.T) {
+	// Arrange: non-numeric lines whose orderId is text, or missing
+	db := newTestDB(t)
+	good := lineOrder(t, db, 200, bson.M{"price": "200", "quantity": 2})
+	insert(t, db, "order_items", bson.M{"orderId": "abc", "price": "1", "quantity": 1})
+	insert(t, db, "order_items", bson.M{"price": "1", "quantity": 1})
+
+	// Act
+	f, ok := findKind(runFindings(t, db), KindNonNumericLineAmount)
+
+	// Assert
+	want := map[string]bool{good.Hex(): true, `"abc"`: true, missingId: true}
+	if !ok || f.Total != 3 || len(f.Ids) != 3 {
+		t.Fatalf("finding = %+v (found %v), want 3 ids", f, ok)
+	}
+	for _, id := range f.Ids {
+		if !want[id] {
+			t.Errorf("unexpected id %q in %v", id, f.Ids)
 		}
 	}
 }

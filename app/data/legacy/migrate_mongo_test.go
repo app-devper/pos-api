@@ -21,6 +21,7 @@ var legacyCollections = map[string]int{
 	"order_items":       2,
 	"payments":          1,
 	"product_histories": 1,
+	"product_lots":      2,
 }
 
 // newTestDB connects to MONGO_TEST_URI and returns a database of its own,
@@ -193,5 +194,37 @@ func TestMigrate_SecondRunChangesNothing(t *testing.T) {
 	}
 	if n := countDocs(t, database, "branches", bson.M{}); n != 1 {
 		t.Errorf("branches count = %d, want 1", n)
+	}
+}
+
+func TestMigrate_ApplyCountsTheDocumentsItWrote(t *testing.T) {
+	// Arrange: the seeded legacy documents, a current Order, two 2024 Receives
+	// (one with a receive_items row, one without)
+	database := newTestDB(t)
+	seedLegacy(t, database)
+	insertDoc(t, database, "orders", bson.M{"_id": primitive.NewObjectID(), "branchId": primitive.NewObjectID()})
+	withRows, withoutRows := primitive.NewObjectID(), primitive.NewObjectID()
+	insertDoc(t, database, "receives", bson.M{"_id": withRows, "code": "RC_0001"})
+	insertDoc(t, database, "receives", bson.M{"_id": withoutRows, "code": "RC_0002"})
+	insertDoc(t, database, "receive_items", bson.M{"_id": primitive.NewObjectID(), "receiveId": withRows, "productId": primitive.NewObjectID(), "costPrice": 1.0, "quantity": 1})
+
+	// Act
+	report, err := Migrate(context.Background(), database, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert: every count is the documents that now carry the HQ Branch
+	for name, want := range legacyCollections {
+		written := countDocs(t, database, name, bson.M{"branchId": report.HQ})
+		if got := changeCount(report, name); got != written || got != int64(want) {
+			t.Errorf("%s changed %d, written %d, seeded %d", name, got, written, want)
+		}
+	}
+	wantReceives := map[string]int64{"branchId": 2, "status": 2, "items": 1}
+	for field, want := range wantReceives {
+		if got := changeFor(report, "receives", field); got != want {
+			t.Errorf("receives/%s changed %d, want %d", field, got, want)
+		}
 	}
 }

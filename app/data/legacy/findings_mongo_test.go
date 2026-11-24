@@ -10,11 +10,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// insert writes a copy of doc with a new _id; doc itself is not changed.
 func insert(t *testing.T, db *mongo.Database, coll string, doc bson.M) primitive.ObjectID {
 	t.Helper()
 	id := primitive.NewObjectID()
-	doc["_id"] = id
-	if _, err := db.Collection(coll).InsertOne(context.Background(), doc); err != nil {
+	withId := bson.M{"_id": id}
+	for k, v := range doc {
+		if k != "_id" {
+			withId[k] = v
+		}
+	}
+	if _, err := db.Collection(coll).InsertOne(context.Background(), withId); err != nil {
 		t.Fatal(err)
 	}
 	return id
@@ -113,6 +119,25 @@ func TestFindings_DuplicateSerialCountsSoftDeleted(t *testing.T) {
 	wantFinding(t, runFindings(t, db), KindDuplicateSerial, 2, a, b)
 }
 
+func TestFindings_ArrayValuedKeyIsListedNotFatal(t *testing.T) {
+	// Arrange
+	db := newTestDB(t)
+	array, _ := seedFindingsProduct(t, db, "")
+	if _, err := db.Collection("products").UpdateByID(context.Background(), array, bson.M{"$set": bson.M{"serialNumber": bson.A{"X", "Y"}}}); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := seedFindingsProduct(t, db, "A1")
+	b, _ := seedFindingsProduct(t, db, "A1")
+	seedFindingsProduct(t, db, "B2")
+	seqArray := insert(t, db, "sequences", bson.M{"field": bson.A{"ORDER"}})
+	insert(t, db, "sequences", bson.M{"field": "ORDER"})
+	// Act
+	all := runFindings(t, db)
+	// Assert
+	wantFinding(t, all, KindDuplicateSerial, 3, array, a, b)
+	wantFinding(t, all, KindDuplicateSequence, 1, seqArray)
+}
+
 func TestFindings_DuplicateSequence(t *testing.T) {
 	db := newTestDB(t)
 	a := insert(t, db, "sequences", bson.M{"field": "ORDER"})
@@ -193,6 +218,30 @@ func TestFindings_IdsCappedAndSorted(t *testing.T) {
 	}
 }
 
+func TestFindings_LargeDuplicateGroupIsCappedAndCounted(t *testing.T) {
+	// Arrange: 25 sequences rows share one field, 2 share another
+	db := newTestDB(t)
+	ids := []string{}
+	for i := 0; i < 25; i++ {
+		ids = append(ids, insert(t, db, "sequences", bson.M{"field": "ORDER"}).Hex())
+	}
+	for i := 0; i < 2; i++ {
+		insert(t, db, "sequences", bson.M{"field": "RECEIVE"})
+	}
+	insert(t, db, "sequences", bson.M{"field": "ALONE"})
+	// Act
+	f, _ := findKind(runFindings(t, db), KindDuplicateSequence)
+	// Assert: ObjectIDs made in one process sort in insertion order
+	if f.Total != 27 || len(f.Ids) != maxFindingIds {
+		t.Fatalf("total %d ids %d, want 27 and %d", f.Total, len(f.Ids), maxFindingIds)
+	}
+	for i, id := range f.Ids {
+		if id != ids[i] {
+			t.Fatalf("ids[%d] = %s, want %s (the smallest ids first)", i, id, ids[i])
+		}
+	}
+}
+
 func TestFindings_OrderIsFixed(t *testing.T) {
 	db := newTestDB(t)
 	insert(t, db, "payments", bson.M{"type": "CHEQUE"})
@@ -229,6 +278,8 @@ func TestIsReplicaSet(t *testing.T) {
 		{"standalone", bson.M{"ok": 1}, false},
 		{"empty name", bson.M{"setName": ""}, false},
 		{"wrong type", bson.M{"setName": 3}, false},
+		{"mongos", bson.M{"msg": "isdbgrid"}, true},
+		{"other msg", bson.M{"msg": "hello"}, false},
 	}
 	for _, c := range cases {
 		if got := isReplicaSet(c.reply); got != c.want {
