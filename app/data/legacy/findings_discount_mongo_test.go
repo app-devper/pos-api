@@ -40,6 +40,18 @@ func TestFindings_DiscountNotSubtracted(t *testing.T) {
 	wantFinding(t, all, KindDiscountUnknown, 1, unknown)
 }
 
+func TestFindings_DiscountToleranceBoundary(t *testing.T) {
+	// Arrange: per unit the total is 190
+	db := newTestDB(t)
+	discountOrder(t, db, 190.004, 5)
+	discountOrder(t, db, 189.996, 5)
+	offByOneSatang := discountOrder(t, db, 190.01, 5)
+	// Act
+	all := runFindings(t, db)
+	// Assert
+	wantFinding(t, all, KindDiscountUnknown, 1, offByOneSatang)
+}
+
 func TestFindings_DiscountKindsInFixedOrder(t *testing.T) {
 	db := newTestDB(t)
 	discountOrder(t, db, 150, 5)

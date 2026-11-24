@@ -10,11 +10,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// insert writes a copy of doc with a new _id; doc itself is not changed.
 func insert(t *testing.T, db *mongo.Database, coll string, doc bson.M) primitive.ObjectID {
 	t.Helper()
 	id := primitive.NewObjectID()
-	doc["_id"] = id
-	if _, err := db.Collection(coll).InsertOne(context.Background(), doc); err != nil {
+	withId := bson.M{"_id": id}
+	for k, v := range doc {
+		if k != "_id" {
+			withId[k] = v
+		}
+	}
+	if _, err := db.Collection(coll).InsertOne(context.Background(), withId); err != nil {
 		t.Fatal(err)
 	}
 	return id

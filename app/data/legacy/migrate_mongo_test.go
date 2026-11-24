@@ -21,6 +21,7 @@ var legacyCollections = map[string]int{
 	"order_items":       2,
 	"payments":          1,
 	"product_histories": 1,
+	"product_lots":      2,
 }
 
 // newTestDB connects to MONGO_TEST_URI and returns a database of its own,
