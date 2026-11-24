@@ -73,7 +73,7 @@ func run(args []string, env func(string) string, out, errOut io.Writer, migrate 
 	report, err := migrate(ctx, cfg.uri, cfg.name, cfg.apply)
 	printReport(out, report, cfg.apply)
 	if err != nil {
-		fmt.Fprintln(out, "\nthe run did not finish: the lines above are what was done before the error (the step that failed may have written part of its documents); running it again is safe")
+		fmt.Fprintln(out, "\n"+unfinished(report, cfg.apply))
 		fmt.Fprintln(errOut, err)
 		return exitError
 	}
@@ -150,12 +150,25 @@ func hostsOf(uri string) (string, bool) {
 	return strings.Join(cs.Hosts, ","), true
 }
 
+// unfinished explains a run that stopped on an error: whether anything was
+// written, and that a re-run is safe.
+func unfinished(report legacy.Report, apply bool) string {
+	if !apply || report.Reached < legacy.StageWriting {
+		return "the run did not finish: nothing was written (it stopped before its first write); running it again is safe"
+	}
+	return "the run did not finish: the lines above are what was done before the error; the step that failed may have written part of its documents, and its count may be missing or partial; running it again is safe"
+}
+
+// printReport prints as much of report as the run reached: the HQ line only
+// once the HQ Branch was looked up.
 func printReport(out io.Writer, report legacy.Report, apply bool) {
 	verb := "would change"
 	if apply {
 		verb = "changed"
 	}
-	fmt.Fprintf(out, "HQ Branch %s (created: %t)\n", report.HQ.Hex(), report.HQCreated)
+	if report.Reached >= legacy.StageHQ {
+		fmt.Fprintf(out, "HQ Branch %s (created: %t)\n", report.HQ.Hex(), report.HQCreated)
+	}
 	for _, c := range report.Changes {
 		fmt.Fprintf(out, "%s %s: %s %d\n", c.Collection, c.Field, verb, c.Count)
 	}

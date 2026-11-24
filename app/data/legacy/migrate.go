@@ -43,14 +43,19 @@ func Migrate(ctx context.Context, db *mongo.Database, apply bool) (Report, error
 	if err != nil {
 		return Report{}, err
 	}
-	report := Report{Findings: found}
+	report := Report{Reached: StageFindings, Findings: found}
 	hq, err := findHQ(ctx, db)
 	if err != nil {
 		return report, err
 	}
 	report.HQ = hq
+	report.Reached = StageHQ
+	if !apply {
+		return migrateCollections(ctx, db, report, apply)
+	}
 
-	if apply && hq.IsZero() {
+	report.Reached = StageWriting
+	if hq.IsZero() {
 		hq, err = insertHQ(ctx, db)
 		if err != nil {
 			return report, err

@@ -20,8 +20,24 @@ type Finding struct {
 	Total  int64
 }
 
+// Stage is how far a Migrate run got.
+type Stage int
+
+const (
+	// StageStarted: nothing completed; the report is empty.
+	StageStarted Stage = iota
+	// StageFindings: the findings were read.
+	StageFindings
+	// StageHQ: the HQ Branch was looked up; HQ is known, zero when none.
+	StageHQ
+	// StageWriting: apply mode sent its first write (the HQ insert or the
+	// backfill); a failure from here on may have written part of a step.
+	StageWriting
+)
+
 // Report is what a Migrate run did, or in report mode would do.
 type Report struct {
+	Reached   Stage
 	HQ        primitive.ObjectID
 	HQCreated bool
 	Changes   []Change

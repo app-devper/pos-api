@@ -35,6 +35,9 @@ func TestMigrate_AFailedApplyReturnsWhatItWrote(t *testing.T) {
 	if err == nil {
 		t.Fatal("Migrate succeeded, want the payments write refused")
 	}
+	if report.Reached != StageWriting {
+		t.Errorf("reached = %d, want StageWriting", report.Reached)
+	}
 	if report.HQ.IsZero() || !report.HQCreated {
 		t.Errorf("HQ = %s created %v, want the created HQ", report.HQ.Hex(), report.HQCreated)
 	}
@@ -79,5 +82,27 @@ func TestMigrate_AFailedReceiveKeepsTheReceivesDoneBeforeIt(t *testing.T) {
 	}
 	if n := changeCount(report, "product_lots"); n != 0 {
 		t.Errorf("product_lots = %d, want 0 (the backfill before receives finished)", n)
+	}
+}
+
+func TestMigrate_ReachedSaysHowFarARunGot(t *testing.T) {
+	// Arrange
+	database := newTestDB(t)
+	seedLegacy(t, database)
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	// Act
+	stopped, stopErr := Migrate(cancelled, database, true)
+	reported, reportErr := Migrate(context.Background(), database, false)
+	applied, applyErr := Migrate(context.Background(), database, true)
+	// Assert
+	if stopErr == nil || stopped.Reached != StageStarted {
+		t.Errorf("cancelled: err %v reached %d, want an error at StageStarted", stopErr, stopped.Reached)
+	}
+	if reportErr != nil || reported.Reached != StageHQ {
+		t.Errorf("report: err %v reached %d, want StageHQ", reportErr, reported.Reached)
+	}
+	if applyErr != nil || applied.Reached != StageWriting {
+		t.Errorf("apply: err %v reached %d, want StageWriting", applyErr, applied.Reached)
 	}
 }

@@ -130,6 +130,7 @@ func TestRun_FailedApplyPrintsWhatWasWrittenBeforeTheError(t *testing.T) {
 	// Arrange
 	c := &call{}
 	partial := legacy.Report{
+		Reached:  legacy.StageWriting,
 		Changes:  []legacy.Change{{Collection: "product_stocks", Field: "branchId", Count: 4}},
 		Findings: []legacy.Finding{{Kind: legacy.KindNegativeStock, Detail: "Stock below zero", Ids: []string{"a1"}, Total: 1}},
 	}
@@ -139,7 +140,7 @@ func TestRun_FailedApplyPrintsWhatWasWrittenBeforeTheError(t *testing.T) {
 	if code != 1 || !strings.Contains(errOut, "boom") {
 		t.Fatalf("code=%d stderr=%q, want 1 and the error", code, errOut)
 	}
-	for _, want := range []string{"product_stocks branchId: changed 4", legacy.KindNegativeStock, "did not finish", "again is safe"} {
+	for _, want := range []string{"product_stocks branchId: changed 4", legacy.KindNegativeStock, "did not finish", "may have written part", "again is safe"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -245,6 +246,46 @@ func TestRun_EveryHostOfAValidListIsAccepted(t *testing.T) {
 		// Assert
 		if code != 0 || c.count != 1 || !strings.Contains(strings.Split(out, "\n")[0], " on "+tc.hosts+", ") {
 			t.Errorf("%s: code=%d calls=%d, want 0, 1 and hosts %q:\n%s%s", tc.uri, code, c.count, tc.hosts, out, errOut)
+		}
+	}
+}
+
+func TestRun_AFailedRunSaysWhetherAnythingWasWritten(t *testing.T) {
+	applyArgs := []string{"-apply", "-confirm-db", "copy_db"}
+	cases := []struct {
+		name          string
+		args          []string
+		reached       legacy.Stage
+		want, notWant []string
+	}{
+		{"connect failed", nil, legacy.StageStarted, []string{"nothing was written"}, []string{"HQ Branch", "may have written"}},
+		{"report mode after HQ", nil, legacy.StageHQ, []string{"HQ Branch", "nothing was written"}, []string{"may have written"}},
+		{"apply before any write", applyArgs, legacy.StageFindings, []string{"nothing was written", legacy.KindNegativeStock}, []string{"HQ Branch", "may have written"}},
+		{"apply after HQ, before writing", applyArgs, legacy.StageHQ, []string{"HQ Branch", "nothing was written"}, []string{"may have written"}},
+		{"apply while writing", applyArgs, legacy.StageWriting, []string{"HQ Branch", "may have written part"}, []string{"nothing was written"}},
+	}
+	for _, tc := range cases {
+		// Arrange
+		c := &call{}
+		report := legacy.Report{Reached: tc.reached}
+		if tc.reached >= legacy.StageFindings {
+			report.Findings = []legacy.Finding{{Kind: legacy.KindNegativeStock, Detail: "d", Ids: []string{"a1"}, Total: 1}}
+		}
+		// Act
+		code, out, _ := exec(tc.args, fullEnv, fakeMigrate(c, report, errors.New("boom")))
+		// Assert
+		if code != 1 {
+			t.Errorf("%s: code=%d, want 1", tc.name, code)
+		}
+		for _, want := range append([]string{"did not finish", "again is safe"}, tc.want...) {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: output lacks %q:\n%s", tc.name, want, out)
+			}
+		}
+		for _, notWant := range tc.notWant {
+			if strings.Contains(out, notWant) {
+				t.Errorf("%s: output has %q:\n%s", tc.name, notWant, out)
+			}
 		}
 	}
 }
