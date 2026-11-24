@@ -5,10 +5,13 @@ import (
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+// missingId shows an offender whose _id is missing or null: a Line grouped by
+// an orderId it does not have.
+const missingId = "(missing)"
 
 // offenders is one finding: the documents of a pipeline that match match.
 type offenders struct {
@@ -75,7 +78,7 @@ func findOffenders(ctx context.Context, db *mongo.Database, coll string, pipelin
 // findingAt reads group i of a facet result; none when it has no offender.
 func findingAt(row bson.Raw, i int, g offenders) ([]Finding, error) {
 	var ids []struct {
-		Id primitive.ObjectID `bson:"_id"`
+		Id bson.RawValue `bson:"_id"`
 	}
 	if err := row.Lookup(idsKey(i)).Unmarshal(&ids); err != nil {
 		return nil, err
@@ -91,7 +94,19 @@ func findingAt(row bson.Raw, i int, g offenders) ([]Finding, error) {
 	}
 	hex := make([]string, 0, len(ids))
 	for _, id := range ids {
-		hex = append(hex, id.Id.Hex())
+		hex = append(hex, idText(id.Id))
 	}
 	return []Finding{{Kind: g.kind, Detail: g.detail, Ids: hex, Total: total[0].N}}, nil
+}
+
+// idText shows an _id: an ObjectID as hex, a missing or null one as
+// missingId, anything else (a text orderId, say) in its extended JSON form.
+func idText(id bson.RawValue) string {
+	if oid, ok := id.ObjectIDOK(); ok {
+		return oid.Hex()
+	}
+	if id.Type == 0 || id.Type == bson.TypeNull || id.Type == bson.TypeUndefined {
+		return missingId
+	}
+	return id.String()
 }

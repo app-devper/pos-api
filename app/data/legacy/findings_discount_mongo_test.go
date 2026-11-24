@@ -122,6 +122,28 @@ func TestFindings_NonNumericAmountCountsAsZeroInTheSums(t *testing.T) {
 	}
 }
 
+func TestFindings_OddOrderIdsAreShownNotFatal(t *testing.T) {
+	// Arrange: non-numeric lines whose orderId is text, or missing
+	db := newTestDB(t)
+	good := lineOrder(t, db, 200, bson.M{"price": "200", "quantity": 2})
+	insert(t, db, "order_items", bson.M{"orderId": "abc", "price": "1", "quantity": 1})
+	insert(t, db, "order_items", bson.M{"price": "1", "quantity": 1})
+
+	// Act
+	f, ok := findKind(runFindings(t, db), KindNonNumericLineAmount)
+
+	// Assert
+	want := map[string]bool{good.Hex(): true, `"abc"`: true, missingId: true}
+	if !ok || f.Total != 3 || len(f.Ids) != 3 {
+		t.Fatalf("finding = %+v (found %v), want 3 ids", f, ok)
+	}
+	for _, id := range f.Ids {
+		if !want[id] {
+			t.Errorf("unexpected id %q in %v", id, f.Ids)
+		}
+	}
+}
+
 // bulkDiscountOrders inserts n Orders of two lines each, in batches. Every odd
 // Order has a discounted line; its total cycles through the per-unit (fine),
 // per-line, Σ price and unknown rules.

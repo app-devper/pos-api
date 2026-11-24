@@ -16,7 +16,7 @@ type Change struct {
 type Finding struct {
 	Kind   string
 	Detail string
-	Ids    []string // at most 20, hex
+	Ids    []string // at most 20: hex, "(missing)", or an odd id as extended JSON
 	Total  int64
 }
 
