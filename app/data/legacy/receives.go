@@ -17,16 +17,51 @@ const (
 	receiveItemsCollection = "receive_items"
 )
 
-// withoutItems matches a Receive that carries no items of its own.
-var withoutItems = bson.M{"$or": bson.A{
-	bson.M{"items": bson.M{"$exists": false}},
-	bson.M{"items": bson.A{}},
-	bson.M{"items": nil},
-}}
+// withoutItemsAt matches a Receive, found under path, that carries no items of
+// its own and no branchId.
+func withoutItemsAt(path string) bson.M {
+	return bson.M{
+		path + branchIdField: bson.M{"$exists": false},
+		"$or": bson.A{
+			bson.M{path + "items": bson.M{"$exists": false}},
+			bson.M{path + "items": bson.A{}},
+			bson.M{path + "items": nil},
+		},
+	}
+}
+
+// countReceivesToFill counts the legacy Receives without items that have at
+// least one receive_items row. It starts from receive_items, so it needs no
+// index on receiveId: one scan, then each Receive is found by its _id.
+func countReceivesToFill(ctx context.Context, db *mongo.Database) (int64, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$group", Value: bson.M{"_id": "$receiveId"}}},
+		{{Key: "$lookup", Value: bson.M{"from": receivesCollection, "localField": "_id", "foreignField": "_id", "as": "r"}}},
+		{{Key: "$unwind", Value: "$r"}},
+		{{Key: "$match", Value: withoutItemsAt("r.")}},
+		{{Key: "$count", Value: "n"}},
+	}
+	cursor, err := db.Collection(receiveItemsCollection).Aggregate(ctx, pipeline, options.Aggregate().SetAllowDiskUse(true))
+	if err != nil {
+		return 0, fmt.Errorf("count receives without items: %w", err)
+	}
+	defer cursor.Close(ctx)
+	var rows []struct {
+		N int64 `bson:"n"`
+	}
+	if err := cursor.All(ctx, &rows); err != nil {
+		return 0, fmt.Errorf("read count of receives without items: %w", err)
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	return rows[0].N, nil
+}
 
 // migrateReceives turns the 2024 Receives (no branchId) into the current shape:
 // the HQ Branch, status IMPORTED (their Stock was created at once, so they must
-// never be imported again) and the items they kept in receive_items. A Receive
+// never be imported again) and the items they kept in receive_items (a Receive
+// with no receive_items rows keeps its items field as it is). A Receive
 // the current API wrote has a branchId and is never touched; receive_items is
 // left as it is. Counts are the documents found before writing.
 func migrateReceives(ctx context.Context, db *mongo.Database, hq primitive.ObjectID, apply bool) ([]Change, error) {
@@ -35,9 +70,9 @@ func migrateReceives(ctx context.Context, db *mongo.Database, hq primitive.Objec
 	if err != nil {
 		return nil, fmt.Errorf("count receives without branchId: %w", err)
 	}
-	needItems, err := receives.CountDocuments(ctx, bson.M{"$and": bson.A{withoutBranchId, withoutItems}})
+	needItems, err := countReceivesToFill(ctx, db)
 	if err != nil {
-		return nil, fmt.Errorf("count receives without items: %w", err)
+		return nil, err
 	}
 	changes := []Change{
 		{Collection: receivesCollection, Field: branchIdField, Count: legacy},
@@ -75,7 +110,9 @@ func writeReceives(ctx context.Context, db *mongo.Database, hq primitive.ObjectI
 			if err != nil {
 				return err
 			}
-			set["items"] = items
+			if len(items) > 0 {
+				set["items"] = items
+			}
 		}
 		filter := bson.M{"_id": receive.Id, branchIdField: bson.M{"$exists": false}}
 		if _, err := receives.UpdateOne(ctx, filter, bson.M{"$set": set}); err != nil {

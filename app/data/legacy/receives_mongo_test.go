@@ -187,3 +187,33 @@ func TestMigrate_SecondRunChangesNoReceives(t *testing.T) {
 		t.Errorf("second run changed the receive: %v -> %v", between, after)
 	}
 }
+
+func TestMigrate_LegacyReceiveWithNoItemRowsKeepsNoItems(t *testing.T) {
+	for _, apply := range []bool{false, true} {
+		// Arrange: a 2024 Receive with no items and no receive_items rows
+		database := newTestDB(t)
+		receiveID := primitive.NewObjectID()
+		insertDoc(t, database, "receives", bson.M{"_id": receiveID, "code": "RC_0006", "totalCost": 0.0})
+		// Act
+		report, err := Migrate(context.Background(), database, apply)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Assert
+		got := findReceive(t, database, receiveID)
+		if _, ok := got["items"]; ok {
+			t.Errorf("apply=%v: items = %v, want no items field", apply, got["items"])
+		}
+		if n := changeFor(report, "receives", "items"); n != 0 {
+			t.Errorf("apply=%v: receives/items change = %d, want 0", apply, n)
+		}
+		for _, field := range []string{"branchId", "status"} {
+			if n := changeFor(report, "receives", field); n != 1 {
+				t.Errorf("apply=%v: receives/%s change = %d, want 1", apply, field, n)
+			}
+		}
+		if apply && (got["branchId"] != report.HQ || got["status"] != constant.IMPORTED) {
+			t.Errorf("receive not migrated: %v", got)
+		}
+	}
+}
