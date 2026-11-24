@@ -14,14 +14,14 @@ main runbook:
 |---|---|---|
 | `NOT_REPLICA_SET` | The server is neither a replica set nor a `mongos`. | Stop. Restore onto a replica set (main runbook, section 2). |
 | `NEGATIVE_STOCK` | Stock below zero (`product_stocks`). The current ledger refuses a move that leaves one. | Do not hand-edit `quantity`: that bypasses the Stock ledger (ADR-0001). First record, per listed row, the legacy value and the counted value. Then either (a) leave it and do a Stock count or adjustment in the new till after the move, or (b) the owner decides on a hand edit in the copy. Limitation if left: the ledger refuses a move that leaves a Stock below zero, so cancelling a bill that drew from that Stock can fail until it is corrected. |
-| `DUPLICATE_SERIAL` | Products share a `serialNumber`, empty counts, soft-deleted too. The unique index on `products.serialNumber` cannot be built. | Give each a distinct serial in the copy. |
-| `DUPLICATE_SEQUENCE` | `sequences` rows share a `field`. The unique index cannot be built. | See "Duplicate sequence rows" below; the right row is not always the highest value. |
+| `DUPLICATE_SERIAL` | Products share a `serialNumber`, empty counts, soft-deleted too; a Product whose `serialNumber` is an array is listed here too. The unique index on `products.serialNumber` cannot be built. | Give each a distinct serial (a plain text, not an array) in the copy. |
+| `DUPLICATE_SEQUENCE` | `sequences` rows share a `field`; a row whose `field` is an array is listed here too. The unique index cannot be built. | See "Duplicate sequence rows" below; the right row is not always the highest value. |
 | `ORPHAN_STOCK` | Stock whose `productId` or `unitId` matches no Product or Unit. | Export the listed rows first (see "Before deleting orphan Stock" below). Deleting them is the owner's decision; the alternative is to restore the missing Product/Unit. |
 | `NO_MAIN_UNIT` | A Product has no `product_units` row named like its own unit; a Receive is entered in the main unit. | Add the unit row in the copy. |
 | `DISCOUNT_PER_LINE` | An Order with a discounted line whose total is Σ(price − discount): the discount taken once per Line. | **Do NOT edit totals in the copy: they are what the shop charged.** Read "Discounted 2024 Orders after the move" below. |
 | `DISCOUNT_NOT_SUBTRACTED` | An Order with a discounted line whose total is Σ price: the discount not taken at all. This is how the 2024 server itself recomputed a total. | **Do NOT edit totals in the copy: they are what the shop charged.** Read "Discounted 2024 Orders after the move" below. |
 | `DISCOUNT_UNKNOWN` | An Order with a discounted line whose total matches none of the three rules. | **Do NOT edit totals in the copy: they are what the shop charged.** Open the listed Orders with the owner to understand them; read "Discounted 2024 Orders after the move" below. |
-| `NON_NUMERIC_LINE_AMOUNT` | An Order (the ids are **Order** ids) with a Line whose `price`, `quantity` or `discount` holds something that is not a number, such as the text `"5"`. The discount check counted that value as 0. | Read "Lines with a non-numeric amount" below. |
+| `NON_NUMERIC_LINE_AMOUNT` | An Order (the ids are **Order** ids) with a Line whose `price`, `quantity` or `discount` the current code cannot read: not a number (such as the text `"5"`, counted as 0 by the discount check), a Decimal128, or a fractional `quantity`. | Read "Lines with an amount the current code cannot read" below. |
 | `UNKNOWN_PAYMENT_TYPE` | `payments.type` outside `CASH`, `CREDIT`, `PROMPTPAY`, `TRANSFER`. | First find out what each legacy value meant (ask the shop); only then map it, or leave it. Effect of leaving it: the current Go code stores and returns `payments.type` without grouping or validating it, so the API itself is unaffected; whether the till or its reports group by it is not determined. |
 
 The findings do **not** check `customers.code` or `categories.value`, which
@@ -78,32 +78,47 @@ Expected: one line per Order, `<_id> <code> <createdDate>`, oldest first. A
 Line whose `discount` is text is not listed (MongoDB does not compare text
 with a number); it is a `NON_NUMERIC_LINE_AMOUNT` bill.
 
-## Lines with a non-numeric amount
+## Lines with an amount the current code cannot read
 
-`NON_NUMERIC_LINE_AMOUNT` lists Orders. To see which Line and value, for one
-listed Order id, in `mongosh '<NEW_MONGO_URI>'` (reads only; tried on a
-synthetic scratch database only, never real data):
+`NON_NUMERIC_LINE_AMOUNT` lists Orders (an id `(missing)` stands for Lines
+with no `orderId`; a text `orderId` shows in quotes). To see which Line and
+value, for one listed Order id, in `mongosh '<NEW_MONGO_URI>'` (reads only;
+tried on a synthetic scratch database only, never real data):
 
 ```js
 const d = db.getSiblingDB('<COPY_DB_NAME>');
-d.order_items.find({orderId: ObjectId('<ORDER_ID>')}, {price: 1, quantity: 1, discount: 1})
-  .forEach(l => print(l._id.toHexString(), 'price', typeof l.price, l.price,
-    'quantity', typeof l.quantity, l.quantity, 'discount', typeof l.discount, l.discount));
+d.order_items.aggregate([
+  {$match: {orderId: ObjectId('<ORDER_ID>')}},
+  {$project: {price: 1, quantity: 1, discount: 1,
+    types: {price: {$type: '$price'}, quantity: {$type: '$quantity'}, discount: {$type: '$discount'}}}},
+]).forEach(l => print(l._id.toHexString(), 'price', l.types.price, String(l.price),
+  'quantity', l.types.quantity, String(l.quantity), 'discount', l.types.discount, String(l.discount)));
 ```
 
-Expected: one line per Line of that Order; the bad value shows as `string`
-(or `object`) where a `number` is expected.
+Expected: one line per Line of that Order, each amount with its BSON type,
+for example `… price int 200 quantity long 2 discount string 5`. Fine:
+`int`, `long`, `double` (for `quantity` only a whole `double` such as `2`),
+and `missing` or `null` (read as 0). Not fine: `string`, `decimal`, any
+other type, and a fractional, infinite or NaN `quantity` such as `2.5`.
 
 What the current code does with such a Line: `entities.OrderItem` holds
-`price` and `discount` as `float64` and `quantity` as `int`. Checked with a
-throwaway decode test against the driver in `go.mod` (v1.17.9, not
-committed): text in `price` or `discount` fails with `cannot decode string
-into a float32 or float64 type`, text in `quantity` with `cannot decode
-string into an integer type`; a Decimal128 `discount` fails too (`cannot
-decode 128-bit decimal`), though the finding does not list it, as it is a
-number. A missing or null amount decodes as 0. So **the bill cannot be opened,
+`price` and `discount` as `float64` and `quantity` as `int`. Checked with
+throwaway decode tests against the driver in `go.mod` (v1.17.9, not
+committed):
+- text in `price` or `discount` fails with `cannot decode string into a
+  float32 or float64 type`;
+- text in `quantity` fails with `cannot decode string into an integer type`;
+- a Decimal128 in any of the three fails (`cannot decode 128-bit decimal`);
+- a `quantity` of `2.5` or NaN fails (`float64 can only be truncated … when
+  truncation is enabled`), and +Inf fails (`overflows int64`);
+- a whole double `quantity`, a `long` or an `int` decodes, and so does a
+  missing or null amount (as 0).
+
+The finding lists all the failing cases. So **the bill cannot be opened,
 cancelled or returned against until the value is corrected**, and a list that
-reads that Line fails as a whole.
+reads that Line fails as a whole. The discount check counts a non-number as 0
+and a Decimal128 as its value, so such an Order may also appear under a
+discount kind.
 
 Decision: look at the listed documents with the owner. Correct the value in
 the copy (as a number) only if the owner can say what it was, for example
@@ -144,7 +159,9 @@ Expected: one `row <_id> <field> <type> date <date> value <value>` line per
 row, then per counter `<FIELD> highest code <code> date <date part> number
 <n>` (or `none`). The script compares codes by date part, then by number, so
 it stays right past 9,999 codes in a period (a 5-digit `OD_2026112410000`
-ranks above `OD_202611249999`, which a text sort would get wrong). Example:
+ranks above `OD_202611249999`, which a text sort would get wrong). Numbers are
+read as decimals, so a code of up to 34 digits compares right; tried with a
+20-digit one. Example:
 `row … ORDER DAILY date 20261124 value 7` and `ORDER highest code
 OD_202611240007 date 20261124 number 7` agree. If the code's period is later
 than the row's, or its number is higher, correct the surviving row in the

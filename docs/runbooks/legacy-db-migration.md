@@ -161,11 +161,13 @@ If findings remain it exits 3, and says `the backfill above HAS been written`:
 the backfill happened anyway, the findings still need their decision.
 
 If it exits 1 during apply (an error, a lost connection, the 10-minute limit),
-the output still lists what was written before the failure (HQ Branch,
-findings, each `changed` line completed), then `the run did not finish`; the
-error itself is on stderr. The step that failed is not listed and may have
-written part of its documents. Run it again: a re-run is safe and finishes
-what was left. Every write is filtered by a missing `branchId`, and a Receive
+the output still lists what was done before the failure (findings, HQ
+Branch, each `changed` line completed), then a line starting `the run did not
+finish`; the error itself is on stderr. That line says `nothing was written`
+when the run stopped before its first write (and always in report mode);
+otherwise the step that failed may have written part of its documents, and
+its count may be missing or partial. Run it again: a re-run is safe and
+finishes what was left. Every write is filtered by a missing `branchId`, and a Receive
 gets its `branchId` last, so a document already done is never written twice.
 
 Re-running is safe: the second run reports `changed 0` everywhere and
