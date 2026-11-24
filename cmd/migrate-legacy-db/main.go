@@ -15,14 +15,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"pos/app/data/legacy"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/mongo/driver/connstring"
 )
 
 const (
@@ -116,15 +117,37 @@ func parseConfig(args []string, env func(string) string, errOut io.Writer) (conf
 	return config{uri: uri, hosts: hosts, name: name, apply: *apply}, true
 }
 
-// hostsOf returns the host list of a MongoDB URI, without user, password,
-// database or options; false when uri does not parse. The parse error is
-// dropped: it quotes the URI.
+const (
+	schemePlain = "mongodb://"
+	schemeSRV   = "mongodb+srv://"
+)
+
+// hostsOf returns the host list of a MongoDB URI as the driver reads it,
+// without user, password, database or options; false when the driver would
+// refuse it. The parse error is dropped: it can quote the URI. A mongodb+srv
+// URI is parsed as mongodb:// with its one host, so nothing is looked up.
 func hostsOf(uri string) (string, bool) {
-	u, err := url.Parse(uri)
-	if err != nil || (u.Scheme != "mongodb" && u.Scheme != "mongodb+srv") || u.Host == "" {
+	rest, srv := strings.CutPrefix(uri, schemeSRV)
+	if !srv && !strings.HasPrefix(uri, schemePlain) {
 		return "", false
 	}
-	return u.Host, true
+	plain := uri
+	if srv {
+		plain = schemePlain + rest
+	}
+	cs, err := connstring.ParseAndValidate(plain)
+	if err != nil || len(cs.Hosts) == 0 {
+		return "", false
+	}
+	if srv && (len(cs.Hosts) != 1 || strings.Contains(cs.Hosts[0], ":")) {
+		return "", false
+	}
+	for _, host := range cs.Hosts {
+		if strings.Contains(host, "@") {
+			return "", false
+		}
+	}
+	return strings.Join(cs.Hosts, ","), true
 }
 
 func printReport(out io.Writer, report legacy.Report, apply bool) {

@@ -172,7 +172,8 @@ func TestRun_FirstLineShowsTheHostsWithoutCredentials(t *testing.T) {
 }
 
 func TestRun_UnparsableHostIsUsageErrorThatDoesNotEchoIt(t *testing.T) {
-	for _, uri := range []string{"mongodb://alice:s3cretpw@db1:notaport/", "alice:s3cretpw@db1", "mongodb://alice:s3cretpw@/x"} {
+	for _, uri := range []string{"mongodb://alice:s3cretpw@db1:notaport/", "alice:s3cretpw@db1", "mongodb://alice:s3cretpw@/x",
+		"mongodb://alice:s3cretpw@h1:27017,h2:x/db", "mongodb+srv://alice:s3cretpw@h1,h2/db"} {
 		// Arrange
 		c := &call{}
 		env := map[string]string{"MONGO_HOST": uri, "MONGO_POS_DB_NAME": "copy_db"}
@@ -184,6 +185,66 @@ func TestRun_UnparsableHostIsUsageErrorThatDoesNotEchoIt(t *testing.T) {
 		}
 		if !strings.Contains(errOut, "MONGO_HOST") || strings.Contains(out+errOut, "s3cretpw") || strings.Contains(out+errOut, "alice") {
 			t.Errorf("%s: output must name MONGO_HOST without echoing it:\n%s%s", uri, out, errOut)
+		}
+	}
+}
+
+// secrets are the user and password spellings the host cases below use.
+var secrets = []string{"user", "12345", "12%40345", "12@345", "12%3A345", "12:345"}
+
+func TestRun_HostLineNeverShowsUserinfo(t *testing.T) {
+	cases := []struct {
+		uri, hosts string // hosts "" = usage error
+	}{
+		{"mongodb://user:12345?x@host/db", "host"},
+		{"mongodb://user:12345#x@host/db", "host"},
+		{"mongodb://user:12345/6@host/db", ""},
+		{"mongodb://user?x@host", "host"},
+		{"mongodb://user:12%40345@host/db", "host"},
+		{"mongodb://user:12%3A345@host/db", "host"},
+		{"mongodb+srv://user:12345@cluster0.example.net/?retryWrites=true", "cluster0.example.net"},
+	}
+	for _, tc := range cases {
+		for _, migrateErr := range []error{nil, errors.New("boom")} {
+			// Arrange
+			c := &call{}
+			env := map[string]string{"MONGO_HOST": tc.uri, "MONGO_POS_DB_NAME": "copy_db"}
+			// Act
+			code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, migrateErr))
+			// Assert
+			for _, secret := range secrets {
+				if strings.Contains(out+errOut, secret) {
+					t.Errorf("%s err %v: output shows %q:\n%s%s", tc.uri, migrateErr, secret, out, errOut)
+				}
+			}
+			if tc.hosts == "" {
+				if code != 2 || c.count != 0 {
+					t.Errorf("%s: code=%d calls=%d, want 2 and 0", tc.uri, code, c.count)
+				}
+				continue
+			}
+			if first := strings.Split(out, "\n")[0]; !strings.Contains(first, " on "+tc.hosts+", ") {
+				t.Errorf("%s: first line %q, want hosts %q", tc.uri, first, tc.hosts)
+			}
+		}
+	}
+}
+
+func TestRun_EveryHostOfAValidListIsAccepted(t *testing.T) {
+	cases := []struct{ uri, hosts string }{
+		{"mongodb://u:p@h1:27017,h2/db", "h1:27017,h2"},
+		{"mongodb://%2Ftmp%2Fmongodb-27017.sock/db", "/tmp/mongodb-27017.sock"},
+		{"mongodb://[::1]:27017,[::2]:1/", "[::1]:27017,[::2]:1"},
+	}
+	for _, tc := range cases {
+		// Arrange
+		c := &call{}
+		env := map[string]string{"MONGO_HOST": tc.uri, "MONGO_POS_DB_NAME": "copy_db"}
+		// Act
+		code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+		// Assert
+		if code != 0 || c.count != 1 || !strings.Contains(strings.Split(out, "\n")[0], " on "+tc.hosts+", ") {
+			t.Errorf("%s: code=%d calls=%d, want 0, 1 and hosts %q:\n%s%s", tc.uri, code, c.count, tc.hosts, out, errOut)
 		}
 	}
 }
