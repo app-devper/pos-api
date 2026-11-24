@@ -96,6 +96,8 @@ nodemon --exec go run main.go --signal SIGTERM
 Deploy ทำอัตโนมัติ ทุก push ที่เข้า branch `main` จะ build และขึ้น Cloud Run
 service `pos-dev-api` (`asia-southeast1`) ให้เอง
 
+ย้ายร้านที่ยังใช้ build ปี 2024 และฐานข้อมูลเก่า: ดู [docs/runbooks/legacy-db-migration.md](docs/runbooks/legacy-db-migration.md)
+
 **build config ไม่ได้อยู่ใน repo นี้** — มันเก็บเป็น inline config บนตัว trigger
 เอง แก้ pipeline ต้องไปแก้ที่ trigger ใน Google Cloud ไม่ใช่ที่นี่
 
