@@ -39,8 +39,10 @@ history you share, and commits.
       Authentication goes through UM; a user missing there cannot sign in.
 - [ ] The current till (`devper.web.app`) is deployed. The 2024 till cannot sell
       against the new API: a Sale without `saleId` is refused with 400.
-- [ ] `<NEW_MONGO_URI>` is a **replica set** (Atlas counts). The current API
-      writes Stock in MongoDB transactions, which a standalone server refuses.
+- [ ] `<NEW_MONGO_URI>` is a **replica set** (Atlas counts; a `mongos` is
+      accepted too). The current API writes Stock in MongoDB transactions,
+      which a standalone server refuses. It runs **MongoDB 5.0 or later**: the
+      findings use `$setWindowFields` (tried on 8.0 only).
 - [ ] **No use of the legacy till or its back office** from the dump until the
       switch: no sale, no Receive, no Stock count or adjustment, no new or
       edited Product, Unit, price or Customer. Order codes continue from the
@@ -54,6 +56,9 @@ Run once the shop has stopped using the legacy till and its back office
 (section 1, last item). This reads the legacy database; it writes nothing to
 it, but it touches the legacy stack: it needs the owner's explicit go-ahead
 and is never run by an agent on its own.
+
+`mongodump` and `mongorestore` were not installed where this runbook was
+written, so steps 1 and 2 are untried.
 
 1. Dump (untried):
 
@@ -74,7 +79,8 @@ and is never run by an agent on its own.
    Expected: `N document(s) restored successfully. 0 document(s) failed to
    restore.`, exit 0.
 
-3. Compare counts (untried). In `mongosh '<NEW_MONGO_URI>'`:
+3. Compare counts. In `mongosh '<NEW_MONGO_URI>'` (the `mongosh` line tried
+   on a synthetic scratch database; the comparison with a real dump untried):
 
    ```js
    db.getSiblingDB('<COPY_DB_NAME>').orders.countDocuments({})
@@ -102,7 +108,7 @@ reports `changed 0` and `created: false`.
 Expected, on a copy with nothing to decide (exit 0):
 
 ```
-database <COPY_DB_NAME>, mode REPORT
+database <COPY_DB_NAME> on <HOST:PORT[,HOST:PORT...]>, mode REPORT
 HQ Branch 000000000000000000000000 (created: false)
 product_stocks branchId: would change <N>
 orders branchId: would change <N>
@@ -115,113 +121,25 @@ receives status: would change <N>
 receives items: would change <N>
 ```
 
+**Read the first line before anything else.** It names the database and the
+server's host(s) from `MONGO_HOST` (never the user, password or options). If
+the host is not the server that holds the copy, or the name is not
+`<COPY_DB_NAME>`, stop. The command cannot tell a copy from the live legacy
+database: both are a 2024 database without Branches. This line and
+`-confirm-db` are the only guards. A `MONGO_HOST` that does not parse as a
+`mongodb://` or `mongodb+srv://` URI is refused with exit 2, without printing
+it.
+
 The all-zero HQ id means no HQ Branch exists yet; `-apply` creates it. Each
-`Change` line is a field the migration sets; counts are documents found before
+`Change` line is a field the migration sets; in report mode the counts are
+the documents that would change.
+
+**Exit 3** means findings follow: each prints as `FINDING <KIND> (<total>):
+<detail>`, then up to 20 document ids. What each kind means and what to
+decide, before section 4, is in
+[legacy-db-findings.md](legacy-db-findings.md). After fixing the copy, run the
+report again until it exits 0, or the owner accepts the remaining findings in
 writing.
-
-**Exit 3** means findings follow. Each prints as `FINDING <KIND> (<total>):
-<detail>`, then up to 20 document ids. Decide each before section 4:
-
-| Kind | Meaning | Decision |
-|---|---|---|
-| `NOT_REPLICA_SET` | The server is not a replica set. | Stop. Restore onto a replica set (section 2). |
-| `NEGATIVE_STOCK` | Stock below zero (`product_stocks`). The current ledger refuses a move that leaves one. | Do not hand-edit `quantity`: that bypasses the Stock ledger (ADR-0001). First record, per listed row, the legacy value and the counted value. Then either (a) leave it and do a Stock count or adjustment in the new till after the move, or (b) the owner decides on a hand edit in the copy. Limitation if left: the ledger refuses a move that leaves a Stock below zero, so cancelling a bill that drew from that Stock can fail until it is corrected. |
-| `DUPLICATE_SERIAL` | Products share a `serialNumber`, empty counts, soft-deleted too. The unique index on `products.serialNumber` cannot be built. | Give each a distinct serial in the copy. |
-| `DUPLICATE_SEQUENCE` | `sequences` rows share a `field`. The unique index cannot be built. | See "Duplicate sequence rows" below; the right row is not the highest value. |
-| `ORPHAN_STOCK` | Stock whose `productId` or `unitId` matches no Product or Unit. | Export the listed rows first (see "Before deleting orphan Stock" below). Deleting them is the owner's decision; the alternative is to restore the missing Product/Unit. |
-| `NO_MAIN_UNIT` | A Product has no `product_units` row named like its own unit; a Receive is entered in the main unit. | Add the unit row in the copy. |
-| `DISCOUNT_PER_LINE` | An Order with a discounted line whose total is Σ(price − discount): the discount taken once per Line. | **Do NOT edit totals in the copy: they are what the shop charged.** Read "Discounted 2024 Orders after the move" below. |
-| `DISCOUNT_NOT_SUBTRACTED` | An Order with a discounted line whose total is Σ price: the discount not taken at all. This is how the 2024 server itself recomputed a total. | **Do NOT edit totals in the copy: they are what the shop charged.** Read "Discounted 2024 Orders after the move" below. |
-| `DISCOUNT_UNKNOWN` | An Order with a discounted line whose total matches none of the three rules. | **Do NOT edit totals in the copy: they are what the shop charged.** Open the listed Orders with the owner to understand them; read "Discounted 2024 Orders after the move" below. |
-| `UNKNOWN_PAYMENT_TYPE` | `payments.type` outside `CASH`, `CREDIT`, `PROMPTPAY`, `TRANSFER`. | First find out what each legacy value meant (ask the shop); only then map it, or leave it. Effect of leaving it: the current Go code stores and returns `payments.type` without grouping or validating it, so the API itself is unaffected; whether the till or its reports group by it is not determined. |
-
-### Discounted 2024 Orders after the move
-
-A Line's `price` is its whole amount before discount. The current code charges
-Σ(price − discount × quantity): the discount is per unit
-(`app/domain/sale/money.go`, `OrderMoney`). An Order whose total follows that
-rule is fine, whatever else it also matches. The check compares the stored
-total of every Order with a discounted line against three rules, within 0.005:
-
-- per unit, Σ(price − discount × quantity): fine, not reported;
-- per line, Σ(price − discount): `DISCOUNT_PER_LINE`;
-- not subtracted, Σ price: `DISCOUNT_NOT_SUBTRACTED`;
-- none of them: `DISCOUNT_UNKNOWN`.
-
-The 2024 server stored the total the till sent, and replaced it with Σ price
-whenever a Line was deleted (`b165b4d` `app/data/repositories/order.go`,
-`UpdateTotalOrderById`). What the 2024 **till** sent as `price` and
-`discount`, and its rule for the total, is **not known from this repo**.
-
-The stored totals stay as they are. What changes after the move:
-
-- **Cancelling one Line** (`CancelLine`, `app/data/ledger/cancel.go`,
-  `recomputeOrder`) recomputes the **whole** Order from its standing Lines
-  with the per-unit rule (`sale.OrderMoney`), overwriting `total`,
-  `totalCost`, `discount`. The new total is lower than what the remaining
-  Lines were charged: by each one's discount × quantity under
-  `DISCOUNT_NOT_SUBTRACTED`, × (quantity − 1) under `DISCOUNT_PER_LINE`.
-- **Cancelling the whole Order** (`CancelOrder`) marks it, its Lines and its
-  payments cancelled and puts the Stock back; it does not recompute the total.
-- **A Return** caps each refund at price ÷ quantity − discount per unit
-  (`app/data/ledger/return.go`, `paidPerUnit`). On a `DISCOUNT_NOT_SUBTRACTED`
-  or `DISCOUNT_PER_LINE` bill (per line: quantity above 1) that is below what
-  was paid per unit: the shop decides the refund amount by hand.
-
-The report lists at most 20 ids per kind; `(<total>)` is the real count. So
-the rule for the shop does not depend on that list: **for any bill made before
-the switch that has a discounted Line, cancel the whole bill, never one Line.**
-To give the shop every such bill, run on the COPY (reads only; tried on a
-synthetic scratch database only, never real data):
-
-```bash
-COPY_DB=<COPY_DB_NAME> mongosh '<NEW_MONGO_URI>' --quiet docs/runbooks/legacy-discounted-orders.js
-```
-
-Expected: one line per Order, `<_id> <code> <createdDate>`, oldest first.
-
-### Duplicate sequence rows
-
-`app/data/repositories/sequence.go`: each `sequences` row has `field`,
-`value`, `date` (`YYYYMMDD`, shop time zone), `prefix`, `format`, `type`. The
-`ORDER` (prefix `OD_`) and `RECEIVE` (prefix `RC_`) counters are `DAILY`: on
-each request, if the row's `date` equals today it adds 1 to `value`, otherwise
-it sets `value` to 1 and `date` to today. The code is `prefix + date +
-value` zero-padded to `format` digits (4), for example `OD_202611240007`.
-
-So the right row is the one with the **latest `date`, and among equal dates
-the highest `value`**. Keeping an older date with a higher value makes today's
-next order restart at 1 and collide with bills already made today. The
-surviving row must cover the highest code already used in `orders` for that
-date. Check in `mongosh '<NEW_MONGO_URI>'` (untried):
-
-```js
-const d = db.getSiblingDB('<COPY_DB_NAME>');
-d.sequences.find({field: 'ORDER'}, {_id: 0, field: 1, date: 1, value: 1}).toArray()
-d.orders.find({code: /^OD_/}, {_id: 0, code: 1}).sort({code: -1}).limit(1).toArray()
-```
-
-Expected: one `ORDER` row, e.g. `{ field: 'ORDER', date: '20261124', value: 7 }`,
-and a highest code `OD_202611240007` with the same date and a number no
-higher than `value`. If the code's date is later, or its number is higher,
-fix the row before going on. Repeat with `field: 'RECEIVE'`, `code: /^RC_/`
-on `receives`.
-
-### Before deleting orphan Stock
-
-Export the listed rows so they can be put back (untried; ids from the
-report):
-
-```bash
-mongoexport --uri='<NEW_MONGO_URI>' --db=<COPY_DB_NAME> --collection=product_stocks \
-  --query='{"_id": {"$in": [{"$oid": "<ID_1>"}, {"$oid": "<ID_2>"}]}}' --out=orphan-stock.json
-```
-
-Expected: `exported <N> records`, N equal to the ids given. Keep the file with
-the dump.
-
-After fixing the copy, run the report again until it exits 0, or the owner
-accepts the remaining findings in writing.
 
 ## 4. Apply run
 
@@ -233,17 +151,22 @@ MONGO_HOST='<NEW_MONGO_URI>' MONGO_POS_DB_NAME=<COPY_DB_NAME> \
   ./migrate-legacy-db -apply -confirm-db <COPY_DB_NAME>
 ```
 
-Expected (exit 0): the same lines as the report run, mode `APPLY`, `HQ Branch
-<24 hex characters> (created: true)`, and `changed <N>` where the report said
-`would change <N>`.
+Read the first line again: same host and database as the report run, mode
+`APPLY`. Expected (exit 0): the same lines as the report run, `HQ Branch <24
+hex characters> (created: true)`, and `changed <N>` where the report said
+`would change <N>`. In apply mode `changed` is what the database actually
+modified; on a copy nobody else writes to, the two are equal.
 
 If findings remain it exits 3, and says `the backfill above HAS been written`:
 the backfill happened anyway, the findings still need their decision.
 
 If it exits 1 during apply (an error, a lost connection, the 10-minute limit),
-run it again: a re-run is safe and finishes what was left. Every write is
-filtered by a missing `branchId`, and a Receive gets its `branchId` last, so a
-document already done is never written twice.
+the output still lists what was written before the failure (HQ Branch,
+findings, each `changed` line completed), then `the run did not finish`; the
+error itself is on stderr. The step that failed is not listed and may have
+written part of its documents. Run it again: a re-run is safe and finishes
+what was left. Every write is filtered by a missing `branchId`, and a Receive
+gets its `branchId` last, so a document already done is never written twice.
 
 Re-running is safe: the second run reports `changed 0` everywhere and
 `created: false`.
@@ -267,9 +190,15 @@ Checks, all must hold:
 
 1. **Startup log has no failed index.** Expected: no line containing
    `failed to create`. A line like `failed to create <name> index: ...
-   duplicate key` means a unique index could not be built: a duplicate the
-   report should have named (`DUPLICATE_SERIAL`, `DUPLICATE_SEQUENCE`). Fix the
-   copy and restart.
+   duplicate key` means a unique index could not be built. For
+   `products.serialNumber` and `sequences.field` the report names the
+   duplicates (`DUPLICATE_SERIAL`, `DUPLICATE_SEQUENCE`). `customers.code` and
+   `categories.value` are unique indexes too (`app/data/repositories/
+   customer.go`, `category.go`; log names `customers`, `categories`), which
+   the findings do not check. The 2024 build defined the same two unique
+   indexes (`b165b4d`, same files) but ignored the error when it could not
+   build them, so a legacy database may hold duplicates there only if the
+   index is missing from it. Fix the copy and restart.
 2. **Stock is visible:** sign in as a shop user, open Stock: quantities equal
    the legacy till's.
 3. **A legacy bill opens:** open an old Order by its code in the till; lines

@@ -1,5 +1,5 @@
 // Lists every Order that has a Line with discount > 0, run on the COPY only
-// (docs/runbooks/legacy-db-migration.md, "Discounted 2024 Orders"). Reads only.
+// (docs/runbooks/legacy-db-findings.md, "Discounted 2024 Orders"). Reads only.
 // Usage: COPY_DB=<COPY_DB_NAME> mongosh '<NEW_MONGO_URI>' --quiet legacy-discounted-orders.js
 const name = process.env.COPY_DB;
 if (!name) { print('set COPY_DB to the copy database name'); quit(2); }
