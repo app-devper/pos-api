@@ -2,6 +2,7 @@ package legacy
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -107,5 +108,82 @@ func TestMigrate_CurrentDraftReceiveStaysADraft(t *testing.T) {
 		if n := changeFor(report, "receives", field); n != 0 {
 			t.Errorf("receives/%s change = %d, want 0", field, n)
 		}
+	}
+}
+
+func TestMigrate_LegacyReceiveWithItsOwnItemsKeepsThem(t *testing.T) {
+	database := newTestDB(t)
+	receiveID, product := primitive.NewObjectID(), primitive.NewObjectID()
+	own := bson.A{bson.M{"productId": product, "costPrice": 7.0, "quantity": int32(4)}}
+	insertDoc(t, database, "receives", bson.M{"_id": receiveID, "code": "RC_0003", "items": own})
+	insertDoc(t, database, "receive_items", bson.M{"_id": primitive.NewObjectID(), "receiveId": receiveID, "productId": primitive.NewObjectID(), "costPrice": 1.0, "quantity": 99, "createdDate": time.Now()})
+
+	report, err := Migrate(context.Background(), database, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := findReceive(t, database, receiveID)
+	items, _ := got["items"].(bson.A)
+	if len(items) != 1 {
+		t.Fatalf("items = %v, want its own single item", got["items"])
+	}
+	item, _ := items[0].(bson.M)
+	if item["productId"] != product || item["costPrice"] != 7.0 || item["quantity"] != int32(4) {
+		t.Errorf("item = %v, want %v", item, own[0])
+	}
+	if got["branchId"] != report.HQ || got["status"] != constant.IMPORTED {
+		t.Errorf("receive not migrated: %v", got)
+	}
+	if n := changeFor(report, "receives", "items"); n != 0 {
+		t.Errorf("receives/items change = %d, want 0", n)
+	}
+}
+
+func TestMigrate_ReportModeLeavesAReceiveAsSeeded(t *testing.T) {
+	database := newTestDB(t)
+	receiveID := primitive.NewObjectID()
+	insertDoc(t, database, "receives", bson.M{"_id": receiveID, "code": "RC_0004", "totalCost": 10.0})
+	insertDoc(t, database, "receive_items", bson.M{"_id": primitive.NewObjectID(), "receiveId": receiveID, "productId": primitive.NewObjectID(), "costPrice": 1.0, "quantity": 1, "createdDate": time.Now()})
+	before := findReceive(t, database, receiveID)
+
+	report, err := Migrate(context.Background(), database, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	after := findReceive(t, database, receiveID)
+	if !reflect.DeepEqual(before, after) {
+		t.Errorf("report mode changed the receive: before %v, after %v", before, after)
+	}
+	for _, field := range []string{"branchId", "status", "items"} {
+		if n := changeFor(report, "receives", field); n != 1 {
+			t.Errorf("receives/%s change = %d, want 1", field, n)
+		}
+	}
+}
+
+func TestMigrate_SecondRunChangesNoReceives(t *testing.T) {
+	database := newTestDB(t)
+	receiveID := primitive.NewObjectID()
+	insertDoc(t, database, "receives", bson.M{"_id": receiveID, "code": "RC_0005", "totalCost": 10.0})
+	insertDoc(t, database, "receive_items", bson.M{"_id": primitive.NewObjectID(), "receiveId": receiveID, "productId": primitive.NewObjectID(), "costPrice": 1.0, "quantity": 1, "createdDate": time.Now()})
+	if _, err := Migrate(context.Background(), database, true); err != nil {
+		t.Fatal(err)
+	}
+	between := findReceive(t, database, receiveID)
+
+	report, err := Migrate(context.Background(), database, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, field := range []string{"branchId", "status", "items"} {
+		if n := changeFor(report, "receives", field); n != 0 {
+			t.Errorf("receives/%s change = %d on second run, want 0", field, n)
+		}
+	}
+	if after := findReceive(t, database, receiveID); !reflect.DeepEqual(between, after) {
+		t.Errorf("second run changed the receive: %v -> %v", between, after)
 	}
 }
