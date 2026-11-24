@@ -199,6 +199,30 @@ func TestFindings_IdsCappedAndSorted(t *testing.T) {
 	}
 }
 
+func TestFindings_LargeDuplicateGroupIsCappedAndCounted(t *testing.T) {
+	// Arrange: 25 sequences rows share one field, 2 share another
+	db := newTestDB(t)
+	ids := []string{}
+	for i := 0; i < 25; i++ {
+		ids = append(ids, insert(t, db, "sequences", bson.M{"field": "ORDER"}).Hex())
+	}
+	for i := 0; i < 2; i++ {
+		insert(t, db, "sequences", bson.M{"field": "RECEIVE"})
+	}
+	insert(t, db, "sequences", bson.M{"field": "ALONE"})
+	// Act
+	f, _ := findKind(runFindings(t, db), KindDuplicateSequence)
+	// Assert: ObjectIDs made in one process sort in insertion order
+	if f.Total != 27 || len(f.Ids) != maxFindingIds {
+		t.Fatalf("total %d ids %d, want 27 and %d", f.Total, len(f.Ids), maxFindingIds)
+	}
+	for i, id := range f.Ids {
+		if id != ids[i] {
+			t.Fatalf("ids[%d] = %s, want %s (the smallest ids first)", i, id, ids[i])
+		}
+	}
+}
+
 func TestFindings_OrderIsFixed(t *testing.T) {
 	db := newTestDB(t)
 	insert(t, db, "payments", bson.M{"type": "CHEQUE"})

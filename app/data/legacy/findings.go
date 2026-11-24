@@ -3,12 +3,10 @@ package legacy
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"pos/app/domain/constant"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -63,37 +61,7 @@ func findings(ctx context.Context, db *mongo.Database) ([]Finding, error) {
 // idFinding runs pipeline on coll; every document it returns is one offender.
 // It returns no finding when there are none.
 func idFinding(ctx context.Context, db *mongo.Database, coll string, pipeline mongo.Pipeline, kind, detail string) ([]Finding, error) {
-	cursor, err := db.Collection(coll).Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, fmt.Errorf("check %s on %s: %w", kind, coll, err)
-	}
-	defer cursor.Close(ctx)
-	var rows []struct {
-		Id primitive.ObjectID `bson:"_id"`
-	}
-	if err := cursor.All(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read %s on %s: %w", kind, coll, err)
-	}
-	ids := make([]string, 0, len(rows))
-	for _, row := range rows {
-		ids = append(ids, row.Id.Hex())
-	}
-	return findingOf(kind, detail, ids), nil
-}
-
-// findingOf is one finding for the hex ids, sorted and capped; none when ids
-// is empty. ids is not changed.
-func findingOf(kind, detail string, ids []string) []Finding {
-	if len(ids) == 0 {
-		return nil
-	}
-	ids = append([]string(nil), ids...)
-	sort.Strings(ids)
-	total := int64(len(ids))
-	if len(ids) > maxFindingIds {
-		ids = ids[:maxFindingIds]
-	}
-	return []Finding{{Kind: kind, Detail: detail, Ids: ids, Total: total}}
+	return findOffenders(ctx, db, coll, pipeline, []offenders{{kind: kind, detail: detail, match: bson.M{}}})
 }
 
 func checkReplicaSet(ctx context.Context, db *mongo.Database) ([]Finding, error) {
@@ -134,12 +102,13 @@ func checkNegativeStock(ctx context.Context, db *mongo.Database) ([]Finding, err
 }
 
 // duplicatesOf lists every document sharing the value of field with another.
+// Each document is given the size of its group; no group's ids are gathered
+// into one document.
 func duplicatesOf(field string) mongo.Pipeline {
 	return mongo.Pipeline{
-		{{Key: "$group", Value: bson.M{"_id": "$" + field, "ids": bson.M{"$push": "$_id"}, "n": bson.M{"$sum": 1}}}},
+		{{Key: "$setWindowFields", Value: bson.M{"partitionBy": "$" + field, "output": bson.M{"n": bson.M{"$count": bson.M{}}}}}},
 		{{Key: "$match", Value: bson.M{"n": bson.M{"$gt": 1}}}},
-		{{Key: "$unwind", Value: "$ids"}},
-		{{Key: "$project", Value: bson.M{"_id": "$ids"}}},
+		{{Key: "$project", Value: bson.M{"_id": 1}}},
 	}
 }
 

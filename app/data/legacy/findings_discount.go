@@ -2,12 +2,9 @@ package legacy
 
 import (
 	"context"
-	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // discountKind is one way an Order's stored total can disagree with the
@@ -78,25 +75,9 @@ func discountPipeline() mongo.Pipeline {
 // checkDiscountConvention reports, in one pass, the Orders with a discounted
 // line whose total does not follow the current per-unit discount.
 func checkDiscountConvention(ctx context.Context, db *mongo.Database) ([]Finding, error) {
-	cursor, err := db.Collection("order_items").Aggregate(ctx, discountPipeline(), options.Aggregate().SetAllowDiskUse(true))
-	if err != nil {
-		return nil, fmt.Errorf("check discounts on order_items: %w", err)
-	}
-	defer cursor.Close(ctx)
-	var rows []struct {
-		Id   primitive.ObjectID `bson:"_id"`
-		Kind string             `bson:"kind"`
-	}
-	if err := cursor.All(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read discounts on order_items: %w", err)
-	}
-	byKind := map[string][]string{}
-	for _, row := range rows {
-		byKind[row.Kind] = append(byKind[row.Kind], row.Id.Hex())
-	}
-	found := []Finding{}
+	groups := make([]offenders, 0, len(discountKinds))
 	for _, k := range discountKinds {
-		found = append(found, findingOf(k.kind, k.detail, byKind[k.kind])...)
+		groups = append(groups, offenders{kind: k.kind, detail: k.detail, match: bson.M{"kind": k.kind}})
 	}
-	return found, nil
+	return findOffenders(ctx, db, "order_items", discountPipeline(), groups)
 }
