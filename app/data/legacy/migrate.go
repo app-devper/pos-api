@@ -60,6 +60,11 @@ func Migrate(ctx context.Context, db *mongo.Database, apply bool) (Report, error
 		}
 		report.Changes = append(report.Changes, change)
 	}
+	changes, err := migrateReceives(ctx, db, report.HQ, apply)
+	if err != nil {
+		return Report{}, err
+	}
+	report.Changes = append(report.Changes, changes...)
 	return report, nil
 }
 
