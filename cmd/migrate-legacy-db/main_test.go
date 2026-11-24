@@ -146,6 +146,48 @@ func TestRun_FailedApplyPrintsWhatWasWrittenBeforeTheError(t *testing.T) {
 	}
 }
 
+func TestRun_FirstLineShowsTheHostsWithoutCredentials(t *testing.T) {
+	// Arrange
+	env := map[string]string{
+		"MONGO_HOST":        "mongodb://alice:s3cretpw@db1.example:27017,db2.example:27018/admin?replicaSet=rs0&authSource=admin",
+		"MONGO_POS_DB_NAME": "copy_db",
+	}
+	for _, migrateErr := range []error{nil, errors.New("boom")} {
+		c := &call{}
+		// Act
+		_, out, errOut := exec([]string{"-apply", "-confirm-db", "copy_db"}, env, fakeMigrate(c, legacy.Report{}, migrateErr))
+		// Assert
+		first := strings.Split(out, "\n")[0]
+		for _, want := range []string{"db1.example:27017,db2.example:27018", "copy_db", "APPLY"} {
+			if !strings.Contains(first, want) {
+				t.Errorf("err %v: first line %q lacks %q", migrateErr, first, want)
+			}
+		}
+		for _, secret := range []string{"alice", "s3cretpw", "replicaSet", "authSource"} {
+			if strings.Contains(out+errOut, secret) {
+				t.Errorf("err %v: output shows %q:\n%s%s", migrateErr, secret, out, errOut)
+			}
+		}
+	}
+}
+
+func TestRun_UnparsableHostIsUsageErrorThatDoesNotEchoIt(t *testing.T) {
+	for _, uri := range []string{"mongodb://alice:s3cretpw@db1:notaport/", "alice:s3cretpw@db1", "mongodb://alice:s3cretpw@/x"} {
+		// Arrange
+		c := &call{}
+		env := map[string]string{"MONGO_HOST": uri, "MONGO_POS_DB_NAME": "copy_db"}
+		// Act
+		code, out, errOut := exec(nil, env, fakeMigrate(c, legacy.Report{}, nil))
+		// Assert
+		if code != 2 || c.count != 0 {
+			t.Errorf("%s: code=%d calls=%d, want 2 and 0", uri, code, c.count)
+		}
+		if !strings.Contains(errOut, "MONGO_HOST") || strings.Contains(out+errOut, "s3cretpw") || strings.Contains(out+errOut, "alice") {
+			t.Errorf("%s: output must name MONGO_HOST without echoing it:\n%s%s", uri, out, errOut)
+		}
+	}
+}
+
 func TestRun_BadFlagExitsTwo(t *testing.T) {
 	c := &call{}
 	code, _, _ := exec([]string{"-nope"}, fullEnv, fakeMigrate(c, legacy.Report{}, nil))
