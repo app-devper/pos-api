@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type stockCountEntity struct {
@@ -17,8 +16,8 @@ type stockCountEntity struct {
 }
 
 type IStockCount interface {
-	GetStockCountById(id string, branchId string) (*entities.StockCount, error)
-	GetStockCounts(branchId string) ([]entities.StockCount, error)
+	GetStockCountById(id string, branchId string) (*entities.StockCountDetail, error)
+	GetStockCounts(branchId string) ([]entities.StockCountDetail, error)
 }
 
 func NewStockCountEntity(resource *db.Resource) IStockCount {
@@ -34,7 +33,7 @@ func ensureStockCountIndexes(repo *mongo.Collection) {
 	})
 }
 
-func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*entities.StockCount, error) {
+func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*entities.StockCountDetail, error) {
 	logrus.Info("GetStockCountById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -42,14 +41,21 @@ func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*
 	if err != nil {
 		return nil, err
 	}
-	data := entities.StockCount{}
-	if err := entity.stockCountRepo.FindOne(ctx, filter).Decode(&data); err != nil {
+	cursor, err := entity.stockCountRepo.Aggregate(ctx, append([]bson.M{{"$match": filter}}, namedCountLines()...))
+	if err != nil {
 		return nil, err
 	}
-	return &data, nil
+	items := []entities.StockCountDetail{}
+	if err := cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, mongo.ErrNoDocuments
+	}
+	return &items[0], nil
 }
 
-func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.StockCount, error) {
+func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.StockCountDetail, error) {
 	logrus.Info("GetStockCounts")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -61,12 +67,12 @@ func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.Stoc
 		}
 		filter["branchId"] = branchObjID
 	}
-	opts := options.Find().SetSort(bson.D{{Key: "createdDate", Value: -1}})
-	cursor, err := entity.stockCountRepo.Find(ctx, filter, opts)
+	pipeline := append([]bson.M{{"$match": filter}, {"$sort": bson.D{{Key: "createdDate", Value: -1}}}}, namedCountLines()...)
+	cursor, err := entity.stockCountRepo.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
-	items := []entities.StockCount{}
+	items := []entities.StockCountDetail{}
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
