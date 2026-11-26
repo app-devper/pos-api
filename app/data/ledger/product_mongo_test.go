@@ -199,3 +199,25 @@ func TestAdjustStillRefusesAStockWhoseUnitIsGone(t *testing.T) {
 		t.Fatal("a refused Adjustment moved Stock")
 	}
 }
+
+// A Stock row with no number for its quantity reads as 0: it needs no
+// Adjustment, no code and no history row.
+func TestDeleteProductSkipsAStockWithNoNumericQuantity(t *testing.T) {
+	f := newFixture(t)
+	held := f.stock(f.tab, 1, 2)
+	for _, quantity := range []any{nil, "n/a"} {
+		doc := bson.M{"_id": primitive.NewObjectID(), "branchId": f.branch, "productId": f.product, "unitId": f.tab, "sequence": 9}
+		if quantity != nil {
+			doc["quantity"] = quantity
+		}
+		f.insert("product_stocks", doc)
+	}
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	if f.quantity(held) != 0 || f.count("stock_adjustments", bson.M{}) != 1 || len(f.histories()) != 1 {
+		t.Fatalf("adjustments %d, histories %+v: want one each, for the Stock that held 2", f.count("stock_adjustments", bson.M{}), f.histories())
+	}
+}

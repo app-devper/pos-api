@@ -34,10 +34,14 @@ func (l *Ledger) DeleteProduct(ctx context.Context, productID, by string) (*enti
 			return nil, err
 		}
 		var stocks []entities.ProductStock
-		if err := find(b, "product_stocks", bson.M{"productId": id, "quantity": bson.M{"$ne": 0}}, &stocks); err != nil {
+		// A row whose quantity is missing or not a number holds nothing to zero.
+		if err := find(b, "product_stocks", bson.M{"productId": id, "quantity": bson.M{"$ne": 0, "$type": "number"}}, &stocks); err != nil {
 			return nil, err
 		}
 		for i := range stocks {
+			if stocks[i].Quantity == 0 {
+				continue
+			}
 			if err := b.zero(&stocks[i], by); err != nil {
 				return nil, err
 			}
