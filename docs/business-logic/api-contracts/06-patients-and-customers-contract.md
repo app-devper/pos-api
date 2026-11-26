@@ -25,7 +25,7 @@
 - Frontend คาดหวังข้อมูลผู้ป่วยที่แยกส่วนข้อมูลทั่วไปกับข้อมูลสุขภาพได้
 - Backend ต้อง enforce สิทธิ์เข้าถึงข้อมูลสุขภาพ
 - Response ควรมีข้อมูลพอสำหรับ allergy checks, order history และ patient context ใน POS
-- patient record ที่ถูก archive ไม่ควรถูกคืนใน list และ customer-code lookup ปกติ แต่ยังต้องคงอยู่เชิงประวัติ
+- patient record ที่ถูก archive ไม่ควรถูกคืนใน list และ customer-code lookup ปกติ แต่ยังต้องคงอยู่เชิงประวัติ — ข้อนี้ใช้กับ **patient** record (list และ lookup ของผู้ป่วย) เท่านั้น ไม่ใช่กับ **customer**: ลูกค้าที่ `ARCHIVED` ยังอยู่ใน `GET /customers` ตามค่าเริ่มต้น (ตัดออกได้ด้วย `excludeArchived=true`) และ `GET /customers/code/:customerCode` หาเจอเสมอ ตาม §1
 
 ### 3. Create / Update Flows
 
