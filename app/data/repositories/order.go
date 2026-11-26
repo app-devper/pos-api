@@ -118,6 +118,10 @@ func (entity *orderEntity) GetOrderRange(form request.GetOrderRange) ([]entities
 		}
 		filter["branchId"] = branchObjId
 	}
+	if form.ExcludeCancelled {
+		// Standing Orders, a legacy Order without a status among them.
+		filter["$or"] = ledger.StandingLines()
+	}
 	var items []entities.Order
 	cursor, err := entity.orderRepo.Find(ctx, filter)
 	if err != nil {

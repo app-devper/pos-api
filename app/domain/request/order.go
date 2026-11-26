@@ -19,6 +19,9 @@ type GetOrderRange struct {
 	StartDate FlexibleTime `form:"startDate" binding:"required"`
 	EndDate   FlexibleTime `form:"endDate" binding:"required"`
 	BranchId  string
+	// ExcludeCancelled leaves out cancelled Orders; the handler sets it from
+	// the opt-in `excludeCancelled` query parameter, and reports leave it false.
+	ExcludeCancelled bool `form:"-"`
 }
 
 type UpdateCustomerCode struct {

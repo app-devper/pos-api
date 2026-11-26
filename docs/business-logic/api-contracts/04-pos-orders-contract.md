@@ -94,12 +94,19 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 - ถ้าส่ง JSON body มาแต่ parse ไม่ได้ ระบบต้องตอบ `400 bad request` แทนการ ignore body แล้ว cancel ต่อ
 - การ cancel ต้อง reverse stock อย่างสอดคล้อง และ mark payment/item/order เป็น `CANCELLED`
 
+### 7. Order List (`GET /orders?startDate=&endDate=`)
+
+- ค่าเริ่มต้นคืนทุก Order ในช่วงเวลา รวมใบที่ `CANCELLED` (client แสดงใบที่ยกเลิกพร้อมเครื่องหมาย)
+- `excludeCancelled=true` (opt-in) คืนเฉพาะ Order ที่ยังยืน: `status` เป็น `CONFIRMED`, `ACTIVE` (legacy), ว่าง หรือไม่มี field `status` (legacy)
+- `excludeCancelled` รับ `true` / `false` (ไม่สนตัวพิมพ์); ค่าอื่น → `400 OR-400-001`
+- พารามิเตอร์ boolean ของ query ทุกตัวอ่านด้วย `request.BoolQuery` กติกาเดียวกัน: ไม่ส่ง = `false`
+
 ## Endpoints
 
 | Method | Path | คำอธิบาย |
 |---|---|---|
 | POST | /orders | สร้าง order ใหม่ |
-| GET | /orders | ดูรายการ orders |
+| GET | /orders | ดูรายการ orders (`startDate`, `endDate`, optional `excludeCancelled=true`) |
 | GET | /orders/:orderId | ดูรายละเอียด order |
 | DELETE | /orders/:orderId | ยกเลิก order ทั้งใบ พร้อมรับ optional body `{ "reason": "..." }` |
 | PATCH | /orders/:orderId/customer-code | อัปเดต customer code |
