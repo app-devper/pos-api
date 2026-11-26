@@ -15,6 +15,9 @@
 
 - Frontend คาดหวังรายการเอกสารรับสินค้าและข้อมูล detail ตามเอกสารที่เลือก
 - Detail ควรมีรายการสินค้า supplier วันที่ และข้อมูลสรุปที่เกี่ยวข้อง
+- `GET /receives?startDate=&endDate=` ค่าเริ่มต้นคืนทุกเอกสารในช่วงเวลา รวมใบที่ `CANCELLED` (client แสดงใบที่ยกเลิกพร้อมเครื่องหมาย)
+- `excludeCancelled=true` (opt-in) ตัดใบที่ `status` เป็น `CANCELLED` ออก; `ACTIVE` (ร่าง), `IMPORTED`, ว่าง หรือไม่มี field `status` (legacy) ยังอยู่
+- `excludeCancelled` รับ `true` / `false` (ไม่สนตัวพิมพ์, อ่านด้วย `request.BoolQuery`); ค่าอื่น ค่าว่าง หรือส่งซ้ำ → `400 RC-400-001`
 
 ### 2. Create Receive
 
@@ -46,7 +49,7 @@
 | Method | Path | คำอธิบาย |
 |---|---|---|
 | POST | /receives | สร้างเอกสารรับสินค้า |
-| GET | /receives | ดูรายการเอกสารรับสินค้า |
+| GET | /receives | ดูรายการเอกสารรับสินค้า (`startDate`, `endDate`, optional `excludeCancelled=true`) |
 | GET | /receives/:receiveId | ดูรายละเอียดเอกสาร |
 | PUT | /receives/:receiveId | แก้ไขเอกสาร |
 | DELETE | /receives/:receiveId | ยกเลิกเอกสารที่ยังไม่ถูก import |

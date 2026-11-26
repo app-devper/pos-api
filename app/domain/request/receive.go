@@ -4,6 +4,9 @@ type GetReceiveRange struct {
 	StartDate FlexibleTime `form:"startDate" binding:"required"`
 	EndDate   FlexibleTime `form:"endDate" binding:"required"`
 	BranchId  string
+	// ExcludeCancelled leaves out cancelled Receives; the handler sets it from
+	// the opt-in `excludeCancelled` query parameter.
+	ExcludeCancelled bool `form:"-"`
 }
 
 type Receive struct {
