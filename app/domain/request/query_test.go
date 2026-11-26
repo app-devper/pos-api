@@ -23,6 +23,8 @@ func TestBoolQueryReadsAnOptInFlag(t *testing.T) {
 		{"empty", "/x?flag=", false, false},
 		{"maybe", "/x?flag=maybe", false, false},
 		{"one", "/x?flag=1", false, false},
+		{"repeated true", "/x?flag=true&flag=true", false, false},
+		{"repeated true then maybe", "/x?flag=true&flag=maybe", false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

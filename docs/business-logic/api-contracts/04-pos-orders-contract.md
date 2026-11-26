@@ -119,7 +119,7 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 
 - ค่าเริ่มต้นคืนทุก Order ในช่วงเวลา รวมใบที่ `CANCELLED` (client แสดงใบที่ยกเลิกพร้อมเครื่องหมาย)
 - `excludeCancelled=true` (opt-in) คืนเฉพาะ Order ที่ยังยืน: `status` เป็น `CONFIRMED`, `ACTIVE` (legacy), ว่าง หรือไม่มี field `status` (legacy)
-- `excludeCancelled` รับ `true` / `false` (ไม่สนตัวพิมพ์); ค่าอื่น → `400 OR-400-001`
+- `excludeCancelled` รับ `true` / `false` (ไม่สนตัวพิมพ์); ค่าอื่น ค่าว่าง (`excludeCancelled=`) หรือส่ง parameter ซ้ำมากกว่าหนึ่งครั้ง → `400 OR-400-001`
 - พารามิเตอร์ boolean ของ query ทุกตัวอ่านด้วย `request.BoolQuery` กติกาเดียวกัน: ไม่ส่ง = `false`
 
 ### 8. Bill Detail (`GET /orders/:orderId`)

@@ -57,15 +57,23 @@ func TestGetOrdersRangePassesExcludeCancelled(t *testing.T) {
 }
 
 func TestGetOrdersRangeRejectsABadExcludeCancelled(t *testing.T) {
-	repo := &orderRangeRepoStub{}
+	for name, query := range map[string]string{
+		"maybe":    "&excludeCancelled=maybe",
+		"empty":    "&excludeCancelled=",
+		"repeated": "&excludeCancelled=true&excludeCancelled=maybe",
+	} {
+		t.Run(name, func(t *testing.T) {
+			repo := &orderRangeRepoStub{}
 
-	w := serveOrdersRange(repo, orderRangeQuery+"&excludeCancelled=maybe")
+			w := serveOrdersRange(repo, orderRangeQuery+query)
 
-	if w.Code != http.StatusBadRequest || len(repo.calls) != 0 {
-		t.Fatalf("status %d calls %+v", w.Code, repo.calls)
-	}
-	body := w.Body.String()
-	if !strings.Contains(body, errcode.OR_BAD_REQUEST_001) || !strings.Contains(body, "excludeCancelled") {
-		t.Fatalf("body %s", body)
+			if w.Code != http.StatusBadRequest || len(repo.calls) != 0 {
+				t.Fatalf("status %d calls %+v", w.Code, repo.calls)
+			}
+			body := w.Body.String()
+			if !strings.Contains(body, errcode.OR_BAD_REQUEST_001) || !strings.Contains(body, "excludeCancelled") {
+				t.Fatalf("body %s", body)
+			}
+		})
 	}
 }
