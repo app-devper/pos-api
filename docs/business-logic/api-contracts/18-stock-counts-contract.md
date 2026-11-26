@@ -23,6 +23,7 @@
 - Response คืนค่า `StockCount` document ที่มี `countNo` (เลขที่อ้างอิง `SC-...`) และทุกบรรทัดที่นับ พร้อม `systemQuantity`, `countedQuantity`, `delta` ต่อบรรทัด
 - บรรทัดที่ `delta != 0` ต้องมี stock adjustment ถูกสร้างขึ้นจริงเบื้องหลัง (ตรวจสอบย้อนหลังได้จาก stock adjustment list ของสินค้านั้น)
 - บรรทัดที่ `delta = 0` ไม่สร้าง adjustment ใดๆ
+- adjustment ของบรรทัดมี `reason` = `นับสต็อก` และ `note` = `<countNo> <note>`; product history ของบรรทัดนั้นต่อ ` — <countNo> <note>` ท้ายข้อความตามกติกา note ของ contract 17 เช่น `ปรับสต็อกสินค้า (นับสต็อก) จำนวน -2 ชิ้น — SC-0001 รอบเย็น` (ไม่มี note → ` — SC-0001`)
 
 ### 2. List / Get Stock Counts
 

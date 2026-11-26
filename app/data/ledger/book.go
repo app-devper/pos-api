@@ -186,6 +186,9 @@ func (b *book) settle(st *entities.ProductStock, incoming int, r *row) error {
 	return nil
 }
 
+// historyNoteSeparator sets a row's note apart from what the ledger wrote.
+const historyNoteSeparator = " — "
+
 // flush writes one history row per Stock touched, with the balance its branch,
 // Product and Unit hold after the whole event.
 func (b *book) flush() error {
@@ -218,6 +221,9 @@ func (b *book) flush() error {
 		}
 		if t.settled > 0 {
 			h.Description += " (ส่งของค้างลูกค้า " + strconv.Itoa(t.settled) + " " + k.unit.Unit + ")"
+		}
+		if h.Note != "" {
+			h.Description += historyNoteSeparator + h.Note
 		}
 		if _, err := b.col("product_histories").InsertOne(b.ctx, entities.ProductHistory{
 			Id: primitive.NewObjectID(), BranchId: st.BranchId, ProductId: st.ProductId,

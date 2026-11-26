@@ -18,6 +18,9 @@ type ProductHistory struct {
 	Balance     int     `json:"balance"`
 	CreatedBy   string  `json:"createdBy"`
 	BranchId    string
+	// Note ends the description of a row the Stock ledger writes, after the
+	// unit and any settlement it appends (book.flush); empty adds nothing.
+	Note string `json:"-"`
 }
 
 func AddProductHistory(productId string, product Product) ProductHistory {
@@ -147,6 +150,7 @@ func AdjustStockHistory(productId string, unit string, adjustment StockAdjustmen
 		Quantity:    adjustment.Delta,
 		Balance:     balance,
 		CreatedBy:   adjustment.CreatedBy,
+		Note:        HistoryNote(adjustment.Note),
 	}
 }
 
