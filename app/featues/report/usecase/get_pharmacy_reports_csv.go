@@ -40,7 +40,7 @@ func GetKHY9CSV(receiveEntity repositories.IReceive, productEntity repositories.
 			EndDate:   req.EndDate,
 			BranchId:  branchId,
 		}
-		receives, err := receiveEntity.GetReceives(receiveRange)
+		receives, err := getKHY9Receives(receiveEntity, receiveRange)
 		if err != nil {
 			errcode.AbortLookup(ctx, err, errcode.RP_BAD_REQUEST_002)
 			return
