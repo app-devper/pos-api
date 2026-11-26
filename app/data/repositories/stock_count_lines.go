@@ -1,64 +1,128 @@
 package repositories
 
 import (
+	"context"
+
+	"pos/app/data/entities"
+
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// namedCountLines resolves, per Count, the names of its Lines' Products, Units
-// and Stocks: one lookup per collection for every Count the read returns, so
-// counts recorded before names were returned are named too. A Product keeps
-// its document when soft-deleted, so it keeps its name; a Line whose Product
-// or Stock has gone is returned with empty names.
-func namedCountLines() []bson.M {
-	return []bson.M{
-		lookupByIds("products", "$items.productId", "_products", bson.M{"name": 1}),
-		lookupByIds("product_stocks", "$items.stockId", "_stocks", bson.M{"lotNumber": 1, "unitId": 1}),
-		lookupByIds("product_units", "$_stocks.unitId", "_units", bson.M{"unit": 1}),
-		{"$addFields": bson.M{"items": bson.M{"$map": bson.M{
-			"input": bson.M{"$ifNull": bson.A{"$items", bson.A{}}},
-			"as":    "line",
-			"in":    namedLine(),
-		}}}},
-		{"$project": bson.M{"_products": 0, "_stocks": 0, "_units": 0}},
+// countNamer are the collections a Count's Lines are named from.
+type countNamer struct {
+	products, stocks, units *mongo.Collection
+}
+
+type lineProduct struct {
+	Id   primitive.ObjectID `bson:"_id"`
+	Name string             `bson:"name"`
+}
+
+type lineStock struct {
+	Id        primitive.ObjectID `bson:"_id"`
+	UnitId    primitive.ObjectID `bson:"unitId"`
+	LotNumber string             `bson:"lotNumber"`
+}
+
+type lineUnit struct {
+	Id   primitive.ObjectID `bson:"_id"`
+	Unit string             `bson:"unit"`
+}
+
+// name returns counts with every Line named at read time: one find by _id per
+// collection for all the counts together, so counts recorded before names
+// were returned are named too. A Product keeps its document when
+// soft-deleted, so it keeps its name; a Line whose Product or Stock has gone
+// gets empty names.
+func (n countNamer) name(ctx context.Context, counts []entities.StockCount) ([]entities.StockCountDetail, error) {
+	productIds, stockIds := lineIds(counts)
+	var products []lineProduct
+	if err := findByIds(ctx, n.products, productIds, bson.M{"name": 1}, &products); err != nil {
+		return nil, err
 	}
+	var stocks []lineStock
+	if err := findByIds(ctx, n.stocks, stockIds, bson.M{"unitId": 1, "lotNumber": 1}, &stocks); err != nil {
+		return nil, err
+	}
+	unitIds := make([]primitive.ObjectID, 0, len(stocks))
+	for _, st := range stocks {
+		unitIds = append(unitIds, st.UnitId)
+	}
+	var units []lineUnit
+	if err := findByIds(ctx, n.units, distinct(unitIds), bson.M{"unit": 1}, &units); err != nil {
+		return nil, err
+	}
+	return namedCounts(counts, products, stocks, units), nil
 }
 
-// lookupByIds joins the documents of a collection whose _id is in ids,
-// keeping only the fields given.
-func lookupByIds(from string, ids string, as string, fields bson.M) bson.M {
-	return bson.M{"$lookup": bson.M{
-		"from": from,
-		"let":  bson.M{"ids": bson.M{"$ifNull": bson.A{ids, bson.A{}}}},
-		"pipeline": bson.A{
-			bson.M{"$match": bson.M{"$expr": bson.M{"$in": bson.A{"$_id", "$$ids"}}}},
-			bson.M{"$project": fields},
-		},
-		"as": as,
-	}}
+// lineIds is the distinct Product and Stock ids over every Line of counts.
+func lineIds(counts []entities.StockCount) ([]primitive.ObjectID, []primitive.ObjectID) {
+	var products, stocks []primitive.ObjectID
+	for _, c := range counts {
+		for _, line := range c.Items {
+			products = append(products, line.ProductId)
+			stocks = append(stocks, line.StockId)
+		}
+	}
+	return distinct(products), distinct(stocks)
 }
 
-// firstWithId is the first element of the joined array whose _id is id
-// (missing when there is none). It sticks to operators older servers know.
-func firstWithId(array string, id any) bson.M {
-	return bson.M{"$arrayElemAt": bson.A{bson.M{"$filter": bson.M{
-		"input": array, "as": "doc", "cond": bson.M{"$eq": bson.A{"$$doc._id", id}},
-	}}, 0}}
+func distinct(ids []primitive.ObjectID) []primitive.ObjectID {
+	seen := map[primitive.ObjectID]bool{}
+	out := make([]primitive.ObjectID, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
-// namedLine is one stored Line ($$line) with productName, unit and lotNumber.
-func namedLine() bson.M {
-	return bson.M{"$let": bson.M{
-		"vars": bson.M{
-			"product": firstWithId("$_products", "$$line.productId"),
-			"stock":   firstWithId("$_stocks", "$$line.stockId"),
-		},
-		"in": bson.M{"$let": bson.M{
-			"vars": bson.M{"unit": firstWithId("$_units", "$$stock.unitId")},
-			"in": bson.M{"$mergeObjects": bson.A{"$$line", bson.M{
-				"productName": bson.M{"$ifNull": bson.A{"$$product.name", ""}},
-				"unit":        bson.M{"$ifNull": bson.A{"$$unit.unit", ""}},
-				"lotNumber":   bson.M{"$ifNull": bson.A{"$$stock.lotNumber", ""}},
-			}}},
-		}},
-	}}
+// findByIds decodes into out the documents whose _id is in ids, with only
+// the fields given; no ids, no query.
+func findByIds(ctx context.Context, col *mongo.Collection, ids []primitive.ObjectID, fields bson.M, out any) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	cursor, err := col.Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(fields))
+	if err != nil {
+		return err
+	}
+	return cursor.All(ctx, out)
+}
+
+// namedCounts builds the read shape of counts from what was found; the
+// loaded counts are left as they are.
+func namedCounts(counts []entities.StockCount, products []lineProduct, stocks []lineStock, units []lineUnit) []entities.StockCountDetail {
+	productName := map[primitive.ObjectID]string{}
+	for _, p := range products {
+		productName[p.Id] = p.Name
+	}
+	unitName := map[primitive.ObjectID]string{}
+	for _, u := range units {
+		unitName[u.Id] = u.Unit
+	}
+	stockById := map[primitive.ObjectID]lineStock{}
+	for _, st := range stocks {
+		stockById[st.Id] = st
+	}
+	details := make([]entities.StockCountDetail, len(counts))
+	for i, c := range counts {
+		lines := make([]entities.StockCountLine, len(c.Items))
+		for j, item := range c.Items {
+			st, found := stockById[item.StockId]
+			line := entities.StockCountLine{StockCountItem: item, ProductName: productName[item.ProductId], LotNumber: st.LotNumber}
+			if found {
+				line.Unit = unitName[st.UnitId]
+			}
+			lines[j] = line
+		}
+		details[i] = entities.StockCountDetail{Id: c.Id, BranchId: c.BranchId, CountNo: c.CountNo, Note: c.Note,
+			Items: lines, CreatedBy: c.CreatedBy, CreatedDate: c.CreatedDate}
+	}
+	return details
 }

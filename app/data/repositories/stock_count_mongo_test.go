@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,18 +14,48 @@ import (
 	"pos/db"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func newStockCountFixture(t *testing.T) (IStockCount, *mongo.Database) {
 	t.Helper()
+	repo, pos, _ := newCountedStockCountFixture(t)
+	return repo, pos
+}
+
+// commandCounter counts the commands a client starts, by name.
+type commandCounter struct {
+	mu    sync.Mutex
+	names map[string]int
+}
+
+func (c *commandCounter) started(_ context.Context, e *event.CommandStartedEvent) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.names[e.CommandName]++
+}
+
+// reads is how many find, aggregate and getMore commands have started since
+// the last reset, and resets the count.
+func (c *commandCounter) reads() map[string]int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	got := map[string]int{"find": c.names["find"], "aggregate": c.names["aggregate"], "getMore": c.names["getMore"]}
+	c.names = map[string]int{}
+	return got
+}
+
+func newCountedStockCountFixture(t *testing.T) (IStockCount, *mongo.Database, *commandCounter) {
+	t.Helper()
 	uri := os.Getenv("MONGO_TEST_URI")
 	if uri == "" {
 		t.Skip("MONGO_TEST_URI not set")
 	}
 	ctx := context.Background()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	counter := &commandCounter{names: map[string]int{}}
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri).SetMonitor(&event.CommandMonitor{Started: counter.started}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +64,7 @@ func newStockCountFixture(t *testing.T) (IStockCount, *mongo.Database) {
 		_ = pos.Drop(ctx)
 		_ = client.Disconnect(ctx)
 	})
-	return NewStockCountEntity(&db.Resource{Client: client, PosDb: pos}), pos
+	return NewStockCountEntity(&db.Resource{Client: client, PosDb: pos}), pos, counter
 }
 
 func insertDoc(t *testing.T, pos *mongo.Database, collection string, doc any) {
@@ -120,4 +151,109 @@ func TestStockCountWithoutLinesReadsAsEmpty(t *testing.T) {
 	if got.CountNo != "SC-0" || len(got.Items) != 0 {
 		t.Fatalf("got %+v, want SC-0 with no Lines", got)
 	}
+}
+
+// countOf inserts a Count in branch, made at, of one Line per stock (each
+// stock of product), and returns its id.
+func countOf(t *testing.T, pos *mongo.Database, branch primitive.ObjectID, no string, at time.Time, product primitive.ObjectID, stocks ...primitive.ObjectID) primitive.ObjectID {
+	t.Helper()
+	lines := make([]entities.StockCountItem, len(stocks))
+	for i, st := range stocks {
+		lines[i] = entities.StockCountItem{ProductId: product, StockId: st, SystemQuantity: i, CountedQuantity: i}
+	}
+	id := primitive.NewObjectID()
+	insertDoc(t, pos, "stock_counts", entities.StockCount{Id: id, BranchId: branch, CountNo: no, CreatedDate: at, Items: lines})
+	return id
+}
+
+// namedStock inserts a Product with one Unit and one Stock in branch.
+func namedStock(t *testing.T, pos *mongo.Database, branch primitive.ObjectID, name, unit, lot string) (primitive.ObjectID, primitive.ObjectID) {
+	t.Helper()
+	product, unitId, stock := primitive.NewObjectID(), primitive.NewObjectID(), primitive.NewObjectID()
+	insertDoc(t, pos, "products", entities.Product{Id: product, Name: name})
+	insertDoc(t, pos, "product_units", entities.ProductUnit{Id: unitId, ProductId: product, Unit: unit})
+	insertDoc(t, pos, "product_stocks", entities.ProductStock{Id: stock, BranchId: branch, ProductId: product, UnitId: unitId, LotNumber: lot})
+	return product, stock
+}
+
+func TestStockCountListIsTheCallersBranchNewestFirstEachLineNamed(t *testing.T) {
+	repo, pos := newStockCountFixture(t)
+	mine, other := primitive.NewObjectID(), primitive.NewObjectID()
+	p1, s1 := namedStock(t, pos, mine, "Paracetamol", "TAB", "L-1")
+	p2, s2 := namedStock(t, pos, mine, "Syrup", "BOT", "L-2")
+	now := time.Now()
+	countOf(t, pos, mine, "SC-1", now.Add(-2*time.Hour), p1, s1)
+	countOf(t, pos, other, "SC-2", now.Add(-time.Hour), p1, s1)
+	countOf(t, pos, mine, "SC-3", now, p2, s2)
+
+	got, err := repo.GetStockCounts(mine.Hex())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].CountNo != "SC-3" || got[1].CountNo != "SC-1" {
+		t.Fatalf("got %+v, want SC-3 then SC-1", got)
+	}
+	if fmt.Sprint(lineNames(got[0].Items)) != fmt.Sprint([]countLineNames{{"Syrup", "BOT", "L-2"}}) ||
+		fmt.Sprint(lineNames(got[1].Items)) != fmt.Sprint([]countLineNames{{"Paracetamol", "TAB", "L-1"}}) {
+		t.Fatalf("lines named %v and %v", lineNames(got[0].Items), lineNames(got[1].Items))
+	}
+}
+
+func TestStockCountNamesEveryLineOfAStockListedTwice(t *testing.T) {
+	repo, pos := newStockCountFixture(t)
+	branch := primitive.NewObjectID()
+	p1, s1 := namedStock(t, pos, branch, "Paracetamol", "TAB", "L-1")
+	_, s2 := namedStock(t, pos, branch, "Syrup", "BOT", "L-2")
+	id := countOf(t, pos, branch, "SC-1", time.Now(), p1, s1, s2, s1)
+
+	got, err := repo.GetStockCountById(id.Hex(), branch.Hex())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []countLineNames{{"Paracetamol", "TAB", "L-1"}, {"Paracetamol", "BOT", "L-2"}, {"Paracetamol", "TAB", "L-1"}}
+	if fmt.Sprint(lineNames(got.Items)) != fmt.Sprint(want) || got.Items[1].StockId != s2 || got.Items[2].SystemQuantity != 2 {
+		t.Fatalf("lines %+v, want named %v in stored order", got.Items, want)
+	}
+}
+
+// Naming costs one query per collection for the whole response, however
+// many Counts it holds: never one lookup per Count.
+func TestStockCountReadsCostTheSameQueriesForOneCountOrMany(t *testing.T) {
+	repo, pos, counter := newCountedStockCountFixture(t)
+	branch := primitive.NewObjectID()
+	p1, s1 := namedStock(t, pos, branch, "Paracetamol", "TAB", "L-1")
+	byCount := map[int]map[string]int{}
+	for _, n := range []int{1, 8} {
+		for len(mustList(t, repo, branch)) < n {
+			countOf(t, pos, branch, "SC", time.Now(), p1, s1)
+		}
+		counter.reads()
+		if got := mustList(t, repo, branch); len(got) != n || got[0].Items[0].ProductName != "Paracetamol" {
+			t.Fatalf("listed %+v, want %d named Counts", got, n)
+		}
+		byCount[n] = counter.reads()
+	}
+	want := map[string]int{"find": 4, "aggregate": 0, "getMore": 0}
+	for n, got := range byCount {
+		if fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Fatalf("listing %d Counts issued %v, want %v (stock_counts, products, product_stocks, product_units)", n, got, want)
+		}
+	}
+	id := countOf(t, pos, branch, "SC-X", time.Now(), p1, s1)
+	counter.reads()
+	if _, err := repo.GetStockCountById(id.Hex(), branch.Hex()); err != nil {
+		t.Fatal(err)
+	}
+	if got := counter.reads(); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("one Count by id issued %v, want %v", got, want)
+	}
+}
+
+func mustList(t *testing.T, repo IStockCount, branch primitive.ObjectID) []entities.StockCountDetail {
+	t.Helper()
+	got, err := repo.GetStockCounts(branch.Hex())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
 }

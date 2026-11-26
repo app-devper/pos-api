@@ -9,10 +9,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type stockCountEntity struct {
 	stockCountRepo *mongo.Collection
+	names          countNamer
 }
 
 type IStockCount interface {
@@ -22,7 +24,11 @@ type IStockCount interface {
 
 func NewStockCountEntity(resource *db.Resource) IStockCount {
 	stockCountRepo := resource.PosDb.Collection("stock_counts")
-	entity := &stockCountEntity{stockCountRepo: stockCountRepo}
+	entity := &stockCountEntity{stockCountRepo: stockCountRepo, names: countNamer{
+		products: resource.PosDb.Collection("products"),
+		stocks:   resource.PosDb.Collection("product_stocks"),
+		units:    resource.PosDb.Collection("product_units"),
+	}}
 	ensureStockCountIndexes(stockCountRepo)
 	return entity
 }
@@ -41,18 +47,15 @@ func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*
 	if err != nil {
 		return nil, err
 	}
-	cursor, err := entity.stockCountRepo.Aggregate(ctx, append([]bson.M{{"$match": filter}}, namedCountLines()...))
+	data := entities.StockCount{}
+	if err := entity.stockCountRepo.FindOne(ctx, filter).Decode(&data); err != nil {
+		return nil, err
+	}
+	named, err := entity.names.name(ctx, []entities.StockCount{data})
 	if err != nil {
 		return nil, err
 	}
-	items := []entities.StockCountDetail{}
-	if err := cursor.All(ctx, &items); err != nil {
-		return nil, err
-	}
-	if len(items) == 0 {
-		return nil, mongo.ErrNoDocuments
-	}
-	return &items[0], nil
+	return &named[0], nil
 }
 
 func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.StockCountDetail, error) {
@@ -67,14 +70,14 @@ func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.Stoc
 		}
 		filter["branchId"] = branchObjID
 	}
-	pipeline := append([]bson.M{{"$match": filter}, {"$sort": bson.D{{Key: "createdDate", Value: -1}}}}, namedCountLines()...)
-	cursor, err := entity.stockCountRepo.Aggregate(ctx, pipeline)
+	opts := options.Find().SetSort(bson.D{{Key: "createdDate", Value: -1}})
+	cursor, err := entity.stockCountRepo.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
-	items := []entities.StockCountDetail{}
+	items := []entities.StockCount{}
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
-	return items, nil
+	return entity.names.name(ctx, items)
 }

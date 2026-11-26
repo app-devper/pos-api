@@ -29,7 +29,7 @@
 
 - List คืนรายการนับทั้งหมดของ branch เรียงจากล่าสุดไปเก่าสุด
 - Get by id คืนรายละเอียดทุกบรรทัดของการนับครั้งนั้น
-- ทั้ง List และ Get by id: ทุกบรรทัดมี `productName`, `unit`, `lotNumber` เพิ่มจาก `productId`, `stockId` (field เพิ่มเติม ไม่มี field เดิมใดหายไป) — ระบบหาชื่อตอนอ่าน (aggregation `$lookup` ครั้งเดียวต่อ collection ต่อคำขอ) ไม่ได้เก็บไว้ในเอกสาร stock count จึงใช้กับการนับที่บันทึกก่อนการเปลี่ยนแปลงนี้ด้วย; สินค้าที่ถูก soft delete ยังคืนชื่อ; บรรทัดที่สินค้าหรือ stock ไม่อยู่แล้วยังคืนอยู่ โดยค่าที่หาไม่ได้เป็น string ว่าง `""`
+- ทั้ง List และ Get by id: ทุกบรรทัดมี `productName`, `unit`, `lotNumber` เพิ่มจาก `productId`, `stockId` (field เพิ่มเติม ไม่มี field เดิมใดหายไป) — ระบบหาชื่อตอนอ่าน: อ่าน stock count ด้วย find เดิม (branch เดียวกัน เรียงใหม่ไปเก่า) แล้วรวม `productId` / `stockId` ของทุกบรรทัดในทุกใบ ค้นด้วย `_id` (`$in`, ใช้ index `_id`) ครั้งเดียวต่อ collection ต่อคำขอ — `products`, `product_stocks` แล้ว `product_units` ของ unit บน stock ที่พบ — ไม่ว่ามีกี่ใบ ไม่ได้เก็บไว้ในเอกสาร stock count จึงใช้กับการนับที่บันทึกก่อนการเปลี่ยนแปลงนี้ด้วย; สินค้าที่ถูก soft delete ยังคืนชื่อ; บรรทัดที่สินค้าหรือ stock ไม่อยู่แล้วยังคืนอยู่ โดยค่าที่หาไม่ได้เป็น string ว่าง `""`
 - Response ของ `POST /stock-counts` คงเดิม (ไม่มีสาม field นี้)
 
 ## Error Cases
