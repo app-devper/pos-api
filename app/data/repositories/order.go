@@ -453,23 +453,7 @@ func (entity *orderEntity) getOrderItemDetailByOrderId(orderId string) ([]entiti
 	if err != nil {
 		return nil, err
 	}
-	cursor, err := entity.orderItemRepo.Aggregate(ctx, []bson.M{
-		{
-			"$match": bson.M{
-				"orderId": objId,
-			},
-		},
-		{
-			"$lookup": bson.M{
-				"from":         "products",
-				"localField":   "productId",
-				"foreignField": "_id",
-				"as":           "product",
-			},
-		},
-		{"$unwind": "$product"},
-	})
-
+	cursor, err := entity.orderItemRepo.Aggregate(ctx, billLinesPipeline(objId))
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +461,31 @@ func (entity *orderEntity) getOrderItemDetailByOrderId(orderId string) ([]entiti
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
-	return items, nil
+	return withLineStatus(items), nil
+}
+
+// billLinesPipeline is every Line of a bill with its Product. A Line whose
+// Product document is gone is still on the bill, with its stored quantity and
+// money and an empty product.
+func billLinesPipeline(orderId primitive.ObjectID) []bson.M {
+	return []bson.M{
+		{"$match": bson.M{"orderId": orderId}},
+		{"$lookup": bson.M{"from": "products", "localField": "productId", "foreignField": "_id", "as": "product"}},
+		{"$unwind": bson.M{"path": "$product", "preserveNullAndEmptyArrays": true}},
+	}
+}
+
+// withLineStatus is the Lines with a stored empty status, which counts as
+// standing, given as CONFIRMED, so every Line a bill returns names its status.
+func withLineStatus(items []entities.OrderItemProductDetail) []entities.OrderItemProductDetail {
+	lines := make([]entities.OrderItemProductDetail, len(items))
+	for i, item := range items {
+		if item.Status == "" {
+			item.Status = constant.CONFIRMED
+		}
+		lines[i] = item
+	}
+	return lines
 }
 
 func (entity *orderEntity) getOrderItemDetailByOrderProductId(orderId string, productId string) (*entities.OrderItemProductDetail, error) {
@@ -757,11 +765,7 @@ func (entity *orderEntity) getOrderItemDetailsByOrderIdWithContext(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	cursor, err := entity.orderItemRepo.Aggregate(ctx, []bson.M{
-		{"$match": bson.M{"orderId": objId}},
-		{"$lookup": bson.M{"from": "products", "localField": "productId", "foreignField": "_id", "as": "product"}},
-		{"$unwind": "$product"},
-	})
+	cursor, err := entity.orderItemRepo.Aggregate(ctx, billLinesPipeline(objId))
 	if err != nil {
 		return nil, err
 	}
@@ -769,7 +773,7 @@ func (entity *orderEntity) getOrderItemDetailsByOrderIdWithContext(ctx context.C
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
-	return items, nil
+	return withLineStatus(items), nil
 }
 
 func (entity *orderEntity) updateTotalOrderByIdWithContext(ctx context.Context, id string) (*entities.Order, error) {

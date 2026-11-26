@@ -101,6 +101,12 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 - `excludeCancelled` รับ `true` / `false` (ไม่สนตัวพิมพ์); ค่าอื่น → `400 OR-400-001`
 - พารามิเตอร์ boolean ของ query ทุกตัวอ่านด้วย `request.BoolQuery` กติกาเดียวกัน: ไม่ส่ง = `false`
 
+### 8. Bill Detail (`GET /orders/:orderId`)
+
+- `items` คือทุกบรรทัดของบิล รวมบรรทัดที่ `CANCELLED`
+- บรรทัดที่เอกสารสินค้าถูกลบไปแล้วยังอยู่ในบิล พร้อม `quantity`, `price`, `costPrice`, `discount` ที่บันทึกไว้; `product` เป็น object ว่าง (ไม่มีชื่อ เพราะบรรทัดไม่ได้เก็บชื่อสินค้าไว้เอง)
+- ทุกบรรทัดมี `status` เสมอ: บรรทัด legacy ที่ไม่มี status หรือ status ว่าง คืนเป็น `CONFIRMED`
+
 ## Endpoints
 
 | Method | Path | คำอธิบาย |
