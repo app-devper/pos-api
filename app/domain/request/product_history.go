@@ -150,6 +150,20 @@ func AdjustStockHistory(productId string, unit string, adjustment StockAdjustmen
 	}
 }
 
+// DeleteProductStockHistory is the row of a Stock brought to zero because its
+// Product was deleted.
+func DeleteProductStockHistory(productId string, unit string, adjustment StockAdjustment, balance int) ProductHistory {
+	return ProductHistory{
+		ProductId:   productId,
+		Type:        constant.HistoryTypeStockAdjustment,
+		Description: "ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน " + strconv.Itoa(adjustment.Delta) + " " + unit,
+		Unit:        unit,
+		Quantity:    adjustment.Delta,
+		Balance:     balance,
+		CreatedBy:   adjustment.CreatedBy,
+	}
+}
+
 func ProductReturnHistory(productId string, unit string, quantity int, reason string, balance int, createdBy string) ProductHistory {
 	return ProductHistory{
 		ProductId:   productId,

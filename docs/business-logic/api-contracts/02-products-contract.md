@@ -33,6 +33,16 @@
 - การลบ `product unit` ต้องถูกปฏิเสธถ้ายังมี stock history หรือ stock records ที่อ้าง `unitId` นั้นอยู่
 - Frontend ควรมอง error กลุ่มนี้เป็น business rule violation ไม่ใช่ transient system error
 
+### 4.1 Product Delete (`DELETE /products/:productId`, branch admin)
+
+- เป็น soft delete: สินค้าได้ `deletedDate` (และ `updatedBy` = ผู้ลบ) แล้วหายจาก product list, product detail และรายงานสต็อก
+- สินค้าที่ยังมีสต็อกลบได้ (frontend ถามยืนยันก่อน): ใน transaction เดียวกัน ทุก `product_stocks` ของสินค้านั้นที่ `quantity != 0` ในทุกสาขาถูกปรับเป็น 0 ผ่าน Stock ledger แบบเดียวกับการปรับสต็อก
+  - แต่ละ stock ได้ `stock_adjustments` หนึ่งใบ: `reason` = `อื่นๆ`, `note` = `ลบสินค้า`, `delta` = `-quantity`, `after` = 0
+  - แต่ละ stock ได้ product history หนึ่งแถว: `ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน <delta> <unit>` (stock ที่ขายเกินจนติดลบได้ delta เป็นบวก)
+  - ถ้าขั้นใดล้มเหลว ไม่มีอะไรเปลี่ยน (สต็อก ใบปรับ ประวัติ และสินค้า)
+- Response: `200` พร้อม product object ที่ถูกลบ (มี `deletedDate`) เหมือนเดิม
+- Errors: product id ไม่ถูกต้อง → `400 PD-400-002`; ไม่พบสินค้าหรือถูกลบไปแล้ว → `404 SY-404-002`; สต็อกเปลี่ยนระหว่างบันทึก → `409 SY-409-001` (ส่งซ้ำได้)
+
 ### 5. Product History / Print-related Data
 
 - Frontend อาจต้องใช้ข้อมูลสินค้าเพื่อสร้าง price tags, price list หรือประวัติสินค้า

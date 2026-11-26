@@ -43,7 +43,6 @@ type IProduct interface {
 	CreateProduct(param request.Product) (*entities.Product, error)
 	CreateProductCatalog(param request.Product) (*entities.Product, error)
 	CreateProductReceive(param request.Product) (*entities.Product, error)
-	RemoveProductById(id string) (*entities.Product, error)
 	UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error)
 	ClearQuantitySoldFirstById(id string) (*entities.Product, error)
 
@@ -597,31 +596,6 @@ func buildGetProductsByIDsFilter(ids []string) (bson.M, error) {
 		"_id":         bson.M{"$in": objIds},
 		"deletedDate": bson.M{"$exists": false},
 	}, nil
-}
-
-func (entity *productEntity) RemoveProductById(id string) (*entities.Product, error) {
-	logrus.Info("RemoveProductById")
-	ctx, cancel := utils.InitContext()
-	defer cancel()
-	objId, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	isReturnNewDoc := options.After
-	opts := &options.FindOneAndUpdateOptions{
-		ReturnDocument: &isReturnNewDoc,
-	}
-	var data entities.Product
-	err = entity.productsRepo.FindOneAndUpdate(ctx,
-		bson.M{"_id": objId, "deletedDate": bson.M{"$exists": false}},
-		bson.M{"$set": bson.M{"deletedDate": now}},
-		opts,
-	).Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-	return &data, nil
 }
 
 func (entity *productEntity) UpdateProductById(id string, param request.UpdateProduct) (*entities.Product, error) {
