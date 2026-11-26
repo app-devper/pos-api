@@ -33,7 +33,8 @@
 
 ### 4.1 สินค้าที่ถูกลบ
 
-- `/dashboard/low-stock`, `/dashboard/stock-report`, `/dashboard/expiring` และ `/dashboard/dead-stock` ไม่แสดงสินค้าที่มี `deletedDate` แม้ stock ของสินค้านั้นยังมี quantity ค้างอยู่ (สินค้าที่ลบก่อนการลบจะปรับสต็อกเป็น 0)
+- `/dashboard/low-stock`, `/dashboard/stock-report`, `/dashboard/expiring` และ `/dashboard/dead-stock` ไม่แสดงสินค้าที่มี `deletedDate` แม้ stock ของสินค้านั้นยังมี quantity ค้างอยู่
+- การลบสินค้าปรับสต็อกของสินค้านั้นเป็น 0 ในทุกสาขา (ดู `02-products-contract.md` §4.1)
 
 ### 5. Expiring Products
 

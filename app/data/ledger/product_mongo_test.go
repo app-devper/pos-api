@@ -146,3 +146,22 @@ func TestDeleteProductRefusesAProductInAPendingTransfer(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteProductLeavesAnOwedLineOwedAndSettlesNothing(t *testing.T) {
+	f := newFixture(t)
+	oversold := f.stock(f.tab, 1, -3)
+	owed := f.owed(f.branch, f.tab, 3)
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := f.line(owed).OversoldQty; got != 3 || f.quantity(oversold) != 0 {
+		t.Fatalf("owed line oversoldQty %d, Stock %d: want 3 still owed and Stock 0", got, f.quantity(oversold))
+	}
+	for _, h := range f.histories() {
+		if strings.Contains(h.Description, "ส่งของค้างลูกค้า") {
+			t.Fatalf("a delete must not settle an owed line, got history %q", h.Description)
+		}
+	}
+}
