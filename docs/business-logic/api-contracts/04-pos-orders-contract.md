@@ -57,6 +57,26 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 - server คำนวณ `total`, `totalCost`, `discount`, `change` เอง; ยอดชำระรวมน้อยกว่า total → `400 OR-400-001`
 - ส่ง `saleId` เดิมซ้ำด้วยเนื้อหาเดิม → คืน Order เดิม (ไม่ตัด stock ซ้ำ ไม่ใช้เลข order ใหม่); เนื้อหาต่างกัน → `409 OR-409-001`
 - Response: `{ "data": Order, "stocks": [ProductStock ที่ถูกตัด] }`
+- `data.id` คือ id ของ Order (ไม่ว่าง) และ `data.code` คือเลขบิลรูปแบบ `OD_` + วันที่ `yyyyMMdd` + ลำดับของวัน 4 หลัก (`^OD_\d{12}$`); ส่ง `saleId` เดิมซ้ำ → `id` และ `code` เดิม
+
+```json
+{
+  "data": {
+    "id": "6b08576e9e2ed487ea2467e8",
+    "branchId": "...",
+    "code": "OD_202611260001",
+    "status": "CONFIRMED",
+    "total": 20,
+    "totalCost": 6,
+    "discount": 0,
+    "type": "CASH",
+    "saleId": "uuid ที่ till ส่งมา",
+    "createdDate": "2026-11-26T09:30:00Z",
+    "payments": [{ "amount": 50, "total": 20, "change": 30, "type": "CASH", "status": "ACTIVE" }]
+  },
+  "stocks": [{ "id": "...", "quantity": 8 }]
+}
+```
 - Request ที่ไม่มี `saleId` ยังใช้ payload เดิม (till ตัดสินราคาและล็อตเอง) จนกว่า till รุ่นเก่าจะหมด
 
 ### 2.2 ความหมายของเงินใน Order
