@@ -93,6 +93,7 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 - ถ้าไม่ส่ง `reason` ระบบยังต้องทำงานได้เพื่อคง backward compatibility กับ client เดิม
 - ถ้าส่ง JSON body มาแต่ parse ไม่ได้ ระบบต้องตอบ `400 bad request` แทนการ ignore body แล้ว cancel ต่อ
 - การ cancel ต้อง reverse stock อย่างสอดคล้อง และ mark payment/item/order เป็น `CANCELLED`
+- ยกเลิกทั้งบิล (`DELETE /orders/:orderId`): บิลที่บันทึกไว้คง `total` / `totalCost` / `discount` เดิม (ยอดที่ขายไป) และมี `status: CANCELLED`; ทุกบรรทัดและทุก payment เป็น `CANCELLED` — client แสดงยอดเดิมแบบขีดฆ่า (ต่างจากยกเลิกทีละบรรทัด ซึ่งคำนวณเงินของบิลใหม่จากบรรทัดที่เหลือ)
 
 ### 7. Order List (`GET /orders?startDate=&endDate=`)
 
