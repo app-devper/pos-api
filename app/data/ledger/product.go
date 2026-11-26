@@ -25,6 +25,7 @@ func (l *Ledger) DeleteProduct(ctx context.Context, productID, by string) (*enti
 		return nil, reject("invalid product id")
 	}
 	result, err := l.run(ctx, func(b *book) (any, error) {
+		b.unitMayBeGone = true
 		if err := b.refuseIfInPendingTransfer(id); err != nil {
 			return nil, err
 		}

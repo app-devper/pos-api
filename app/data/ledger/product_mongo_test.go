@@ -168,3 +168,34 @@ func TestDeleteProductLeavesAnOwedLineOwedAndSettlesNothing(t *testing.T) {
 		}
 	}
 }
+
+// Old data has Stocks whose Unit document is gone. Deleting their Product
+// still zeroes them, with a history row that names no Unit.
+func TestDeleteProductZeroesAStockWhoseUnitIsGone(t *testing.T) {
+	f := newFixture(t)
+	orphan := f.stock(primitive.NewObjectID(), 1, 4)
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	histories := f.histories()
+	if f.quantity(orphan) != 0 || len(histories) != 1 || histories[0].Description != "ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน -4 " || histories[0].Unit != "" {
+		t.Fatalf("Stock %d, histories %+v: want 0 and one row with no Unit", f.quantity(orphan), histories)
+	}
+	if f.productDoc().DeletedDate == nil {
+		t.Fatal("product not marked deleted")
+	}
+}
+
+// Every other event still refuses a Stock whose Unit is gone.
+func TestAdjustStillRefusesAStockWhoseUnitIsGone(t *testing.T) {
+	f := newFixture(t)
+	orphan := f.stock(primitive.NewObjectID(), 1, 4)
+	if _, err := f.ledger.Adjust(context.Background(), f.adjust(orphan, -1)); err == nil || !strings.Contains(err.Error(), "stock unit not found") {
+		t.Fatalf("want stock unit not found, got %v", err)
+	}
+	if f.quantity(orphan) != 4 {
+		t.Fatal("a refused Adjustment moved Stock")
+	}
+}

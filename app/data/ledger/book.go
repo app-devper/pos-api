@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -28,6 +29,10 @@ type book struct {
 	// notOwed are Lines this event must not settle — a Return's own Lines,
 	// whose goods are coming back, not going out.
 	notOwed []primitive.ObjectID
+	// unitMayBeGone lets flush write a row with no Unit name when a Stock's
+	// Unit document is gone. Only deleting a Product sets it: old data has
+	// such Stocks, and the delete must still zero them.
+	unitMayBeGone bool
 }
 
 // row is one product history row the event writes, once, at flush. Most events
@@ -205,8 +210,8 @@ func (b *book) flush() error {
 		k, ok := cache[key]
 		if !ok {
 			k = &known{}
-			if err := b.col("product_units").FindOne(b.ctx, bson.M{"_id": st.UnitId, "productId": st.ProductId}).Decode(&k.unit); err != nil {
-				return fmt.Errorf("stock unit not found: %w", err)
+			if err := b.unitOf(st, &k.unit); err != nil {
+				return err
 			}
 			balance, err := b.balance(st)
 			if err != nil {
@@ -232,6 +237,19 @@ func (b *book) flush() error {
 		}); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// unitOf decodes the Unit of a Stock into unit. A Unit that is gone is an
+// error, unless unitMayBeGone: then unit stays empty.
+func (b *book) unitOf(st *entities.ProductStock, unit *entities.ProductUnit) error {
+	err := b.col("product_units").FindOne(b.ctx, bson.M{"_id": st.UnitId, "productId": st.ProductId}).Decode(unit)
+	if errors.Is(err, mongo.ErrNoDocuments) && b.unitMayBeGone {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("stock unit not found: %w", err)
 	}
 	return nil
 }
