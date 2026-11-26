@@ -25,6 +25,9 @@ func (l *Ledger) DeleteProduct(ctx context.Context, productID, by string) (*enti
 		return nil, reject("invalid product id")
 	}
 	result, err := l.run(ctx, func(b *book) (any, error) {
+		if err := b.refuseIfInPendingTransfer(id); err != nil {
+			return nil, err
+		}
 		product, err := b.markDeleted(id, by)
 		if err != nil {
 			return nil, err
@@ -44,6 +47,20 @@ func (l *Ledger) DeleteProduct(ctx context.Context, productID, by string) (*enti
 		return nil, err
 	}
 	return result.(*entities.Product), nil
+}
+
+// refuseIfInPendingTransfer rejects deleting a Product a pending Transfer
+// holds: its reservation has left the source Stock already, and a reject would
+// put it back into, or an approve open, Stock of a deleted Product.
+func (b *book) refuseIfInPendingTransfer(id primitive.ObjectID) error {
+	n, err := b.col("stock_transfers").CountDocuments(b.ctx, bson.M{"status": transferPending, "items.productId": id})
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return reject("สินค้านี้อยู่ในใบโอนที่รออนุมัติ ลบไม่ได้")
+	}
+	return nil
 }
 
 // markDeleted sets deletedDate on a Product not deleted yet and returns it.

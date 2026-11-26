@@ -108,3 +108,41 @@ func TestDeleteProductChangesNothingWhenAWriteFails(t *testing.T) {
 		t.Fatal("a failed delete must leave Stock, Adjustments and the Product as they were")
 	}
 }
+
+func TestDeleteProductRefusesAProductInAPendingTransfer(t *testing.T) {
+	settle := map[string]func(l *Ledger, id string) (*entities.StockTransfer, error){
+		"approved": func(l *Ledger, id string) (*entities.StockTransfer, error) {
+			return l.ApproveTransfer(context.Background(), id, "manager")
+		},
+		"rejected": func(l *Ledger, id string) (*entities.StockTransfer, error) {
+			return l.RejectTransfer(context.Background(), id, "manager")
+		},
+	}
+	for name, settleTransfer := range settle {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			source := f.stock(f.tab, 1, 5)
+			tr, err := f.ledger.RequestTransfer(context.Background(), f.transfer(primitive.NewObjectID(), source, 3))
+			if err != nil {
+				t.Fatal(err)
+			}
+			historiesBefore := len(f.histories())
+
+			_, err = f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin")
+
+			var rejected *Rejected
+			if !errors.As(err, &rejected) || !strings.Contains(err.Error(), "สินค้านี้อยู่ในใบโอนที่รออนุมัติ ลบไม่ได้") {
+				t.Fatalf("delete during a pending Transfer: want the ledger's rejection, got %v", err)
+			}
+			if f.productDoc().DeletedDate != nil || f.quantity(source) != 2 || len(f.histories()) != historiesBefore || f.count("stock_adjustments", bson.M{}) != 0 {
+				t.Fatal("a refused delete must change nothing")
+			}
+			if _, err := settleTransfer(f.ledger, tr.Id.Hex()); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+				t.Fatalf("delete after the Transfer is %s: %v", name, err)
+			}
+		})
+	}
+}

@@ -69,6 +69,7 @@ func TestDeleteProductByIdMapsLedgerErrors(t *testing.T) {
 	}{
 		{"already deleted", fmt.Errorf("%w: product x", ledger.ErrNotFound), http.StatusNotFound, errcode.SY_NOT_FOUND_002},
 		{"bad id", &ledger.Rejected{Reason: "invalid product id"}, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002},
+		{"in a pending transfer", &ledger.Rejected{Reason: "สินค้านี้อยู่ในใบโอนที่รออนุมัติ ลบไม่ได้"}, http.StatusBadRequest, errcode.PD_BAD_REQUEST_002},
 		{"conflict", ledger.ErrConflict, http.StatusConflict, errcode.SY_CONFLICT_001},
 	}
 	for _, c := range cases {
