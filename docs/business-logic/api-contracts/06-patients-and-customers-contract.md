@@ -15,6 +15,10 @@
 
 - Frontend คาดหวัง list ที่ค้นหาได้และ detail ที่ดูประวัติการซื้อได้
 - Request และ response ต้องรองรับการใช้งานทั้งบนหน้าจัดการและการเลือกไปใช้ใน POS
+- `GET /customers` ค่าเริ่มต้นคืนลูกค้าทุกคน รวมคนที่ `ARCHIVED` (การลบลูกค้า = ตั้ง `status: ARCHIVED`; client แสดงพร้อมเครื่องหมาย)
+- `excludeArchived=true` (opt-in) ตัดลูกค้าที่ `status` เป็น `ARCHIVED` ออก; `ACTIVE`, `INACTIVE`, `DRAFT`, ว่าง หรือไม่มี field `status` (legacy) ยังอยู่
+- `excludeArchived` รับ `true` / `false` (ไม่สนตัวพิมพ์, อ่านด้วย `request.BoolQuery`); ค่าอื่น ค่าว่าง หรือส่งซ้ำ → `400 CU-400-001`
+- `GET /customers/code/:customerCode` ยังหาลูกค้าที่ `ARCHIVED` เจอเสมอ (บิลเก่าอ้าง code นี้อยู่)
 
 ### 2. Patient List / Detail / Medical Data
 
