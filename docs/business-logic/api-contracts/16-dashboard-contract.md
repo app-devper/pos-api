@@ -31,6 +31,10 @@
 - Frontend คาดหวังข้อมูลสรุป stock ทั้งหมดสำหรับภาพรวม
 - Response ควรมี product name, quantity, cost summary
 
+### 4.1 สินค้าที่ถูกลบ
+
+- `/dashboard/low-stock`, `/dashboard/stock-report`, `/dashboard/expiring` และ `/dashboard/dead-stock` ไม่แสดงสินค้าที่มี `deletedDate` แม้ stock ของสินค้านั้นยังมี quantity ค้างอยู่ (สินค้าที่ลบก่อนการลบจะปรับสต็อกเป็น 0)
+
 ### 5. Expiring Products
 
 - Frontend คาดหวังรายการสินค้าที่ใกล้หมดอายุตามจำนวนวันที่กำหนด

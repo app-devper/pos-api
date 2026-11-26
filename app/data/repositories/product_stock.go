@@ -541,6 +541,19 @@ func buildExpiringProductStocksPipeline(param request.GetProductLotsExpireRange,
 	}, nil
 }
 
+// liveProductLookup joins the Product named by field as "product", leaving it
+// out when the Product is deleted so the row drops at the $unwind after it.
+func liveProductLookup(field string) bson.M {
+	return bson.M{"$lookup": bson.M{
+		"from": "products",
+		"let":  bson.M{"pid": field},
+		"pipeline": bson.A{
+			bson.M{"$match": bson.M{"$expr": bson.M{"$eq": bson.A{"$_id", "$$pid"}}, "deletedDate": bson.M{"$exists": false}}},
+		},
+		"as": "product",
+	}}
+}
+
 func (entity *productStockEntity) GetLowStockProducts(threshold int, branchId string) ([]entities.LowStockProduct, error) {
 	logrus.Info("GetLowStockProducts")
 	ctx, cancel := utils.InitContext()
@@ -584,12 +597,7 @@ func buildLowStockProductsPipeline(threshold int, branchId string) ([]bson.M, er
 			"totalStock": bson.M{"$sum": "$quantity"},
 		}},
 		{"$match": bson.M{"totalStock": bson.M{"$lte": threshold}}},
-		{"$lookup": bson.M{
-			"from":         "products",
-			"localField":   "_id.productId",
-			"foreignField": "_id",
-			"as":           "product",
-		}},
+		liveProductLookup("$_id.productId"),
 		{"$unwind": "$product"},
 		{"$lookup": bson.M{
 			"from":         "product_units",
@@ -652,12 +660,7 @@ func buildStockReportPipeline(branchId string) ([]bson.M, error) {
 			"totalStock": bson.M{"$sum": "$quantity"},
 			"totalCost":  bson.M{"$sum": bson.M{"$multiply": bson.A{"$quantity", "$costPrice"}}},
 		}},
-		{"$lookup": bson.M{
-			"from":         "products",
-			"localField":   "_id.productId",
-			"foreignField": "_id",
-			"as":           "product",
-		}},
+		liveProductLookup("$_id.productId"),
 		{"$unwind": "$product"},
 		{"$lookup": bson.M{
 			"from":         "product_units",

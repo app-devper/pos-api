@@ -37,6 +37,11 @@
 - ข้อมูลเภสัชกร (`pharmacistName`) และเลขใบอนุญาต (`licenseNo`) ดึงจาก order entity
 - Response ต้องมี: date, productName, genericName, quantity, unit, strength, dosageForm, dosage, pharmacistName, licenseNo
 
+### 5. Stock Report Excel (`GET /reports/stocks/excel`)
+
+- ใช้ข้อมูลชุดเดียวกับ `/dashboard/stock-report`: สรุป stock ต่อสินค้าและหน่วยในสาขา
+- ไม่รวมสินค้าที่มี `deletedDate` แม้ stock ของสินค้านั้นยังมี quantity ค้างอยู่
+
 ## Error Cases
 
 - missing filters
