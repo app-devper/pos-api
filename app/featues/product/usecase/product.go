@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"net/http"
 	"pos/app/core/errcode"
 	"pos/app/data/entities"
@@ -109,13 +110,18 @@ func GetProductBySerialNumber(productEntity repositories.IProduct) gin.HandlerFu
 	}
 }
 
-func DeleteProductById(productEntity repositories.IProduct) gin.HandlerFunc {
+// productLedger deletes a Product through the Stock ledger, which zeroes the
+// Stock it still holds.
+type productLedger interface {
+	DeleteProduct(ctx context.Context, productID, by string) (*entities.Product, error)
+}
+
+func DeleteProductById(ledger productLedger) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("productId")
-		product, err := productEntity.RemoveProductById(id)
-
+		product, err := ledger.DeleteProduct(ctx.Request.Context(), id, ctx.GetString("UserId"))
 		if err != nil {
-			errcode.AbortWrite(ctx, err, errcode.PD_BAD_REQUEST_002)
+			errcode.AbortLedger(ctx, err, errcode.PD_BAD_REQUEST_002)
 			return
 		}
 

@@ -14,16 +14,21 @@ import (
 
 type stockCountEntity struct {
 	stockCountRepo *mongo.Collection
+	names          countNamer
 }
 
 type IStockCount interface {
-	GetStockCountById(id string, branchId string) (*entities.StockCount, error)
-	GetStockCounts(branchId string) ([]entities.StockCount, error)
+	GetStockCountById(id string, branchId string) (*entities.StockCountDetail, error)
+	GetStockCounts(branchId string) ([]entities.StockCountDetail, error)
 }
 
 func NewStockCountEntity(resource *db.Resource) IStockCount {
 	stockCountRepo := resource.PosDb.Collection("stock_counts")
-	entity := &stockCountEntity{stockCountRepo: stockCountRepo}
+	entity := &stockCountEntity{stockCountRepo: stockCountRepo, names: countNamer{
+		products: resource.PosDb.Collection("products"),
+		stocks:   resource.PosDb.Collection("product_stocks"),
+		units:    resource.PosDb.Collection("product_units"),
+	}}
 	ensureStockCountIndexes(stockCountRepo)
 	return entity
 }
@@ -34,7 +39,7 @@ func ensureStockCountIndexes(repo *mongo.Collection) {
 	})
 }
 
-func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*entities.StockCount, error) {
+func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*entities.StockCountDetail, error) {
 	logrus.Info("GetStockCountById")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -46,10 +51,14 @@ func (entity *stockCountEntity) GetStockCountById(id string, branchId string) (*
 	if err := entity.stockCountRepo.FindOne(ctx, filter).Decode(&data); err != nil {
 		return nil, err
 	}
-	return &data, nil
+	named, err := entity.names.name(ctx, []entities.StockCount{data})
+	if err != nil {
+		return nil, err
+	}
+	return &named[0], nil
 }
 
-func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.StockCount, error) {
+func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.StockCountDetail, error) {
 	logrus.Info("GetStockCounts")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
@@ -70,5 +79,5 @@ func (entity *stockCountEntity) GetStockCounts(branchId string) ([]entities.Stoc
 	if err = cursor.All(ctx, &items); err != nil {
 		return nil, err
 	}
-	return items, nil
+	return entity.names.name(ctx, items)
 }

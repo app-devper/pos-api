@@ -1,0 +1,223 @@
+package ledger
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	"pos/app/data/entities"
+	"pos/app/domain/constant"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+func (f *fixture) productDoc() entities.Product {
+	f.t.Helper()
+	var got entities.Product
+	if err := f.pos.Collection("products").FindOne(context.Background(), bson.M{"_id": f.product}).Decode(&got); err != nil {
+		f.t.Fatal(err)
+	}
+	return got
+}
+
+func TestDeleteProductZeroesEveryStockWithHistoryAndAnAdjustment(t *testing.T) {
+	f := newFixture(t)
+	tabs, boxes, empty := f.stock(f.tab, 1, 5), f.stock(f.box, 1, 2), f.stock(f.tab, 2, 0)
+
+	deleted, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if deleted.DeletedDate == nil || deleted.Id != f.product {
+		t.Fatalf("returned product %+v, want it with deletedDate", deleted)
+	}
+	stored := f.productDoc()
+	if stored.DeletedDate == nil || stored.UpdatedBy != "admin" {
+		t.Fatalf("stored product %+v, want deletedDate and updatedBy admin", stored)
+	}
+	if f.quantity(tabs) != 0 || f.quantity(boxes) != 0 || f.quantity(empty) != 0 {
+		t.Fatal("every Stock must be zero")
+	}
+	want := map[string]bool{"ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน -5 TAB": false, "ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน -2 BOX": false}
+	histories := f.histories()
+	for _, h := range histories {
+		if _, ok := want[h.Description]; ok && h.Balance == 0 && h.CreatedBy == "admin" && h.Type == constant.HistoryTypeStockAdjustment {
+			want[h.Description] = true
+		}
+	}
+	for d, seen := range want {
+		if !seen || len(histories) != 2 {
+			t.Fatalf("want one history row %q (balance 0), got %+v", d, histories)
+		}
+	}
+	for st, delta := range map[primitive.ObjectID]int{tabs: -5, boxes: -2} {
+		if f.count("stock_adjustments", bson.M{"stockId": st, "delta": delta, "after": 0, "reason": constant.AdjustmentReasonOther, "note": "ลบสินค้า"}) != 1 {
+			t.Fatalf("Stock %s: want one Adjustment of %d naming the delete", st.Hex(), delta)
+		}
+	}
+	if f.count("stock_adjustments", bson.M{"stockId": empty}) != 0 {
+		t.Fatal("an empty Stock needs no Adjustment")
+	}
+}
+
+func TestDeleteProductBringsAnOversoldStockUpToZero(t *testing.T) {
+	f := newFixture(t)
+	oversold := f.stock(f.tab, 1, -3)
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	histories := f.histories()
+	if f.quantity(oversold) != 0 || len(histories) != 1 || histories[0].Description != "ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน 3 TAB" {
+		t.Fatalf("Stock %d, histories %+v: want 0 and one row of +3", f.quantity(oversold), histories)
+	}
+}
+
+func TestDeleteProductTwiceIsNotFound(t *testing.T) {
+	f := newFixture(t)
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("second delete: want ErrNotFound, got %v", err)
+	}
+	if _, err := f.ledger.DeleteProduct(context.Background(), primitive.NewObjectID().Hex(), "admin"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown product: want ErrNotFound, got %v", err)
+	}
+	var rejected *Rejected
+	if _, err := f.ledger.DeleteProduct(context.Background(), "nope", "admin"); !errors.As(err, &rejected) {
+		t.Fatalf("bad id: want Rejected, got %v", err)
+	}
+}
+
+func TestDeleteProductChangesNothingWhenAWriteFails(t *testing.T) {
+	f := newFixture(t)
+	tabs, boxes := f.stock(f.tab, 1, 5), f.stock(f.box, 1, 2)
+	f.failInserts("product_histories")
+
+	_, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin")
+
+	if err == nil || !strings.Contains(err.Error(), "validation") {
+		t.Fatalf("want the history insert to fail, got %v", err)
+	}
+	if f.quantity(tabs) != 5 || f.quantity(boxes) != 2 || f.productDoc().DeletedDate != nil || f.count("stock_adjustments", bson.M{}) != 0 {
+		t.Fatal("a failed delete must leave Stock, Adjustments and the Product as they were")
+	}
+}
+
+func TestDeleteProductRefusesAProductInAPendingTransfer(t *testing.T) {
+	settle := map[string]func(l *Ledger, id string) (*entities.StockTransfer, error){
+		"approved": func(l *Ledger, id string) (*entities.StockTransfer, error) {
+			return l.ApproveTransfer(context.Background(), id, "manager")
+		},
+		"rejected": func(l *Ledger, id string) (*entities.StockTransfer, error) {
+			return l.RejectTransfer(context.Background(), id, "manager")
+		},
+	}
+	for name, settleTransfer := range settle {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			source := f.stock(f.tab, 1, 5)
+			tr, err := f.ledger.RequestTransfer(context.Background(), f.transfer(primitive.NewObjectID(), source, 3))
+			if err != nil {
+				t.Fatal(err)
+			}
+			historiesBefore := len(f.histories())
+
+			_, err = f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin")
+
+			var rejected *Rejected
+			if !errors.As(err, &rejected) || !strings.Contains(err.Error(), "สินค้านี้อยู่ในใบโอนที่รออนุมัติ ลบไม่ได้") {
+				t.Fatalf("delete during a pending Transfer: want the ledger's rejection, got %v", err)
+			}
+			if f.productDoc().DeletedDate != nil || f.quantity(source) != 2 || len(f.histories()) != historiesBefore || f.count("stock_adjustments", bson.M{}) != 0 {
+				t.Fatal("a refused delete must change nothing")
+			}
+			if _, err := settleTransfer(f.ledger, tr.Id.Hex()); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+				t.Fatalf("delete after the Transfer is %s: %v", name, err)
+			}
+		})
+	}
+}
+
+func TestDeleteProductLeavesAnOwedLineOwedAndSettlesNothing(t *testing.T) {
+	f := newFixture(t)
+	oversold := f.stock(f.tab, 1, -3)
+	// Goods of the same Unit and branch, so a settlement run by mistake
+	// would have something to deliver to the owed line.
+	held := f.stock(f.tab, 2, 5)
+	owed := f.owed(f.branch, f.tab, 3)
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := f.line(owed).OversoldQty; got != 3 || f.quantity(oversold) != 0 || f.quantity(held) != 0 {
+		t.Fatalf("owed line oversoldQty %d, Stocks %d and %d: want 3 still owed and both Stocks 0", got, f.quantity(oversold), f.quantity(held))
+	}
+	for _, h := range f.histories() {
+		if strings.Contains(h.Description, "ส่งของค้างลูกค้า") {
+			t.Fatalf("a delete must not settle an owed line, got history %q", h.Description)
+		}
+	}
+}
+
+// Old data has Stocks whose Unit document is gone. Deleting their Product
+// still zeroes them, with a history row that names no Unit.
+func TestDeleteProductZeroesAStockWhoseUnitIsGone(t *testing.T) {
+	f := newFixture(t)
+	orphan := f.stock(primitive.NewObjectID(), 1, 4)
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	histories := f.histories()
+	if f.quantity(orphan) != 0 || len(histories) != 1 || histories[0].Description != "ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน -4 " || histories[0].Unit != "" {
+		t.Fatalf("Stock %d, histories %+v: want 0 and one row with no Unit", f.quantity(orphan), histories)
+	}
+	if f.productDoc().DeletedDate == nil {
+		t.Fatal("product not marked deleted")
+	}
+}
+
+// Every other event still refuses a Stock whose Unit is gone.
+func TestAdjustStillRefusesAStockWhoseUnitIsGone(t *testing.T) {
+	f := newFixture(t)
+	orphan := f.stock(primitive.NewObjectID(), 1, 4)
+	if _, err := f.ledger.Adjust(context.Background(), f.adjust(orphan, -1)); err == nil || !strings.Contains(err.Error(), "stock unit not found") {
+		t.Fatalf("want stock unit not found, got %v", err)
+	}
+	if f.quantity(orphan) != 4 {
+		t.Fatal("a refused Adjustment moved Stock")
+	}
+}
+
+// A Stock row with no number for its quantity reads as 0: it needs no
+// Adjustment, no code and no history row.
+func TestDeleteProductSkipsAStockWithNoNumericQuantity(t *testing.T) {
+	f := newFixture(t)
+	held := f.stock(f.tab, 1, 2)
+	for _, quantity := range []any{nil, "n/a"} {
+		doc := bson.M{"_id": primitive.NewObjectID(), "branchId": f.branch, "productId": f.product, "unitId": f.tab, "sequence": 9}
+		if quantity != nil {
+			doc["quantity"] = quantity
+		}
+		f.insert("product_stocks", doc)
+	}
+
+	if _, err := f.ledger.DeleteProduct(context.Background(), f.product.Hex(), "admin"); err != nil {
+		t.Fatal(err)
+	}
+
+	if f.quantity(held) != 0 || f.count("stock_adjustments", bson.M{}) != 1 || len(f.histories()) != 1 {
+		t.Fatalf("adjustments %d, histories %+v: want one each, for the Stock that held 2", f.count("stock_adjustments", bson.M{}), f.histories())
+	}
+}

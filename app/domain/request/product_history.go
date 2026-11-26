@@ -18,6 +18,9 @@ type ProductHistory struct {
 	Balance     int     `json:"balance"`
 	CreatedBy   string  `json:"createdBy"`
 	BranchId    string
+	// Note ends the description of a row the Stock ledger writes, after the
+	// unit and any settlement it appends (book.flush); empty adds nothing.
+	Note string `json:"-"`
 }
 
 func AddProductHistory(productId string, product Product) ProductHistory {
@@ -143,6 +146,21 @@ func AdjustStockHistory(productId string, unit string, adjustment StockAdjustmen
 		ProductId:   productId,
 		Type:        constant.HistoryTypeStockAdjustment,
 		Description: "ปรับสต็อกสินค้า (" + adjustment.Reason + ") จำนวน " + strconv.Itoa(adjustment.Delta) + " " + unit,
+		Unit:        unit,
+		Quantity:    adjustment.Delta,
+		Balance:     balance,
+		CreatedBy:   adjustment.CreatedBy,
+		Note:        HistoryNote(adjustment.Note),
+	}
+}
+
+// DeleteProductStockHistory is the row of a Stock brought to zero because its
+// Product was deleted.
+func DeleteProductStockHistory(productId string, unit string, adjustment StockAdjustment, balance int) ProductHistory {
+	return ProductHistory{
+		ProductId:   productId,
+		Type:        constant.HistoryTypeStockAdjustment,
+		Description: "ลบสินค้า: ปรับสต็อกเป็น 0 จำนวน " + strconv.Itoa(adjustment.Delta) + " " + unit,
 		Unit:        unit,
 		Quantity:    adjustment.Delta,
 		Balance:     balance,

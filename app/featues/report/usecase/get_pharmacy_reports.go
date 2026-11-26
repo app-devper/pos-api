@@ -111,13 +111,30 @@ type pharmacyReportResponse struct {
 	Items     []pharmacyReportItem `json:"items"`
 }
 
+// getKHY9Receives reads the Receives the purchase report counts: every one in
+// the range except a cancelled one (a legacy Receive without a status counts).
+// The JSON and CSV paths both read through it.
+func getKHY9Receives(receiveEntity repositories.IReceive, receiveRange request.GetReceiveRange) ([]entities.Receive, error) {
+	receives, err := receiveEntity.GetReceives(receiveRange)
+	if err != nil {
+		return nil, err
+	}
+	counted := make([]entities.Receive, 0, len(receives))
+	for _, recv := range receives {
+		if recv.Status != constant.CANCELLED {
+			counted = append(counted, recv)
+		}
+	}
+	return counted, nil
+}
+
 func getKHY9Items(receiveEntity repositories.IReceive, productEntity repositories.IProduct, supplierEntity repositories.ISupplier, branchId string, req pharmacyReportRange) ([]pharmacyReportItem, error) {
 	receiveRange := request.GetReceiveRange{
 		StartDate: request.NewFlexibleTime(req.StartDate.Time),
 		EndDate:   request.NewFlexibleTime(req.EndDate.Time),
 		BranchId:  branchId,
 	}
-	receives, err := receiveEntity.GetReceives(receiveRange)
+	receives, err := getKHY9Receives(receiveEntity, receiveRange)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// excludeCancelledParam opts the list out of cancelled Orders; without it the
+// list is every Order in the range, cancelled ones included.
+const excludeCancelledParam = "excludeCancelled"
+
 func GetOrdersRange(orderEntity repositories.IOrder) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		req := request.GetOrderRange{}
@@ -16,6 +20,12 @@ func GetOrdersRange(orderEntity repositories.IOrder) gin.HandlerFunc {
 			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, err.Error())
 			return
 		}
+		excludeCancelled, ok := request.BoolQuery(ctx, excludeCancelledParam)
+		if !ok {
+			errcode.Abort(ctx, http.StatusBadRequest, errcode.OR_BAD_REQUEST_001, excludeCancelledParam+" must be true or false")
+			return
+		}
+		req.ExcludeCancelled = excludeCancelled
 		req.BranchId = ctx.GetString("BranchId")
 		result, err := orderEntity.GetOrderRange(req)
 		if err != nil {

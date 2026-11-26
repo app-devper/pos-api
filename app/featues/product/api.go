@@ -41,7 +41,7 @@ func ApplyProductAPI(
 	)
 
 	branchAdmin.DELETE("/:productId",
-		usecase.DeleteProductById(repository.Product),
+		usecase.DeleteProductById(repository.Ledger),
 	)
 
 	branchAdmin.DELETE("/:productId/sold-first",

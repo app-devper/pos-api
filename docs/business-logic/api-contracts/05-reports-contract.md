@@ -33,9 +33,15 @@
 - CSV ยังคงมาจาก backend flow
 - Backend ต้องแยกแหล่งข้อมูลให้ถูก:
   - KHY9: receives (เอกสารรับสินค้า) กรองด้วย `product.DrugRegistrations` contains "KHY9"
+    - ไม่นับเอกสารที่ `status` เป็น `CANCELLED` เสมอ ทั้ง `/data` และ `/csv` (กติกาเดียวกัน); `IMPORTED`, `ACTIVE` (ร่าง) และเอกสาร legacy ที่ไม่มี `status` ยังถูกนับ
   - KHY10-13: orders (order_items joined with products) กรองด้วย `product.DrugRegistrations` contains "KHY10"-"KHY13"
 - ข้อมูลเภสัชกร (`pharmacistName`) และเลขใบอนุญาต (`licenseNo`) ดึงจาก order entity
 - Response ต้องมี: date, productName, genericName, quantity, unit, strength, dosageForm, dosage, pharmacistName, licenseNo
+
+### 5. Stock Report Excel (`GET /reports/stocks/excel`)
+
+- ใช้ข้อมูลชุดเดียวกับ `/dashboard/stock-report`: สรุป stock ต่อสินค้าและหน่วยในสาขา
+- ไม่รวมสินค้าที่มี `deletedDate` แม้ stock ของสินค้านั้นยังมี quantity ค้างอยู่
 
 ## Error Cases
 

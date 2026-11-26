@@ -18,7 +18,7 @@ type stockCountByIdStub struct {
 	gotBranch string
 }
 
-func (s *stockCountByIdStub) GetStockCountById(id string, branchId string) (*entities.StockCount, error) {
+func (s *stockCountByIdStub) GetStockCountById(id string, branchId string) (*entities.StockCountDetail, error) {
 	s.gotBranch = branchId
 	return nil, mongo.ErrNoDocuments
 }
