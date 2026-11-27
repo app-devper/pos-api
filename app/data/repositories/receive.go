@@ -132,6 +132,10 @@ func (entity *receiveEntity) GetReceives(form request.GetReceiveRange) (items []
 		}
 		filter["branchId"] = branchObjId
 	}
+	if form.ExcludeCancelled {
+		// A legacy Receive without a status stays in.
+		filter["status"] = bson.M{"$ne": constant.CANCELLED}
+	}
 	cursor, err := entity.receiveRepo.Find(ctx, filter)
 	if err != nil {
 		return nil, err

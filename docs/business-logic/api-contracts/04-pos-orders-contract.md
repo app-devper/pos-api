@@ -57,6 +57,26 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 - server คำนวณ `total`, `totalCost`, `discount`, `change` เอง; ยอดชำระรวมน้อยกว่า total → `400 OR-400-001`
 - ส่ง `saleId` เดิมซ้ำด้วยเนื้อหาเดิม → คืน Order เดิม (ไม่ตัด stock ซ้ำ ไม่ใช้เลข order ใหม่); เนื้อหาต่างกัน → `409 OR-409-001`
 - Response: `{ "data": Order, "stocks": [ProductStock ที่ถูกตัด] }`
+- `data.id` คือ id ของ Order (ไม่ว่าง) และ `data.code` คือเลขบิลรูปแบบ `OD_` + วันที่ `yyyyMMdd` + ลำดับของวัน 4 หลัก (`^OD_\d{12}$`); ส่ง `saleId` เดิมซ้ำ → `id` และ `code` เดิม
+
+```json
+{
+  "data": {
+    "id": "6b08576e9e2ed487ea2467e8",
+    "branchId": "...",
+    "code": "OD_202611260001",
+    "status": "CONFIRMED",
+    "total": 20,
+    "totalCost": 6,
+    "discount": 0,
+    "type": "CASH",
+    "saleId": "uuid ที่ till ส่งมา",
+    "createdDate": "2026-11-26T09:30:00Z",
+    "payments": [{ "amount": 50, "total": 20, "change": 30, "type": "CASH", "status": "ACTIVE" }]
+  },
+  "stocks": [{ "id": "...", "quantity": 8 }]
+}
+```
 - Request ที่ไม่มี `saleId` ยังใช้ payload เดิม (till ตัดสินราคาและล็อตเอง) จนกว่า till รุ่นเก่าจะหมด
 
 ### 2.2 ความหมายของเงินใน Order
@@ -93,13 +113,27 @@ Till ส่งเฉพาะสิ่งที่แคชเชียร์เ
 - ถ้าไม่ส่ง `reason` ระบบยังต้องทำงานได้เพื่อคง backward compatibility กับ client เดิม
 - ถ้าส่ง JSON body มาแต่ parse ไม่ได้ ระบบต้องตอบ `400 bad request` แทนการ ignore body แล้ว cancel ต่อ
 - การ cancel ต้อง reverse stock อย่างสอดคล้อง และ mark payment/item/order เป็น `CANCELLED`
+- ยกเลิกทั้งบิล (`DELETE /orders/:orderId`): บิลที่บันทึกไว้คง `total` / `totalCost` / `discount` เดิม (ยอดที่ขายไป) และมี `status: CANCELLED`; ทุกบรรทัดและทุก payment เป็น `CANCELLED` — client แสดงยอดเดิมแบบขีดฆ่า (ต่างจากยกเลิกทีละบรรทัด ซึ่งคำนวณเงินของบิลใหม่จากบรรทัดที่เหลือ)
+
+### 7. Order List (`GET /orders?startDate=&endDate=`)
+
+- ค่าเริ่มต้นคืนทุก Order ในช่วงเวลา รวมใบที่ `CANCELLED` (client แสดงใบที่ยกเลิกพร้อมเครื่องหมาย)
+- `excludeCancelled=true` (opt-in) คืนเฉพาะ Order ที่ยังยืน: `status` เป็น `CONFIRMED`, `ACTIVE` (legacy), ว่าง หรือไม่มี field `status` (legacy)
+- `excludeCancelled` รับ `true` / `false` (ไม่สนตัวพิมพ์); ค่าอื่น ค่าว่าง (`excludeCancelled=`) หรือส่ง parameter ซ้ำมากกว่าหนึ่งครั้ง → `400 OR-400-001`
+- พารามิเตอร์ boolean ของ query ทุกตัวอ่านด้วย `request.BoolQuery` กติกาเดียวกัน: ไม่ส่ง = `false`
+
+### 8. Bill Detail (`GET /orders/:orderId`)
+
+- `items` คือทุกบรรทัดของบิล รวมบรรทัดที่ `CANCELLED`
+- บรรทัดที่เอกสารสินค้าถูกลบไปแล้วยังอยู่ในบิล พร้อม `quantity`, `price`, `costPrice`, `discount` ที่บันทึกไว้; `product` เป็น product object ที่ทุก field เป็นค่าศูนย์ (`id` เป็นเลข 0 ยาว 24 ตัว `"000000000000000000000000"`, `name` ว่าง, `createdDate` เป็น `"0001-01-01T00:00:00Z"`) ไม่ใช่ object ว่าง เพราะบรรทัดไม่ได้เก็บชื่อสินค้าไว้เอง; บรรทัดยังคง quantity และยอดเงินของตัวเอง
+- ทุกบรรทัดมี `status` เสมอ: บรรทัด legacy ที่ไม่มี status หรือ status ว่าง คืนเป็น `CONFIRMED`
 
 ## Endpoints
 
 | Method | Path | คำอธิบาย |
 |---|---|---|
 | POST | /orders | สร้าง order ใหม่ |
-| GET | /orders | ดูรายการ orders |
+| GET | /orders | ดูรายการ orders (`startDate`, `endDate`, optional `excludeCancelled=true`) |
 | GET | /orders/:orderId | ดูรายละเอียด order |
 | DELETE | /orders/:orderId | ยกเลิก order ทั้งใบ พร้อมรับ optional body `{ "reason": "..." }` |
 | PATCH | /orders/:orderId/customer-code | อัปเดต customer code |

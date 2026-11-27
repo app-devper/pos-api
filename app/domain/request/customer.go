@@ -23,3 +23,9 @@ type UpdateCustomerStatus struct {
 	Status    string `json:"status" binding:"required"`
 	UpdatedBy string
 }
+
+type GetCustomers struct {
+	// ExcludeArchived leaves out archived Customers; the handler sets it from
+	// the opt-in `excludeArchived` query parameter.
+	ExcludeArchived bool
+}

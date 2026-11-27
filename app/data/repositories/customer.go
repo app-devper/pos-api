@@ -21,7 +21,7 @@ type customerEntity struct {
 
 type ICustomer interface {
 	CreateIndex() (string, error)
-	GetCustomerAll() ([]entities.Customer, error)
+	GetCustomerAll(form request.GetCustomers) ([]entities.Customer, error)
 	CreateCustomer(form request.Customer) (*entities.Customer, error)
 	GetCustomerById(id string) (*entities.Customer, error)
 	GetCustomerByCode(code string) (*entities.Customer, error)
@@ -37,12 +37,17 @@ func NewCustomerEntity(resource *db.Resource) ICustomer {
 	return entity
 }
 
-func (entity *customerEntity) GetCustomerAll() ([]entities.Customer, error) {
+func (entity *customerEntity) GetCustomerAll(form request.GetCustomers) ([]entities.Customer, error) {
 	logrus.Info("GetCustomerAll")
 	ctx, cancel := utils.InitContext()
 	defer cancel()
+	filter := bson.M{}
+	if form.ExcludeArchived {
+		// A legacy Customer without a status stays in.
+		filter["status"] = bson.M{"$ne": constant.ARCHIVED}
+	}
 	var items []entities.Customer
-	cursor, err := entity.customerRepo.Find(ctx, bson.M{})
+	cursor, err := entity.customerRepo.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

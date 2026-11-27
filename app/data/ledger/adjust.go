@@ -96,14 +96,22 @@ func (l *Ledger) Count(ctx context.Context, req request.StockCount) (*entities.S
 	return result.(*entities.StockCount), nil
 }
 
+// adjustmentHistory builds the history row of an Adjustment.
+type adjustmentHistory func(productId string, unit string, adjustment request.StockAdjustment, balance int) request.ProductHistory
+
 // adjust records one Adjustment. Before/After describe the correction itself;
 // any settlement it triggers is recorded on the Lines it served.
 func (b *book) adjust(st *entities.ProductStock, req request.StockAdjustment) (*entities.StockAdjustment, error) {
+	return b.adjustWith(st, req, request.AdjustStockHistory)
+}
+
+// adjustWith records one Adjustment whose history row describe writes.
+func (b *book) adjustWith(st *entities.ProductStock, req request.StockAdjustment, describe adjustmentHistory) (*entities.StockAdjustment, error) {
 	before := st.Quantity
 	if err := b.change(st, req.Delta, func(qty int) request.ProductHistory {
 		r := req
 		r.Delta = qty
-		return request.AdjustStockHistory(st.ProductId.Hex(), "", r, 0)
+		return describe(st.ProductId.Hex(), "", r, 0)
 	}); err != nil {
 		return nil, err
 	}
